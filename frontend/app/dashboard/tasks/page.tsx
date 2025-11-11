@@ -96,7 +96,8 @@ export default function TasksPage() {
   const [isDrawerOpen, setIsDrawerOpen] = React.useState(false);
 
 
-  const columns = getTaskColumns(); // no args needed
+  // L-KHELL L-JDID:
+  const columns = getTaskColumns(setSelectedTask, setIsDrawerOpen);
 
 
   console.log("🔍 DEBUG INFO:");
