@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react"; // <-- Add this
-import { TasksTable, getTaskColumns } from "./tasks-table";
+import { TasksTable, getTaskColumns, type Task } from "./tasks-table";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
