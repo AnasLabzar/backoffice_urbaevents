@@ -165,6 +165,7 @@ export default function TasksPage() {
                   </div>
                 ) : (
                   <TasksTable
+                    data={tasksData?.myTasks || []} // <-- ZEDNA HADI
                     columns={columns}
                     selectedTask={selectedTask}
                     setSelectedTask={setSelectedTask}

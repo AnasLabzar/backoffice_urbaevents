@@ -499,12 +499,24 @@ export const getTaskColumns = (
     },
   ];
 
-// --- Main Tasks Table Component ---
+// L-KHELL L-JDID:
 interface TasksTableProps {
-  // columns: ColumnDef<Task>[];
+  data: Task[]; // <-- ZID HADA HNA
+  columns: ColumnDef<Task>[];
+  selectedTask: Task | null;
+  setSelectedTask: React.Dispatch<React.SetStateAction<Task | null>>;
+  isDrawerOpen: boolean;
+  setIsDrawerOpen: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
-export function TasksTable(/* { columns }: TasksTableProps */) {
+export function TasksTable({
+  data, // <-- ZID HADA HNA
+  columns,
+  selectedTask,
+  setSelectedTask,
+  isDrawerOpen,
+  setIsDrawerOpen,
+}: TasksTableProps) {
   const [rowSelection, setRowSelection] = React.useState({});
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
@@ -542,7 +554,7 @@ export function TasksTable(/* { columns }: TasksTableProps */) {
 
   // Table setup
   const table = useReactTable({
-    data: data, // ✅ Use the memoized data
+    data: data, // <-- T2KKED MN HADI
     columns,
     state: {
       sorting,
