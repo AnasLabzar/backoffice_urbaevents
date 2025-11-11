@@ -405,7 +405,7 @@ function ProjectLogsSheet({ project }: { project: any }) {
 // 8. COMPOSANT JDID: TASKS SHEET (Panier dyal l-Tâches)
 // =======================================================================
 function ProjectTasksSheet({ project }: { project: any }) {
-    const isMobile = useIsMobile(false); 
+    const isMobile = useIsMobile(); 
     const [isOpen, setIsOpen] = React.useState(false);
     
     // KANSTA3MLO QUERY JDID
