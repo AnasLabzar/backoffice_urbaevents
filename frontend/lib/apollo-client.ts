@@ -5,7 +5,7 @@ import { setContext } from "@apollo/client/link/context";
 
 // Rg3nah l-createHttpLink l-3adi
 const httpLink = createHttpLink({
-  uri: "http://localhost:5001/graphql",
+  uri: "https://backoffice.urbagroupe.ma/graphql",
 });
 
 const authLink = setContext((_, { headers }) => {

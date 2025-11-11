@@ -234,7 +234,7 @@ function ProjectTimeline({ tasks = [], logs = [] }: { tasks: any[], logs: any[] 
                                         <div className="flex flex-col gap-1.5">
                                             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Versions (V1):</span>
                                             {item.data.v1Uploads.map((upload: any) => (
-                                                <a key={upload.id} href={`http://localhost:5001/${upload.fileUrl}`} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:underline flex items-center gap-2">
+                                                <a key={upload.id} href={`https://backoffice.urbagroupe.ma/${upload.fileUrl}`} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:underline flex items-center gap-2">
                                                     <IconUpload className="h-3 w-3" />
                                                     {upload.originalFileName} ({formatDate(parseDate(upload.createdAt), "p")})
                                                 </a>
@@ -244,7 +244,7 @@ function ProjectTimeline({ tasks = [], logs = [] }: { tasks: any[], logs: any[] 
                                     {item.data.finalUpload && (
                                         <div className="flex flex-col gap-1.5">
                                             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Version Finale:</span>
-                                            <a key={item.data.finalUpload.id} href={`http://localhost:5001/${item.data.finalUpload.fileUrl}`} target="_blank" rel="noopener noreferrer" className="text-xs text-green-400 hover:underline flex items-center gap-2">
+                                            <a key={item.data.finalUpload.id} href={`https://backoffice.urbagroupe.ma/${item.data.finalUpload.fileUrl}`} target="_blank" rel="noopener noreferrer" className="text-xs text-green-400 hover:underline flex items-center gap-2">
                                                 <IconCircleCheck className="h-3 w-3" />
                                                 {item.data.finalUpload.originalFileName} ({formatDate(parseDate(item.data.finalUpload.createdAt), "p")})
                                             </a>

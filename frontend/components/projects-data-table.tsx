@@ -452,7 +452,7 @@ const FileStatusCell = ({ row, docType }: { row: any, docType: string }) => {
     // For other roles: Show download button if file exists
     if (file && file.fileUrl) {
         // FIX: Properly construct the download URL
-        const downloadUrl = `http://localhost:5001/${file.fileUrl}`;
+        const downloadUrl = `https://backoffice.urbagroupe.ma/${file.fileUrl}`;
 
         return (
             <a
@@ -1103,7 +1103,7 @@ function TaskChecklistPanel({ project }: { project: Project }) {
         try {
             toast.loading(`Uploading ${file.name}...`);
             // Nst3mlo l-endpoint l-3adi dyal l-projet
-            const response = await fetch(`http://localhost:5001/api/upload/${project.id}`, { method: 'POST', body: formDataRest });
+            const response = await fetch(`https://backoffice.urbagroupe.ma/api/upload/${project.id}`, { method: 'POST', body: formDataRest });
             if (!response.ok) throw new Error('File upload failed.');
             const result = await response.json();
             const fileUrl = result.fileUrl;
@@ -1489,7 +1489,7 @@ function TableCellViewer({ item }: { item: Project }) {
         formDataRest.append('file', file);
         try {
             toast.loading(`Uploading ${file.name}...`);
-            const response = await fetch(`http://localhost:5001/api/upload/${projectId}`, { method: 'POST', body: formDataRest });
+            const response = await fetch(`https://backoffice.urbagroupe.ma/api/upload/${projectId}`, { method: 'POST', body: formDataRest });
             if (!response.ok) throw new Error('File upload failed.');
             const result = await response.json();
             const fileUrl = result.fileUrl;

@@ -489,7 +489,7 @@ function ProjectTasksSheet({ project }: { project: any }) {
                                             <div className="flex flex-col gap-1.5">
                                                 <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Versions (V1):</span>
                                                 {task.v1Uploads.map((upload: any) => (
-                                                    <a key={upload.id} href={`http://localhost:5001/${upload.fileUrl}`} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:underline flex items-center gap-2">
+                                                    <a key={upload.id} href={`https://backoffice.urbagroupe.ma/${upload.fileUrl}`} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:underline flex items-center gap-2">
                                                         <IconUpload className="h-3 w-3"/>
                                                         {upload.originalFileName} ({formatDate(parseDate(upload.createdAt), "p")})
                                                     </a>
@@ -499,7 +499,7 @@ function ProjectTasksSheet({ project }: { project: any }) {
                                         {task.finalUpload && (
                                             <div className="flex flex-col gap-1.5">
                                                 <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Version Finale:</span>
-                                                <a key={task.finalUpload.id} href={`http://localhost:5001/${task.finalUpload.fileUrl}`} target="_blank" rel="noopener noreferrer" className="text-xs text-green-400 hover:underline flex items-center gap-2">
+                                                <a key={task.finalUpload.id} href={`https://backoffice.urbagroupe.ma/${task.finalUpload.fileUrl}`} target="_blank" rel="noopener noreferrer" className="text-xs text-green-400 hover:underline flex items-center gap-2">
                                                     <IconCircleCheck className="h-3 w-3"/>
                                                     {task.finalUpload.originalFileName} ({formatDate(parseDate(task.finalUpload.createdAt), "p")})
                                                 </a>
