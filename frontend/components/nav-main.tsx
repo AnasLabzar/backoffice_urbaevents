@@ -47,27 +47,26 @@ export function NavMain({ items }: NavMainProps) {
       <SidebarGroupContent className="flex flex-col gap-2">
         <SidebarMenu>
           {items.map((item) => (
-            <Collapsible
-              key={item.title}
-              asChild
-              defaultOpen={item.items ? true : undefined}
-            >
-              <SidebarMenuItem>
-                <CollapsibleTrigger asChild>
-                  <SidebarMenuButton
-                    tooltip={item.title}
-                    className={cn(
-                      pathname === item.url && "bg-accent text-accent-foreground"
-                    )}
-                  >
-                    <item.icon />
-                    <span>{item.title}</span>
-                    {item.items && (
+            // --- HNA L-MODIFICATION ---
+            // 1. Checki wach 3ndo submenu
+            item.items && item.items.length > 0 ? (
+              // 2. ILA 3NDO: Khlli l-code l-qdim (Collapsible)
+              <Collapsible
+                key={item.title}
+                asChild
+                defaultOpen={true} // Bghina l-menu ykon m7loul
+              >
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton
+                      tooltip={item.title}
+                    // 7eyyedna l-check dyal pathname mn hna
+                    >
+                      <item.icon />
+                      <span>{item.title}</span>
                       <ChevronRight className="ml-auto transition-transform duration-200" />
-                    )}
-                  </SidebarMenuButton>
-                </CollapsibleTrigger>
-                {item.items && (
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
                   <CollapsibleContent>
                     <SidebarMenuSub>
                       {item.items.map((subItem) => (
@@ -86,9 +85,26 @@ export function NavMain({ items }: NavMainProps) {
                       ))}
                     </SidebarMenuSub>
                   </CollapsibleContent>
-                )}
+                </SidebarMenuItem>
+              </Collapsible>
+            ) : (
+              // 3. ILA MA 3NDOCH: Reddo <Link> 3adi
+              <SidebarMenuItem key={item.title}>
+                <SidebarMenuButton
+                  asChild // <-- MOHIMMA: katkhlli l-button ywelli howa l-Link
+                  tooltip={item.title}
+                  className={cn(
+                    pathname === item.url && "bg-accent text-accent-foreground"
+                  )}
+                >
+                  <Link href={item.url}>
+                    <item.icon />
+                    <span>{item.title}</span>
+                  </Link>
+                </SidebarMenuButton>
               </SidebarMenuItem>
-            </Collapsible>
+            )
+            // --- FIN DYAL L-MODIFICATION ---
           ))}
         </SidebarMenu>
       </SidebarGroupContent>
