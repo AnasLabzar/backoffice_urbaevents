@@ -292,7 +292,7 @@ function TaskStatusBadge({ status }: { status: string }) {
 // 7. COMPOSANT LOGS SHEET (BDDELNA L-BUTTON L-ICON)
 // =======================================================================
 function ProjectLogsSheet({ project }: { project: any }) {
-    const isMobile = useIsMobile(false); 
+    const isMobile = useIsMobile(); 
     const [isOpen, setIsOpen] = React.useState(false);
 
     const [getLogs, { data: logData, loading: logLoading }] = useLazyQuery(GET_LOGS_QUERY);
