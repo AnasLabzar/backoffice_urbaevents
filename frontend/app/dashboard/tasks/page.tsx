@@ -1,7 +1,7 @@
 "use client";
 
-import * as React from "react"; // <-- Add this
-import { TasksTable, getTaskColumns, type Task } from "./tasks-table";
+import * as React from "react";
+import { TasksTable } from "./tasks-table";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
@@ -9,7 +9,6 @@ import { ChartAreaInteractive } from "@/components/chart-area-interactive";
 import { Skeleton } from "@/components/ui/skeleton";
 import { gql, useQuery } from "@apollo/client";
 
-// HADA HOWA L-QUERY L-S7I7 DYAL L-TASKS
 const GET_MY_TASKS_QUERY = gql`
   query GetMyTasks {
     myTasks {
@@ -92,14 +91,6 @@ export default function TasksPage() {
   const { data: meData, loading: meLoading } = useQuery(GET_ME_DEBUG);
   const { data: allTasksData, loading: allTasksLoading } = useQuery(GET_ALL_TASKS_DEBUG);
 
-  const [selectedTask, setSelectedTask] = React.useState<Task | null>(null);
-  const [isDrawerOpen, setIsDrawerOpen] = React.useState(false);
-
-
-  // L-KHELL L-JDID:
-  const columns = getTaskColumns(setSelectedTask, setIsDrawerOpen);
-
-
   console.log("🔍 DEBUG INFO:");
   console.log("Current User:", meData?.me);
   console.log("My Tasks:", tasksData?.myTasks);
@@ -149,7 +140,6 @@ export default function TasksPage() {
               </div>
 
               <div className="px-4 lg:px-6 h-96">
-
                 {tasksLoading ? (
                   <div className="px-4">
                     <Skeleton className="h-12 w-full" />
@@ -164,14 +154,7 @@ export default function TasksPage() {
                     </div>
                   </div>
                 ) : (
-                  <TasksTable
-                    data={tasksData?.myTasks || []} // <-- ZEDNA HADI
-                    columns={columns}
-                    selectedTask={selectedTask}
-                    setSelectedTask={setSelectedTask}
-                    isDrawerOpen={isDrawerOpen}
-                    setIsDrawerOpen={setIsDrawerOpen}
-                  />
+                  <TasksTable />
                 )}
               </div>
             </div>

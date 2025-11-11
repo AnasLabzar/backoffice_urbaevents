@@ -9,7 +9,7 @@ import {
   IconCircleCheckFilled, IconX,
   IconDownload, IconListCheck,
   IconUsers, IconPlus,
-  IconCheck, IconSelector as IconChevronsUpDown // <-- S777NAHA
+  IconCheck, IconSelector // <-- S777NAHA
 } from "@tabler/icons-react";
 import { gql } from "@apollo/client";
 import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription, SheetFooter } from "@/components/ui/sheet";
@@ -72,6 +72,9 @@ import { FileUpload } from "@/components/ui/file-upload";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format, differenceInDays, subDays } from "date-fns";
 import { cn } from "@/lib/utils";
+const IconChevronsUpDown = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="m7 15 5 5 5-5" /><path d="m7 9 5-5 5 5" /></svg>
+);
 
 // --- L-QUERIES L-MOHIMIN ---
 const GET_PROJECTS_FEED = gql`
@@ -1156,7 +1159,10 @@ function TaskChecklistPanel({ project }: { project: Project }) {
                     {/* 2. Upload V1 */}
                     <div>
                       <Label>Upload Screenshot (V1)</Label>
-                      <FileUpload onFileSelect={(file) => setFileV1(file)} />
+                      <FileUpload
+                        label="Screenshot V1"
+                        onFileSelect={(file) => setFileV1(file)}
+                      />
                       <Button
                         size="sm"
                         className="mt-2"
@@ -1173,7 +1179,10 @@ function TaskChecklistPanel({ project }: { project: Project }) {
                     {/* 3. Upload Final */}
                     <div>
                       <Label>Upload Version Finale</Label>
-                      <FileUpload onFileSelect={(file) => setFileFinal(file)} />
+                      <FileUpload
+                        label="Version Finale"
+                        onFileSelect={(file) => setFileFinal(file)}
+                      />
                       <Button
                         size="sm"
                         className="mt-2 bg-green-600 hover:bg-green-700"

@@ -1,85 +1,94 @@
-"use client"
+"use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { ChevronRight } from "lucide-react";
+import { Icon } from "@tabler/icons-react"; // Import Icon type
 import {
-  IconLayoutDashboard,
-  IconUsers,
-  IconBriefcase,
-  IconListCheck,
-  IconChartBar, // Zidna Analytics
-  IconRecycle,  // Zidna Lifecycle
-} from "@tabler/icons-react";
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import {
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
 } from "@/components/ui/sidebar";
 
-// Hado homa l-links l-assassin
-const links = [
-  {
-    title: "Dashboard",
-    url: "/dashboard",
-    icon: IconLayoutDashboard,
-  },
-  {
-    title: "Lifecycle",
-    url: "/dashboard/lifecycle",
-    icon: IconRecycle,
-  },
-  {
-    title: "Analytics",
-    url: "/dashboard/analytics",
-    icon: IconChartBar,
-  },
-  {
-    title: "Projects",
-    url: "/dashboard/projects",
-    icon: IconBriefcase,
-  },
-  {
-    title: "Team",
-    url: "/dashboard/teams",
-    icon: IconUsers,
-  },
-  // --- HADA HOWA L-LINK L-JDID ---
-  {
-    title: "Tâches",
-    url: "/dashboard/tasks",
-    icon: IconListCheck,
-  },
-  // ----------------------------------
-];
+export interface NavItem {
+  title: string;
+  url: string;
+  icon: Icon; // Use Icon type
+  items?: NavSubItem[];
+}
 
-export function NavMain() {
+export interface NavSubItem {
+  title: string;
+  url: string;
+}
+
+interface NavMainProps {
+  items: NavItem[];
+}
+
+export function NavMain({ items }: NavMainProps) {
   const pathname = usePathname();
 
   return (
     <SidebarGroup>
+      <SidebarGroupLabel>Platform</SidebarGroupLabel>
       <SidebarGroupContent className="flex flex-col gap-2">
         <SidebarMenu>
-          {/* ... (Hna nqdro nkhliw l-Quick Create dyalk ila bghiti) ... */}
-        </SidebarMenu>
-        <SidebarMenu>
-          {links.map((item) => (
-            <SidebarMenuItem key={item.title}>
-              <Link href={item.url}>
-                <SidebarMenuButton
-                  tooltip={item.title}
-                  // Hna l-logic dyal l-link l-active
-                  className={cn(
-                    pathname === item.url && "bg-accent text-accent-foreground"
-                  )}
-                >
-                  {item.icon && <item.icon />}
-                  <span>{item.title}</span>
-                </SidebarMenuButton>
-              </Link>
-            </SidebarMenuItem>
+          {items.map((item) => (
+            <Collapsible
+              key={item.title}
+              asChild
+              defaultOpen={item.items ? true : undefined}
+            >
+              <SidebarMenuItem>
+                <CollapsibleTrigger asChild>
+                  <SidebarMenuButton
+                    tooltip={item.title}
+                    className={cn(
+                      pathname === item.url && "bg-accent text-accent-foreground"
+                    )}
+                  >
+                    <item.icon />
+                    <span>{item.title}</span>
+                    {item.items && (
+                      <ChevronRight className="ml-auto transition-transform duration-200" />
+                    )}
+                  </SidebarMenuButton>
+                </CollapsibleTrigger>
+                {item.items && (
+                  <CollapsibleContent>
+                    <SidebarMenuSub>
+                      {item.items.map((subItem) => (
+                        <SidebarMenuSubItem key={subItem.title}>
+                          <SidebarMenuSubButton asChild>
+                            <Link
+                              href={subItem.url}
+                              className={cn(
+                                pathname === subItem.url && "bg-accent text-accent-foreground"
+                              )}
+                            >
+                              <span>{subItem.title}</span>
+                            </Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      ))}
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                )}
+              </SidebarMenuItem>
+            </Collapsible>
           ))}
         </SidebarMenu>
       </SidebarGroupContent>

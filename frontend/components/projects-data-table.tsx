@@ -443,7 +443,7 @@ const FileStatusCell = ({ row, docType }: { row: any, docType: string }) => {
     const file = docs.find((doc: { fileName: string, fileUrl?: string }) => doc.fileName === docType);
 
     // For PROPOSAL_MANAGER: Show checkmark/cross
-    if (userRole === 'PROPOSAL_MANAGER'|| userRole === 'ADMIN') {
+    if (userRole === 'PROPOSAL_MANAGER' || userRole === 'ADMIN') {
         return file
             ? <IconCircleCheckFilled className="text-green-500 mx-auto" />
             : <IconX className="text-red-500 mx-auto" />;
@@ -574,13 +574,13 @@ export const columns: ColumnDef<ProjectFeedItem>[] = [
 export function DataTable({
     columns,
     data,
-    columnFilters: externalColumnFilters, // <-- MODIFIED: Renamed prop
-    onColumnFiltersChange, // <-- MODIFIED: Added prop
+    columnFilters: externalColumnFilters,
+    onColumnFiltersChange,
 }: {
     columns: ColumnDef<ProjectFeedItem>[];
     data: ProjectFeedItem[];
-    columnFilters: ColumnFiltersState; // <-- MODIFIED: Added type
-    onColumnFiltersChange: (filters: ColumnFiltersState) => void; // <-- MODIFIED: Added type
+    columnFilters: ColumnFiltersState;
+    onColumnFiltersChange: (updater: ColumnFiltersState | ((old: ColumnFiltersState) => ColumnFiltersState)) => void; // <-- FIXED: Use the correct TanStack Table type
 }) {
     const [rowSelection, setRowSelection] = React.useState({});
     const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
@@ -1172,7 +1172,10 @@ function TaskChecklistPanel({ project }: { project: Project }) {
                                         {/* 2. Upload V1 */}
                                         <div>
                                             <Label>Upload Screenshot (V1)</Label>
-                                            <FileUpload onFileSelect={(file) => setFileV1(file)} />
+                                            <FileUpload
+                                                label="Screenshot V1"
+                                                onFileSelect={(file) => setFileV1(file)}
+                                            />
                                             <Button
                                                 size="sm"
                                                 className="mt-2"
@@ -1189,7 +1192,10 @@ function TaskChecklistPanel({ project }: { project: Project }) {
                                         {/* 3. Upload Final */}
                                         <div>
                                             <Label>Upload Version Finale</Label>
-                                            <FileUpload onFileSelect={(file) => setFileFinal(file)} />
+                                            <FileUpload
+                                                label="Version Finale"
+                                                onFileSelect={(file) => setFileFinal(file)}
+                                            />
                                             <Button
                                                 size="sm"
                                                 className="mt-2 bg-green-600 hover:bg-green-700"

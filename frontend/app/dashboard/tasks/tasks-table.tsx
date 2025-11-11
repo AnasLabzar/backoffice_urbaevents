@@ -48,7 +48,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useIsMobile } from "@/hooks/use-mobile"; // <-- Make sure this import path is correct!
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   IconChevronDown,
   IconChevronLeft,
@@ -164,9 +164,7 @@ const GET_ALL_TASKS_QUERY = gql`
 console.log("ALL TASKS", GET_ALL_TASKS_QUERY);
 console.log("MY TASKS", GET_MY_TASKS_QUERY);
 
-
-
-// And update the Task interface to make updatedAt optional
+// Task interface
 export interface Task {
   id: string;
   description: string;
@@ -174,7 +172,7 @@ export interface Task {
   department: "CREATIVE" | "TECHNICAL_OFFICE" | "WORKSHOP" | "FIELD" | "LOGISTICS";
   dueDate: string | null;
   createdAt: string;
-  updatedAt?: string; // Make it optional
+  updatedAt?: string;
   assignedTo: {
     id: string;
     name: string;
@@ -243,21 +241,16 @@ function DepartmentBadge({ department }: { department: Task["department"] }) {
   );
 }
 
-// --- Date Formatter (FIXED) ---
+// --- Date Formatter ---
 function formatDate(dateString: string | null) {
-  // ✅ FIX 1: Handle null values (like dueDate)
   if (!dateString) return "Non définie";
 
   try {
     const date = new Date(dateString);
-
-    // ✅ FIX 2: Check for "Invalid Date"
-    // This catches issues if the date string is bad
     if (isNaN(date.getTime())) {
       throw new Error("Invalid date value provided");
     }
 
-    // 3. Format valid dates
     return new Intl.DateTimeFormat('fr-FR', {
       day: '2-digit',
       month: '2-digit',
@@ -268,7 +261,6 @@ function formatDate(dateString: string | null) {
     return "Date invalide";
   }
 }
-
 
 // --- File Download Component ---
 function FileDownloads({ task }: { task: Task }) {
@@ -310,11 +302,8 @@ function FileDownloads({ task }: { task: Task }) {
 
 function TaskDetailsViewer({ task }: { task: Task }) {
   const [isOpen, setIsOpen] = React.useState(false);
-
-  // Use the mobile hook from your new file to get the same behavior
   const isMobile = useIsMobile();
 
-  // This is the content from your old drawer
   const content = (
     <div className="space-y-4 py-4 px-4">
       <div>
@@ -358,7 +347,6 @@ function TaskDetailsViewer({ task }: { task: Task }) {
   return (
     <Drawer open={isOpen} onOpenChange={setIsOpen} direction={isMobile ? "bottom" : "right"}>
       <DrawerTrigger asChild onClick={() => setIsOpen(true)}>
-        {/* This is what's visible in the table cell */}
         <div className="flex flex-col space-y-1 hover:cursor-pointer">
           <span className="font-medium text-sm hover:underline">{task.description}</span>
           <span className="text-xs text-muted-foreground">
@@ -367,7 +355,6 @@ function TaskDetailsViewer({ task }: { task: Task }) {
         </div>
       </DrawerTrigger>
 
-      {/* This is the side panel content, styled like your new file */}
       <DrawerContent className={cn(
         "p-4",
         isMobile
@@ -478,8 +465,6 @@ export const getTaskColumns = (
               <Button
                 variant="ghost"
                 className="w-full justify-start"
-                // ✅ This onClick will now correctly update the state
-                // inside your TasksTable component, opening the drawer.
                 onClick={() => {
                   setSelectedTask(task);
                   setIsDrawerOpen(true);
@@ -499,62 +484,43 @@ export const getTaskColumns = (
     },
   ];
 
-// L-KHELL L-JDID:
+// --- Main Tasks Table Component ---
 interface TasksTableProps {
-  data: Task[]; // <-- ZID HADA HNA
-  columns: ColumnDef<Task>[];
-  selectedTask: Task | null;
-  setSelectedTask: React.Dispatch<React.SetStateAction<Task | null>>;
-  isDrawerOpen: boolean;
-  setIsDrawerOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  // No props needed since component handles its own data fetching
 }
 
-export function TasksTable({
-  data, // <-- ZID HADA HNA
-  columns,
-  selectedTask,
-  setSelectedTask,
-  isDrawerOpen,
-  setIsDrawerOpen,
-}: TasksTableProps) {
+export function TasksTable({ }: TasksTableProps) {
   const [rowSelection, setRowSelection] = React.useState({});
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [pagination, setPagination] = React.useState({ pageIndex: 0, pageSize: 10 });
   const [activeTab, setActiveTab] = React.useState<"my-tasks" | "all-tasks">("my-tasks");
-
-  // This state is correct and in the right place
   const [selectedTask, setSelectedTask] = React.useState<Task | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = React.useState(false);
 
-
   // Fetch both queries separately
   const { data: myTasksData, loading: myTasksLoading, error: myTasksError } = useQuery(GET_MY_TASKS_QUERY);
-  const { data: allTasksData, loading: allTasksLoading, error: allTasksError } = useQuery(GET_ALL_TASKS_QUERY); // Typo fixed here
+  const { data: allTasksData, loading: allTasksLoading, error: allTasksError } = useQuery(GET_ALL_TASKS_QUERY);
 
   // Safely extract arrays
   const myTasks = myTasksData?.myTasks || [];
   const allTasks = allTasksData?.allTasks || [];
 
   // Decide which tasks to display based on the active tab
-  // ✅ This logic is correct, but we pass it to `useReactTable`
   const data = React.useMemo(() => {
     return activeTab === "my-tasks" ? myTasks : allTasks;
   }, [activeTab, myTasks, allTasks]);
 
-
-  // 3. ✅ ADD THIS: Generate columns *inside* the component
-  // We use React.useMemo so this array isn't recreated on every render
+  // Generate columns
   const columns = React.useMemo(
     () => getTaskColumns(setSelectedTask, setIsDrawerOpen),
-    [] // The state setters are stable and won't change, so we use an empty dependency array
+    [setSelectedTask, setIsDrawerOpen]
   );
-
 
   // Table setup
   const table = useReactTable({
-    data: data, // <-- T2KKED MN HADI
+    data: data,
     columns,
     state: {
       sorting,
@@ -597,8 +563,6 @@ export function TasksTable({
     );
   }
 
-
-
   return (
     <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "my-tasks" | "all-tasks")} className="w-full flex-col justify-start gap-6">
       <div className="flex items-center justify-between lg:px-6 mb-6">
@@ -620,7 +584,6 @@ export function TasksTable({
             <DropdownMenuContent align="end" className="w-56">
               {table
                 .getAllColumns()
-                // Filter out non-data columns like 'actions' if they can't be hidden
                 .filter((col) => col.getCanHide())
                 .map((col) => (
                   <DropdownMenuCheckboxItem
@@ -629,7 +592,6 @@ export function TasksTable({
                     checked={col.getIsVisible()}
                     onCheckedChange={(value) => col.toggleVisibility(!!value)}
                   >
-                    {/* Use header as a more friendly name if possible */}
                     {typeof col.columnDef.header === 'string' ? col.columnDef.header : col.id}
                   </DropdownMenuCheckboxItem>
                 ))}
@@ -648,7 +610,7 @@ export function TasksTable({
         </div>
       </div>
 
-      {/* ✅ Unified table rendering for both tabs */}
+      {/* Unified table rendering for both tabs */}
       <div className="overflow-hidden rounded-lg border">
         <Table>
           <TableHeader>
@@ -668,8 +630,6 @@ export function TasksTable({
             ))}
           </TableHeader>
 
-          {/* ✅ FIX 3: Replaced manual row mapping with table.getRowModel() */}
-          {/* This makes filtering, pagination, and sorting work correctly. */}
           <TableBody>
             {table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
@@ -695,7 +655,7 @@ export function TasksTable({
         </Table>
       </div>
 
-      {/* 🧭 Task Details Drawer */}
+      {/* Task Details Drawer */}
       <Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
         <DrawerContent className="max-w-lg right-0 fixed top-0 h-full bg-white/95 backdrop-blur-md shadow-2xl border-l z-50">
           {selectedTask ? (
@@ -769,7 +729,6 @@ export function TasksTable({
           )}
         </DrawerContent>
       </Drawer>
-
 
       {/* Pagination */}
       <div className="flex items-center justify-between px-4 py-4">
@@ -849,6 +808,6 @@ export function TasksTable({
           </div>
         </div>
       </div>
-    </Tabs >
+    </Tabs>
   );
 }

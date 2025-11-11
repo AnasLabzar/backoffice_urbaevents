@@ -11,12 +11,12 @@ import {
   IconFileWord,
   IconFolder,
   IconHelp,
-  IconInnerShadowTop, // This is no longer used, but we'll leave the import
   IconListDetails,
   IconReport,
   IconSearch,
   IconSettings,
   IconUsers,
+  type Icon, // Import the Icon type
 } from "@tabler/icons-react";
 
 import { NavDocuments } from "@/components/nav-documents";
@@ -32,11 +32,9 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-// 2. Imports jdad l-API
 import { gql } from "@apollo/client";
-import { useQuery } from "@apollo/client/react"; // St3mlna ".../react" b7al l-login
+import { useQuery } from "@apollo/client/react";
 
-// 3. N-definiw L-Query dyal "me"
 const ME_QUERY = gql`
   query Me {
     me {
@@ -47,79 +45,108 @@ const ME_QUERY = gql`
   }
 `;
 
-// Your data object (no changes)
-const data = {
+// Define proper types for the navigation items
+interface NavItem {
+  title: string;
+  url: string;
+  icon: Icon; // Use Icon type for consistency
+  items?: NavSubItem[];
+}
+
+interface NavSubItem {
+  title: string;
+  url: string;
+}
+
+interface NavDocumentsItem {
+  name: string;
+  url: string;
+  icon: Icon; // Use Icon type to match NavDocuments expectations
+}
+
+interface AppSidebarData {
+  navMain: NavItem[];
+  navClouds: NavItem[];
+  navSecondary: NavItem[];
+  documents: NavDocumentsItem[];
+}
+
+const data: AppSidebarData = {
   navMain: [
     {
       title: "Dashboard",
-      url: "#",
+      url: "/dashboard",
       icon: IconDashboard,
     },
     {
       title: "Lifecycle",
-      url: "#",
+      url: "/dashboard/lifecycle",
       icon: IconListDetails,
     },
     {
       title: "Analytics",
-      url: "#",
+      url: "/dashboard/analytics",
       icon: IconChartBar,
     },
     {
       title: "Projects",
-      url: "#",
+      url: "/dashboard/projects",
       icon: IconFolder,
     },
     {
       title: "Team",
-      url: "#",
+      url: "/dashboard/teams",
       icon: IconUsers,
+    },
+    {
+      title: "Tâches",
+      url: "/dashboard/tasks",
+      icon: IconListDetails,
     },
   ],
   navClouds: [
     {
       title: "Capture",
       icon: IconCamera,
-      isActive: true,
-      url: "#",
+      url: "/dashboard/capture",
       items: [
         {
           title: "Active Proposals",
-          url: "#",
+          url: "/dashboard/capture/active",
         },
         {
           title: "Archived",
-          url: "#",
+          url: "/dashboard/capture/archived",
         },
       ],
     },
     {
       title: "Proposal",
       icon: IconFileDescription,
-      url: "#",
+      url: "/dashboard/proposal",
       items: [
         {
           title: "Active Proposals",
-          url: "#",
+          url: "/dashboard/proposal/active",
         },
         {
           title: "Archived",
-          url: "#",
+          url: "/dashboard/proposal/archived",
         },
       ],
     },
     {
       title: "Prompts",
       icon: IconFileAi,
-      url: "#",
+      url: "/dashboard/prompts",
       items: [
         {
           title: "Active Proposals",
-          url: "#",
+          url: "/dashboard/prompts/active",
         },
         {
           title: "Archived",
-          url: "#",
+          url: "/dashboard/prompts/archived",
         },
       ],
     },
@@ -127,45 +154,43 @@ const data = {
   navSecondary: [
     {
       title: "Settings",
-      url: "#",
+      url: "/dashboard/settings",
       icon: IconSettings,
     },
     {
       title: "Get Help",
-      url: "#",
+      url: "/dashboard/help",
       icon: IconHelp,
     },
     {
       title: "Search",
-      url: "#",
+      url: "/dashboard/search",
       icon: IconSearch,
     },
   ],
   documents: [
     {
       name: "Data Library",
-      url: "#",
+      url: "/dashboard/data-library",
       icon: IconDatabase,
     },
     {
       name: "Reports",
-      url: "#",
+      url: "/dashboard/reports",
       icon: IconReport,
     },
     {
       name: "Word Assistant",
-      url: "#",
+      url: "/dashboard/word-assistant",
       icon: IconFileWord,
     },
   ],
 };
 
-
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {  // 5. Nst3mlo L-Hook dyal useQuery bach njibdo l-user
+export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { data: meData, loading, error } = useQuery(ME_QUERY);
-
-  // Njbdo l-user mn l-data
   const user = meData?.me;
+
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
@@ -175,30 +200,21 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               asChild
               className="data-[slot=sidebar-menu-button]:!p-1.5"
             >
-              <a href="#" className="h-9">
-                {/* --- START: THEME LOGO CHANGE --- */}
-
-                {/* 1. Light Mode Logo (Dark text) */}
-                {/* This logo appears by default and hides in dark mode */}
+              <a href="/dashboard" className="h-9">
                 <span className="text-base font-semibold pl-3">
                   <img
-                    src="/logo/logo-black-urba-events.png" // <-- IMPORTANT: Add path to your DARK-TEXT logo
+                    src="/logo/logo-black-urba-events.png"
                     alt="Urba Events DASHBOARD"
-                    className="h-9 dark:hidden" // Hides when dark mode is active
+                    className="h-9 dark:hidden"
                   />
                 </span>
-
-                {/* 2. Dark Mode Logo (White text) */}
-                {/* This logo is hidden by default and appears in dark mode */}
                 <span className="text-base font-semibold">
                   <img
-                    src="/logo/logo-white-urba-events.png" // This is your existing WHITE-TEXT logo
+                    src="/logo/logo-white-urba-events.png"
                     alt="Urba Events DASHBOARD"
-                    className="h-9 hidden dark:block" // Hides by default, shows when dark mode is active
+                    className="h-9 hidden dark:block"
                   />
                 </span>
-
-                {/* --- END: THEME LOGO CHANGE --- */}
               </a>
             </SidebarMenuButton>
           </SidebarMenuItem>
@@ -210,7 +226,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
-        {/* 6. Ghadi nssifto "user" w "loading" l-NavUser */}
         <NavUser user={user} loading={loading} />
       </SidebarFooter>
     </Sidebar>
