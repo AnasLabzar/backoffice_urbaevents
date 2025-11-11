@@ -49,7 +49,16 @@ const startServer = async () => {
     const httpServer = http.createServer(app);
 
     // --- 2. ZID CORS ---
-    app.use(cors());
+    // --- HNA L-MODIFICATION ---
+    // Bddel "app.use(cors());" b had l-bloc jdid:
+    app.use(cors({
+        origin: [
+            'http://localhost:3000', // L-khdma 3la l-PC dyalek
+            'https://backoffice.urbagroupe.ma' // L-Production
+        ],
+        credentials: true
+    }));
+    // --- FIN DYAL L-MODIFICATION ---
 
     // --- 3. ZID L-ENDPOINT L-STATIC (Bach n-affichiw l-fichiers) ---
     app.use('/uploads', express.static(path.join(__dirname, '../../uploads')));
