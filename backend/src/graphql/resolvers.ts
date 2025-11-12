@@ -145,7 +145,7 @@ export const resolvers = {
                 .populate({ path: 'projectManagers', select: userSelect })
                 .populate({ path: 'createdBy', select: userSelect })
                 .populate({ path: 'assignedTeam', select: userSelect })
-                .populate({ path: 'proposalAvis.givenBy', select: userSelect }); // <-- ZEDNA HADI
+                .populate({ path: 'proposalAvis.givenBy', select: userSelect });
 
             for (const p of stagePopulates) projectQuery = projectQuery.populate(p as any);
             for (const p of teamPopulates) projectQuery = projectQuery.populate(p as any);
@@ -876,7 +876,7 @@ export const resolvers = {
             }
 
             // Ensure id field is present
-            populatedTask.id = populatedTask._id.toString();
+            (populatedTask as any).id = populatedTask._id.toString();
 
             await logActivity({
                 userId: context.user.id,

@@ -1074,9 +1074,9 @@ function TaskChecklistPanel({ project }: { project: Project }) {
     });
   };
 
-  // L-Helper dyal l-Upload (l-kbir)
+  // Update the handleFileUploadAndMutate function
   const handleFileUploadAndMutate = async (
-    file: File | null,
+    file: File | null, // <-- HADA HOWA L-FILE LI DÉJA OPTIMISÉ
     mutation: Function,
     docType: string, // "TASK_V1" or "TASK_FINAL"
     taskId: string
@@ -1085,28 +1085,45 @@ function TaskChecklistPanel({ project }: { project: Project }) {
       toast.error(`Aucun fichier sélectionné.`);
       return false;
     }
-    const formDataRest = new FormData();
-    formDataRest.append('file', file);
+
     try {
-      toast.loading(`Uploading ${file.name}...`);
-      // Nst3mlo l-endpoint l-3adi dyal l-projet
-      const response = await fetch(`https://backoffice.urbagroupe.ma/api/upload/${project.id}`, { method: 'POST', body: formDataRest });
+      // --- L-MODIFICATION BDAT HNA ---
+
+      // 7IYYEDNA: const optimizedFile = await optimizeAndValidateFile(file, 50);
+      // L-fichier déja optimisé mn FileUpload.tsx
+
+      const formDataRest = new FormData();
+      formDataRest.append('file', file); // <-- N-sifto l-fichier l-s7i7
+
+      toast.loading(`Optimisation et upload de ${file.name}...`);
+
+      const response = await fetch(`https://backoffice.urbagroupe.ma/api/upload/${project.id}`, {
+        method: 'POST',
+        body: formDataRest
+      });
+
       if (!response.ok) throw new Error('File upload failed.');
+
       const result = await response.json();
       const fileUrl = result.fileUrl;
       toast.dismiss();
 
-      await mutation({
-        variables: {
-          taskId: taskId,
-          originalFileName: file.name,
-          fileUrl: fileUrl,
-        },
-      });
+      // Had l-function khassa ghir b les tâches
+      const mutationVariables = {
+        taskId: taskId,
+        originalFileName: file.name, // <-- Nst3mlo l-fichier l-s7i7
+        fileUrl: fileUrl,
+      };
+
+      await mutation({ variables: mutationVariables });
+
+      toast.success(`Fichier uploadé avec succès! (${(file.size / 1024 / 1024).toFixed(2)} MB)`); // <-- Nst3mlo l-fichier l-s7i7
       return true;
+
+      // --- L-MODIFICATION SALAT HNA ---
     } catch (error: any) {
       toast.dismiss();
-      toast.error(`Error uploading file: ${error.message}`);
+      toast.error(`Erreur: ${error.message}`);
       return false;
     }
   };
@@ -1462,7 +1479,7 @@ function TableCellViewer({ item }: { item: Project }) {
 
   // Function dyal l-upload l-jdida (b REST)
   const handleFileUploadAndMutate = async (
-    file: File | null,
+    file: File | null, // <-- HADA HOWA L-FILE LI DÉJA OPTIMISÉ
     mutation: Function,
     docType: string,
     stageName?: string
@@ -1491,6 +1508,8 @@ function TableCellViewer({ item }: { item: Project }) {
           fileUrl: fileUrl,
         },
       });
+      // --- L-MODIFICATION HNA ---
+      toast.success(`Fichier uploadé avec succès! (${(file.size / 1024 / 1024).toFixed(2)} MB)`);
       return true;
     } catch (error: any) {
       toast.dismiss();
