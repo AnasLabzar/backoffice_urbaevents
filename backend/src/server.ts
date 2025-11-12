@@ -25,6 +25,14 @@ import { typeDefs } from './graphql/typeDefs';
 import { resolvers } from './graphql/resolvers';
 import { verifyToken, DecodedToken } from './utils/jwt';
 
+// --- ZID HADO L-JDAD ---
+import * as cron from 'node-cron';
+import Task from './models/Task';
+import Project from './models/Project';
+import { createNotification } from './utils/notifications';
+import { NotificationLevel } from './models/Notification';
+// -----------------------
+
 // Interface l-Context dyalna (Nafs l-code)
 export interface IContext {
     user: DecodedToken | null;
@@ -41,10 +49,88 @@ const connectDB = async () => {
     }
 };
 
+// --- ZID L-CRON JOB HNA ---
+const startCronJobs = () => {
+    // T-khdem kolla nhar m3a 9h dyal sba7
+    cron.schedule('0 9 * * *', async () => {
+        console.log('⏰ Running CRON Job: Checking Deadlines...');
+
+        const today = new Date();
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        try {
+            // 1. Jbed l-Tasks li 9rib y-saliw (ghdda)
+            const tasks = await Task.find({
+                dueDate: {
+                    $gte: today,
+                    $lte: tomorrow
+                },
+                status: { $ne: 'DONE' } // Ghi li mazal ma salawch
+            }).populate('project'); // Jbed l-project m3ahom
+
+            for (const task of tasks) {
+                const project = task.project as any;
+                let userIds: string[] = [];
+
+                // Sifet l-user li m-assigni lih l-task
+                if (task.assignedTo) {
+                    userIds.push(task.assignedTo.toString());
+                }
+                // Sifet l-PMs dyal l-project
+                if (project && project.projectManagers) {
+                    userIds.push(...project.projectManagers.map((pm: any) => pm.toString()));
+                }
+
+                if (userIds.length > 0) {
+                    await createNotification({
+                        userIds: [...new Set(userIds)], // 7iyd doublons
+                        level: NotificationLevel.DEADLINE, // Level 5
+                        message: `Deadline Proche (+1j): La tâche "${task.description}" doit être terminée demain.`,
+                        link: `/dashboard/projects/${project._id}`,
+                        project: project._id.toString()
+                    });
+                }
+            }
+
+            // 2. Jbed l-Projects li 3ndhom Date de Dépôt qriba
+            const projects = await Project.find({
+                submissionDeadline: {
+                    $gte: today,
+                    $lte: tomorrow
+                },
+                preparationStatus: { $ne: 'DONE' }
+            });
+
+            for (const project of projects) {
+                if (project.projectManagers && project.projectManagers.length > 0) {
+                    await createNotification({
+                        userIds: project.projectManagers.map(pm => pm.toString()),
+                        level: NotificationLevel.DEADLINE, // Level 5
+                        message: `Deadline Dépôt (+1j): Le projet "${project.object}" doit être déposé demain.`,
+                        link: `/dashboard/projects/${project._id}`,
+                        project: project._id.toString()
+                    });
+                }
+            }
+            console.log('⏰ CRON Job Finished.');
+        } catch (error) {
+            console.error('Error in CRON Job:', error);
+        }
+    }, {
+        scheduled: true,
+        timezone: "Africa/Casablanca" // MZYAN T-DIR TIMEZONE
+    });
+};
+// -----------------------
+
 
 // ---- 2. BDA L-CODE JDID DYAL SERVER ----
 const startServer = async () => {
     await connectDB();
+    // --- ZID HADI HNA ---
+    startCronJobs(); // Demarri l-CRON Jobs
+    // -------------------
     const app = express();
     const httpServer = http.createServer(app);
 

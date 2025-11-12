@@ -16,6 +16,13 @@ import Project from '../models/Project';
 import Task from '../models/Task';
 import ActivityLog from '../models/ActivityLog';
 import Document from '../models/Document';
+import Notification, { NotificationLevel } from '../models/Notification'; // <-- ZID HADA
+
+
+// --- ZID IMPORTS L-JDAD ---
+import { createNotification } from '../utils/notifications';
+import { pubsub, NEW_TASK_EVENT, TASK_UPDATED_EVENT, NEW_NOTIFICATION_EVENT } from '../utils/pubsub'; // <-- BDDEL HADA
+import { withFilter } from 'graphql-subscriptions';
 
 // -------------------- Populates --------------------
 const stagePopulates = [
@@ -40,6 +47,22 @@ const teamPopulates = [
 // --- HNA L-MODIFICATION ---
 const defaultUser = { _id: 'DELETED_USER_ID', id: 'DELETED_USER_ID', name: 'Utilisateur Supprimé', email: '', role: null };
 // ------------------------------------
+
+
+/**
+ * Helper jdid: Kay-jib ga3 l-IDs dyal l-users li 3ndhom wa7d l-role
+ */
+const getRoleUserIds = async (roleName: string): Promise<string[]> => {
+    try {
+        const role = await Role.findOne({ name: roleName });
+        if (!role) return [];
+        const users = await User.find({ role: role._id });
+        return users.map(user => user._id.toString());
+    } catch (error) {
+        console.error(`Error fetching user IDs for role ${roleName}:`, error);
+        return [];
+    }
+};
 
 // -------------------- Helpers --------------------
 const checkPermission = async (context: IContext, required: string) => {
@@ -527,6 +550,24 @@ export const resolvers = {
 
             return tasks.filter(task => task.project !== null); // Securité taniya
         },
+
+        // --- L-QUERY L-JDID DYAL L-NOTIFS ---
+        myNotifications: async (_: unknown, __: unknown, context: IContext) => {
+            if (!context.user) throw new ApolloError('Not authenticated', 'UNAUTHENTICATED');
+            const userId = new Types.ObjectId(context.user.id);
+            const notifs = await Notification.find({
+                $or: [
+                    { users: userId },
+                    { level: NotificationLevel.INFO }
+                ]
+            }).sort({ createdAt: -1 }).limit(50);
+
+            return notifs.map(notif => ({
+                ...notif.toObject(),
+                id: notif._id,
+                isRead: notif.readBy.includes(userId)
+            }));
+        },
         // --- FIN L-FIX ---
 
     },
@@ -667,6 +708,20 @@ export const resolvers = {
                 project: project._id,
                 details: `Proposal submitted for review: "${project.title}"`,
             });
+
+            // --- ZIDNA NOTIFICATION (L-ADMINS) ---
+            const adminIds = await getRoleUserIds('ADMIN');
+            if (adminIds.length > 0) {
+                await createNotification({
+                    userIds: adminIds,
+                    level: NotificationLevel.IMPORTANT,
+                    message: `Nouveau projet soumis pour validation: "${project.object}"`,
+                    link: `/dashboard/projects`, // (L-Admin 3ndo l-kolchi)
+                    project: project._id.toString()
+                });
+            }
+            // ------------------------------------
+
             return project;
         },
 
@@ -721,6 +776,18 @@ export const resolvers = {
                 project: project._id,
                 details: `Project assigned. Status: ${status}`,
             });
+
+            // --- ZIDNA NOTIFICATION (L-PM L-JDID) ---
+            if (status === 'TO_PREPARE' && projectManagerIds.length > 0) {
+                await createNotification({
+                    userIds: projectManagerIds,
+                    level: NotificationLevel.STANDARD,
+                    message: `Vous avez été assigné au projet: "${project.object}"`,
+                    link: `/dashboard/projects/`, // L-PM ghaylqah f l-feed dyalo
+                    project: project._id.toString()
+                });
+            }
+            // ---------------------------------------
 
             // --- DEBUT DYAL L-CODE L-JDID ---
             // Hna kan-crééw l-tâche générale l kol PM
@@ -822,6 +889,19 @@ export const resolvers = {
                 project: project._id,
                 details: `Feasibility check '${checkType}' set to ${status}`,
             });
+
+            // --- ZIDNA NOTIFICATION (L-PM) ---
+            if (project.projectManagers.length > 0) {
+                await createNotification({
+                    userIds: project.projectManagers.map(pm => pm.toString()),
+                    level: NotificationLevel.INFO,
+                    message: `Check de faisabilité [${checkType}] mis à jour: ${status} (Projet: ${project.object})`,
+                    link: `/dashboard/projects/`,
+                    project: project._id.toString()
+                });
+            }
+            // ---------------------------------
+
             await project.save();
             return project;
         },
@@ -845,6 +925,25 @@ export const resolvers = {
                 details: `Project launched. Pending caution.`,
             });
             await project.save();
+
+            // --- ZIDNA NOTIFICATION (L-PM O L-FINANCE) ---
+            const financeIds = await getRoleUserIds('FINANCE');
+            const userIds = [
+                ...project.projectManagers.map(pm => pm.toString()),
+                ...financeIds
+            ];
+
+            if (userIds.length > 0) {
+                await createNotification({
+                    userIds: [...new Set(userIds)], // 7iyd doublons
+                    level: NotificationLevel.IMPORTANT,
+                    message: `Projet lancé. En attente de la demande de caution: "${project.object}"`,
+                    link: `/dashboard/projects/`,
+                    project: project._id.toString()
+                });
+            }
+            // -----------------------------------------
+
             return project;
         },
 
@@ -865,7 +964,7 @@ export const resolvers = {
                 throw new ApolloError('Failed to create task or task has no ID', 'TASK_CREATION_FAILED');
             }
 
-            // Use lean and explicit population
+            // --- L-Populate l-s7i7 (bqa b7al b7al) ---
             const populatedTask = await Task.findById(task._id)
                 .populate({ path: 'assignedTo', select: userSelect })
                 .populate({ path: 'project', select: 'title projectCode' })
@@ -887,6 +986,27 @@ export const resolvers = {
 
             pubsub.publish(NEW_TASK_EVENT, { taskCreated: populatedTask });
 
+            // --- HNA N-ZIDO L-NOTIFICATION ---
+            if (task) {
+                await createNotification({
+                    userIds: [assignedToId],
+                    level: NotificationLevel.STANDARD,
+                    message: `Nouvelle tâche assignée: "${description}"`,
+                    link: `/dashboard/projects/${projectId}`, // Bddel b link s7i7
+                    project: projectId
+                });
+            }
+
+            // --- NOTIFICATION (Déja kayna) ---
+            await createNotification({
+                userIds: [input.assignedToId],
+                level: NotificationLevel.STANDARD,
+                message: `Nouvelle tâche assignée: "${input.description}"`,
+                link: `/dashboard/projects/${input.projectId}`,
+                project: input.projectId
+            });
+            // ---------------------------------
+
             return populatedTask;
         },
 
@@ -903,13 +1023,52 @@ export const resolvers = {
             if (!oldTask) throw new ApolloError('Task not found', 'NOT_FOUND');
             const task = await Task.findByIdAndUpdate(taskId, { status }, { new: true });
             if (!task) throw new ApolloError('Task not found', 'NOT_FOUND');
+
             await logActivity({
                 userId: context.user.id,
                 action: 'PM_UPDATE_TASK_STATUS',
                 project: task.project,
                 details: `Task "${task.description}" status changed to ${task.status}`,
             });
-            return task.populate({ path: 'project assignedTo', select: userSelect });
+
+            // --- NOTIFICATION (Déja kayna) ---
+            if (task && (status === 'DONE' || status === 'BLOCKED')) {
+                const project = await Project.findById(task.project);
+                if (project && project.projectManagers.length > 0) {
+                    await createNotification({
+                        userIds: project.projectManagers.map(pm => pm.toString()),
+                        level: NotificationLevel.IMPORTANT,
+                        message: `Tâche "${task.description}" marquée comme: ${status}`,
+                        link: `/dashboard/projects/${project._id}`,
+                        project: project._id.toString()
+                    });
+                }
+            }
+            // ---------------------------------
+
+            // --- L-MODIFICATION 2: N-PUBLISHIW L-UPDATE ---
+            const populatedTask = await task.populate([
+                { path: 'project assignedTo', select: userSelect }
+            ]);
+
+            // --- HNA N-ZIDO L-NOTIFICATION ---
+            if (task && (status === 'DONE' || status === 'BLOCKED')) {
+                // Sifet notif l-PM dyal l-projet
+                const project = await Project.findById(task.project);
+                if (project && project.projectManagers.length > 0) {
+                    await createNotification({
+                        userIds: project.projectManagers.map(pm => pm.toString()),
+                        level: NotificationLevel.IMPORTANT,
+                        message: `Tâche "${task.description}" marquée comme: ${status}`,
+                        link: `/dashboard/projects/${project._id}`,
+                        project: project._id.toString()
+                    });
+                }
+            }
+            // --------------------------------
+            pubsub.publish(TASK_UPDATED_EVENT, { taskUpdated: populatedTask });
+
+            return populatedTask;
         },
 
         pm_validateStage: async (_: unknown, { projectId, stage }: any, context: IContext) => {
@@ -981,6 +1140,19 @@ export const resolvers = {
                 details: `Avis donné: ${status}${reason ? ` (raison: ${reason})` : ''}`,
             });
 
+            // --- ZIDNA NOTIFICATION (L-ADMIN) ---
+            const adminIds = await getRoleUserIds('ADMIN');
+            if (adminIds.length > 0) {
+                await createNotification({
+                    userIds: adminIds,
+                    level: NotificationLevel.IMPORTANT,
+                    message: `Avis [${status}] donné par le PM pour le projet: "${project.object}"`,
+                    link: `/dashboard/projects/`,
+                    project: project._id.toString()
+                });
+            }
+            // ------------------------------------
+
             return project;
         },
 
@@ -1015,6 +1187,20 @@ export const resolvers = {
             });
 
             await project.save();
+
+            // --- ZIDNA NOTIFICATION (L-ADMIN) ---
+            const adminIds = await getRoleUserIds('ADMIN');
+            if (adminIds.length > 0) {
+                await createNotification({
+                    userIds: adminIds,
+                    level: NotificationLevel.STANDARD,
+                    message: `L'estimation de coût a été uploadée pour: "${project.object}"`,
+                    link: `/dashboard/projects/`, // L-Admin y-qdr y-clicki o y-dir feasibility
+                    project: project._id.toString()
+                });
+            }
+            // ------------------------------------
+
             return project;
         },
 
@@ -1036,6 +1222,25 @@ export const resolvers = {
                 details: `Project team assigned.`,
             });
             await project.save();
+
+            // --- ZIDNA NOTIFICATION (L-TEAM L-JDID) ---
+            const allAssignedIds = [
+                ...(infographisteIds || []),
+                ...(team3DIds || []),
+                ...(assistantIds || [])
+            ];
+
+            if (allAssignedIds.length > 0) {
+                await createNotification({
+                    userIds: [...new Set(allAssignedIds)], // 7iyd doublons
+                    level: NotificationLevel.STANDARD,
+                    message: `Vous avez été assigné à l'équipe du projet: "${project.object}"`,
+                    link: `/dashboard/projects/`,
+                    project: project._id.toString()
+                });
+            }
+            // ------------------------------------------
+
             return project;
         },
 
@@ -1072,6 +1277,23 @@ export const resolvers = {
                 details: `CP uploaded an asset: "${originalFileName}"`,
             });
 
+            // --- ZIDNA NOTIFICATION (L-TEAM) ---
+            const teamIds = [
+                ...project.team.infographistes.map(u => u.toString()),
+                ...project.team.team3D.map(u => u.toString()),
+                ...project.team.assistants.map(u => u.toString()),
+            ];
+            if (teamIds.length > 0) {
+                await createNotification({
+                    userIds: [...new Set(teamIds)],
+                    level: NotificationLevel.INFO,
+                    message: `Un nouvel asset a été ajouté au projet "${project.object}": ${originalFileName}`,
+                    link: `/dashboard/projects/`,
+                    project: project._id.toString()
+                });
+            }
+            // ------------------------------------
+
             await project.populate({
                 path: 'stages.technical.documents',
                 populate: { path: 'uploadedBy', select: userSelect },
@@ -1093,6 +1315,24 @@ export const resolvers = {
                 project: project._id,
                 details: `Caution requested by Finance.`,
             });
+
+            // --- ZIDNA NOTIFICATION (L-PM O L-ADMIN) ---
+            const adminIds = await getRoleUserIds('ADMIN');
+            const userIds = [
+                ...project.projectManagers.map(pm => pm.toString()),
+                ...adminIds
+            ];
+            if (userIds.length > 0) {
+                await createNotification({
+                    userIds: [...new Set(userIds)],
+                    level: NotificationLevel.IMPORTANT,
+                    message: `Caution demandée. Le projet "${project.object}" est officiellement en production.`,
+                    link: `/dashboard/projects/`,
+                    project: project._id.toString()
+                });
+            }
+            // -----------------------------------------
+
             await project.save();
             return project;
         },
@@ -1131,6 +1371,19 @@ export const resolvers = {
                 details: `Team uploaded V1 for task "${task.description}": "${originalFileName}"`,
             });
 
+            // --- ZIDNA NOTIFICATION (L-PM) ---
+            const project = await Project.findById(task.project);
+            if (project && project.projectManagers.length > 0) {
+                await createNotification({
+                    userIds: project.projectManagers.map(pm => pm.toString()),
+                    level: NotificationLevel.STANDARD,
+                    message: `Une V1 a été uploadée pour la tâche: "${task.description}"`,
+                    link: `/dashboard/projects/${project._id}`,
+                    project: project._id.toString()
+                });
+            }
+            // ------------------------------------
+
             await task.save();
 
             const populatedTask = await task.populate([
@@ -1149,7 +1402,7 @@ export const resolvers = {
 
             const newDocument = await handleUpload(fileUrl, originalFileName, 'TASK_FINAL', context.user.id);
             task.finalUpload = newDocument._id;
-            task.status = 'DONE';
+            task.status = 'DONE'; // <-- L-Status kay-tbdl hna
 
             await logActivity({
                 userId: context.user.id,
@@ -1160,12 +1413,62 @@ export const resolvers = {
 
             await task.save();
 
+            // --- NOTIFICATION (Déja kayna) ---
+            const project = await Project.findById(task.project);
+            if (project && project.projectManagers.length > 0) {
+                await createNotification({
+                    userIds: project.projectManagers.map(pm => pm.toString()),
+                    level: NotificationLevel.IMPORTANT,
+                    message: `Version Finale Reçue: La tâche "${task.description}" est terminée.`,
+                    link: `/dashboard/projects/${project._id}`,
+                    project: project._id.toString()
+                });
+            }
+            // --------------------------------
+
+            // --- L-MODIFICATION SALAT HNA ---
+
             const populatedTask = await task.populate([
                 { path: 'v1Uploads', populate: { path: 'uploadedBy', select: userSelect } },
                 { path: 'finalUpload', populate: { path: 'uploadedBy', select: userSelect } },
                 { path: 'assignedTo', select: userSelect },
             ]);
+
+            // L-Publish dyal l-Socket (bqa b7al b7al)
+            pubsub.publish(TASK_UPDATED_EVENT, { taskUpdated: populatedTask });
+            // ------------------------------------
+
             return populatedTask;
+        },
+
+        // --- ZID HADO L-MUTATIONS L-JDAD ---
+        markNotificationAsRead: async (_: unknown, { notificationId }: any, context: IContext) => {
+            if (!context.user) throw new ApolloError('Not authenticated', 'UNAUTHENTICATED');
+
+            const notif = await Notification.findById(notificationId);
+            if (!notif) throw new ApolloError('Notification not found');
+
+            await Notification.updateOne(
+                { _id: notificationId },
+                { $addToSet: { readBy: context.user.id } }
+            );
+
+            return {
+                ...notif.toObject(),
+                id: notif._id,
+                isRead: true
+            };
+        },
+
+        markAllNotificationsAsRead: async (_: unknown, __: unknown, context: IContext) => {
+            if (!context.user) throw new ApolloError('Not authenticated', 'UNAUTHENTICATED');
+
+            await Notification.updateMany(
+                { $or: [{ users: context.user.id }, { level: NotificationLevel.INFO }] },
+                { $addToSet: { readBy: context.user.id } }
+            );
+
+            return true;
         },
     },
 
@@ -1179,14 +1482,30 @@ export const resolvers = {
                         return false;
                     }
                     // Ensure we have a valid assignedTo field
-                    if (!payload.taskCreated.assignedTo) {
-                        console.error('Task created without assignedTo:', payload.taskCreated);
-                        return false;
-                    }
+                    if (!payload.taskCreated?.assignedTo) return false;
                     return payload.taskCreated.assignedTo.toString() === variables.userId;
                 }
             ),
         },
+        // --- L-MODIFICATION 4: ZIDNA SUBSCRIPTION JDIDA ---
+        taskUpdated: {
+            // N-tssennto l-l-event l-jdid
+            subscribe: () => pubsub.asyncIterator(TASK_UPDATED_EVENT),
+            // Note: Hna ma dirnach filter, ay update ghadi ywssel l-kolchi
+            // Hadchi mzyan bach l-Project Feed y-tbdl 3nd kolchi
+        },
+
+        // --- ZID HADA L-SUBSCRIPTION L-JDID ---
+        newNotification: {
+            subscribe: withFilter(
+                () => pubsub.asyncIterator(NEW_NOTIFICATION_EVENT),
+                (payload, variables) => {
+                    return payload.newNotification.userId === variables.userId ||
+                        payload.newNotification.userId === 'GLOBAL';
+                }
+            ),
+        }
+        // ---------------------------------------
     },
 
     // No special field resolvers needed; we rely on correct populates + selects.

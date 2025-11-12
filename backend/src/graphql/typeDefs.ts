@@ -194,6 +194,7 @@ export const typeDefs = gql`
     tasksByProject(projectId: ID!): [Task!]!
     logs(projectId: ID): [ActivityLog!]!
     myTasks: [Task!]!
+    myNotifications: [Notification!]
     allTasks: [Task!]!
   }
 
@@ -243,9 +244,38 @@ export const typeDefs = gql`
     # Team
     team_uploadTaskV1(taskId: ID!, fileUrl: String!, originalFileName: String!): Task!
     team_uploadTaskFinal(taskId: ID!, fileUrl: String!, originalFileName: String!): Task!
+
+    # Notifications
+    markNotificationAsRead(notificationId: ID!): Notification
+    markAllNotificationsAsRead: Boolean
   }
 
+  # Zid f Subscription
   type Subscription {
-    taskCreated(userId: ID!): Task!
+    taskCreated(userId: ID!): Task
+    taskUpdated: Task
+    # HADI L-JDIDA L-MOHIMMA
+    newNotification(userId: ID!): Notification
   }
+
+  # Zid had l-Type l-jdid
+  type Notification {
+    id: ID!
+    level: NotificationLevel!
+    message: String!
+    link: String
+    createdAt: String!
+    # Check wach l-user l-current qraha wla mazal
+    isRead: Boolean 
+  }
+
+  # Zid had l-Enum l-jdid
+  enum NotificationLevel {
+    INFO
+    STANDARD
+    IMPORTANT
+    URGENT
+    DEADLINE
+  }
+    
 `;

@@ -41,7 +41,7 @@ const TaskSchema: Schema = new Schema(
     },
     department: { // ZIDNA HADA
       type: String,
-      enum: ['CREATIVE', 'TECHNICAL_OFFICE', 'WORKSHOP', 'FIELD', 'LOGISTICS'],
+      enum: ['CREATIVE', 'TECHNICAL_OFFICE', 'WORKSHOP', 'FIELD', 'LOGISTICS', 'PROJECT_MANAGEMENT'],
       required: true,
     },
     dueDate: {

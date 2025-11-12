@@ -13,13 +13,13 @@ import {
 } from "@tabler/icons-react";
 import { gql } from "@apollo/client";
 import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription, SheetFooter } from "@/components/ui/sheet";
-import { useMutation, useQuery, useLazyQuery } from "@apollo/client/react";
+import { useMutation, useQuery, useLazyQuery, useSubscription } from "@apollo/client/react";
 import {
   ColumnDef, ColumnFiltersState, SortingState, VisibilityState, flexRender,
   getCoreRowModel, getFacetedRowModel, getFacetedUniqueValues,
   getFilteredRowModel, getPaginationRowModel, getSortedRowModel, useReactTable
 } from "@tanstack/react-table";
-import { toast } from "sonner";
+import { Toaster, toast } from "sonner";
 import { z } from "zod";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Badge } from "@/components/ui/badge";
@@ -143,6 +143,32 @@ const GET_LOGS_QUERY = gql`
       }
     }
   }
+`;
+
+const TASK_CREATED_SUBSCRIPTION = gql`
+    subscription TaskCreated($userId: ID!) {
+      taskCreated(userId: $userId) {
+        id
+        description
+        status
+        project {
+          id
+        }
+      }
+    }
+`;
+
+const TASK_UPDATED_SUBSCRIPTION = gql`
+    subscription TaskUpdated {
+      taskUpdated {
+        id
+        description
+        status
+        project {
+          id
+        }
+      }
+    }
 `;
 
 // --- QUERY JDID L-TASKS ---
@@ -350,6 +376,38 @@ function TaskStatusPill({ status }: { status: string }) {
       {status.toLowerCase().replace('_', ' ')}
     </Badge>
   );
+}
+
+/**
+ * Hada component mkhfi, kay-tssennet l-l-updates (Sockets)
+ * o kay-3llem l-query l-ra2issi (GET_PROJECTS_FEED) bach y-dir refetch.
+ */
+function ProjectFeedUpdater({ currentUserId, refetchFeed }: {
+  currentUserId: string;
+  refetchFeed: () => void;
+}) {
+
+  // 1. Tssennet l-les tâches jdad li t-assignaw LIK
+  useSubscription(TASK_CREATED_SUBSCRIPTION, {
+    variables: { userId: currentUserId },
+    onData: ({ data }) => {
+      console.log("⚡ Socket: New task assigned to me!", data.data.taskCreated);
+      toast.info(`Nouvelle tâche assignée: ${data.data.taskCreated.description}`);
+      refetchFeed(); // Refreshi l-data
+    }
+  });
+
+  // 2. Tssennet l-AY task t-bddel l-status dyalo
+  useSubscription(TASK_UPDATED_SUBSCRIPTION, {
+    onData: ({ data }) => {
+      console.log("⚡ Socket: Task status updated!", data.data.taskUpdated);
+      // Ma n-affichiwch alert hna bach ma n-brztoch l-user
+      // Ghir n-refreshiw l-data b chwiya
+      refetchFeed();
+    }
+  });
+
+  return null; // Ma kay-renderi walo
 }
 
 function ProjectStatusPill({ status }: { status: string }) {
@@ -582,8 +640,13 @@ export function DataTable({
     pageSize: 10,
   });
 
-  const { data: meData, loading: roleLoading } = useQuery(ME_QUERY);
+  // --- L-MODIFICATION HNA ---
+  // Jbedna l-function `refetch` mn l-query l-ra2issi dyal l-feed
+  // o l-ID dyal l-user
+  const { data: meData, loading: roleLoading, refetch: refetchFeed } = useQuery(ME_QUERY);
   const userRole = meData?.me.role.name;
+  const currentUserId = meData?.me.id;
+  // --------------------------
 
 
   const table = useReactTable({
@@ -646,6 +709,15 @@ export function DataTable({
       defaultValue="outline"
       className="w-full flex-col justify-start gap-6"
     >
+      <Toaster position="top-center" richColors />
+      {/* --- ZIDNA L-COMPONENT L-MKHFI HNA --- */}
+      {currentUserId && refetchFeed && (
+        <ProjectFeedUpdater
+          currentUserId={currentUserId}
+          refetchFeed={refetchFeed}
+        />
+      )}
+      {/* ------------------------------------ */}
       <div className="flex items-center justify-between px-4 lg:px-6">
         <TabsList className="**:data-[slot=badge]:bg-muted-foreground/30 hidden **:data-[slot=badge]:size-5 **:data-[slot=badge]:rounded-full **:data-[slot=badge]:px-1 @4xl/main:flex">
           <TabsTrigger value="outline">Outline</TabsTrigger>
@@ -1347,17 +1419,57 @@ function TableCellViewer({ item }: { item: Project }) {
   const [newTaskDesc, setNewTaskDesc] = React.useState("");
   const [newTaskAssignee, setNewTaskAssignee] = React.useState("");
   const [newTaskDept, setNewTaskDept] = React.useState("");
+  const [avisData, setAvisData] = React.useState({
+    status: '',
+    reason: ''
+  });
+  // ---------------------------
 
   // --- L-Mutations ---
-  const [updateProject, { loading: loadingUpdate }] = useMutation(UPDATE_PROJECT_MUTATION, { /* ... */ });
-  const [uploadDocument, { loading: loadingUpload }] = useMutation(UPLOAD_DOCUMENT_MUTATION, { /* ... */ });
-  const [submitForReview, { loading: loadingSubmit }] = useMutation(SUBMIT_REVIEW_MUTATION, { /* ... */ });
-  const [adminAssignProject, { loading: loadingAssign }] = useMutation(ADMIN_ASSIGN_PROJECT_MUTATION, { /* ... */ });
-  const [cpUploadEstimate, { loading: loadingEstimate }] = useMutation(CP_UPLOAD_ESTIMATE_MUTATION, { /* ... */ });
-  const [adminRunFeasibility, { loading: loadingFeasibility }] = useMutation(ADMIN_RUN_FEASIBILITY_MUTATION, { /* ... */ });
-  const [adminLaunchProject, { loading: loadingLaunch }] = useMutation(ADMIN_LAUNCH_PROJECT_MUTATION, { /* ... */ });
-  const [financeRequestCaution, { loading: loadingCaution }] = useMutation(FINANCE_REQUEST_CAUTION_MUTATION, { /* ... */ });
-  const [cpAssignTeam, { loading: loadingTeam }] = useMutation(CP_ASSIGN_TEAM_MUTATION, { /* ... */ });
+  const [updateProject, { loading: loadingUpdate }] = useMutation(UPDATE_PROJECT_MUTATION, {
+    onCompleted: () => toast.success("Projet mis à jour!"),
+    onError: (error) => toast.error(`Erreur: ${error.message}`),
+    refetchQueries: [GET_PROJECTS_FEED] // <-- ZEDNA REFETCH
+  });
+  const [uploadDocument, { loading: loadingUpload }] = useMutation(UPLOAD_DOCUMENT_MUTATION, {
+    // Handled by handleFileUploadAndMutate
+  });
+  const [submitForReview, { loading: loadingSubmit }] = useMutation(SUBMIT_REVIEW_MUTATION, {
+    onCompleted: () => toast.success("Projet soumis pour révision!"),
+    onError: (error) => toast.error(`Erreur: ${error.message}`),
+    refetchQueries: [GET_PROJECTS_FEED] // <-- ZEDNA REFETCH
+  });
+  const [adminAssignProject, { loading: loadingAssign }] = useMutation(ADMIN_ASSIGN_PROJECT_MUTATION, {
+    onCompleted: () => toast.success("Projet assigné!"),
+    onError: (error) => toast.error(`Erreur: ${error.message}`),
+    refetchQueries: [GET_PROJECTS_FEED] // <-- ZEDNA REFETCH
+  });
+  const [cpUploadEstimate, { loading: loadingEstimate }] = useMutation(CP_UPLOAD_ESTIMATE_MUTATION, {
+    // Handled by handleFileUploadAndMutate
+    refetchQueries: [GET_PROJECTS_FEED] // <-- ZEDNA REFETCH
+  });
+  const [adminRunFeasibility, { loading: loadingFeasibility }] = useMutation(ADMIN_RUN_FEASIBILITY_MUTATION, {
+    onCompleted: () => toast.info("Check de faisabilité mis à jour."), // Info alert
+    onError: (error) => toast.error(`Erreur: ${error.message}`),
+    refetchQueries: [GET_PROJECTS_FEED] // <-- ZEDNA REFETCH
+  });
+  const [adminLaunchProject, { loading: loadingLaunch }] = useMutation(ADMIN_LAUNCH_PROJECT_MUTATION, {
+    onCompleted: () => toast.success("Projet lancé!"),
+    onError: (error) => toast.error(`Erreur: ${error.message}`),
+    refetchQueries: [GET_PROJECTS_FEED] // <-- ZEDNA REFETCH
+  });
+  const [financeRequestCaution, { loading: loadingCaution }] = useMutation(FINANCE_REQUEST_CAUTION_MUTATION, {
+    onCompleted: () => toast.success("Demande de caution enregistrée!"),
+    onError: (error) => toast.error(`Erreur: ${error.message}`),
+    refetchQueries: [GET_PROJECTS_FEED] // <-- ZEDNA REFETCH
+  });
+  const [cpAssignTeam, { loading: loadingTeam }] = useMutation(CP_ASSIGN_TEAM_MUTATION, {
+    onCompleted: () => toast.success("Équipe assignée!"),
+    onError: (error) => toast.error(`Erreur: ${error.message}`),
+    refetchQueries: [GET_PROJECTS_FEED] // <-- ZEDNA REFETCH
+  });
+
+  // --- L-Mutations l-khrin (Déja mzyanin b l-alerts o refetch) ---
   const [createTask, { loading: loadingTaskCreate }] = useMutation(PM_CREATE_TASK_MUTATION, {
     onCompleted: () => {
       toast.success("Tâche créée!");
@@ -1371,7 +1483,6 @@ function TableCellViewer({ item }: { item: Project }) {
       { query: GET_PROJECTS_FEED }
     ],
   });
-  // --- ZID L-MUTATION L-JDIDA ---
   const [giveProposalAvis, { loading: loadingAvis }] = useMutation(GIVE_PROPOSAL_AVIS_MUTATION, {
     onCompleted: () => {
       toast.success("Avis enregistré!");
@@ -1380,22 +1491,18 @@ function TableCellViewer({ item }: { item: Project }) {
     onError: (error) => toast.error(`Error: ${error.message}`),
     refetchQueries: [{ query: GET_PROJECTS_FEED }],
   });
-  const [updateTaskStatus, { loading: loadingTaskUpdate }] = useMutation(PM_UPDATE_TASK_STATUS_MUTATION, { /* ... */ });
-
-  // --- ZIDNA HADI L-MUTATION L-JDIDA (CP ASSET) ---
+  const [updateTaskStatus, { loading: loadingTaskUpdate }] = useMutation(PM_UPDATE_TASK_STATUS_MUTATION, {
+    onCompleted: () => toast.success("Status de la tâche mis à jour!"),
+    onError: (error) => toast.error(`Error: ${error.message}`),
+    refetchQueries: [GET_PROJECTS_FEED] // <-- ZEDNA REFETCH
+  });
   const [cpUploadAsset, { loading: loadingAsset }] = useMutation(CP_UPLOAD_ASSET_MUTATION, {
     onCompleted: () => { toast.success("Asset uploadé!"); setFileAsset(null); },
     onError: (error) => toast.error(`Error: ${error.message}`),
-    refetchQueries: [{ query: GET_PROJECTS_FEED }], // N-refreshiw l-docs
+    refetchQueries: [{ query: GET_PROJECTS_FEED }],
   });
 
-  // --- ZID HNA L-STATE L-JDID ---
-  const [avisData, setAvisData] = React.useState({
-    status: '',
-    reason: ''
-  });
-
-  // --- L-Queries ---
+  // --- L-Queries (Bqaw b7al b7al) ---
   const { data: pmData, loading: loadingPMs } = useQuery(GET_PROJECT_MANAGERS, {
     skip: userRole !== 'ADMIN'
   });
@@ -1411,7 +1518,6 @@ function TableCellViewer({ item }: { item: Project }) {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => { setFormData({ ...formData, [e.target.id]: e.target.value }); };
   const handleSelectChange = (id: string, value: string) => { setFormData({ ...formData, [id]: value }); };
 
-  // --- HADI L-FUNCTION L-LI KANT NAQSSA (1) ---
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     updateProject({
