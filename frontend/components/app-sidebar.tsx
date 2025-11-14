@@ -80,7 +80,7 @@ const data: AppSidebarData = {
     },
     {
       title: "Lifecycle",
-      url: "/dashboard/lifecycle",
+      url: "/dashboard/structure",
       icon: IconListDetails,
     },
     {

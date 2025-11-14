@@ -185,17 +185,26 @@ export const typeDefs = gql`
     permissions: [String!]!
   }
 
+  # Zid had l-input jdid (foq l-Query)
+  input ProjectFilterInput {
+    preparationStatus: String
+  }
+
   type Query {
     me: User
-    users(role: String): [User!]!
-    projects_proposals: [Project!]!
-    projects_feed: [ProjectFeedItem!]!
+    users(role: String): [User!]
+    projects_proposals: [Project!]
+    
+    # --- ZID HADA L-QUERY L-JDID ---
+    projects(filter: ProjectFilterInput): [Project!]
+
+    projects_feed: [ProjectFeedItem!]
     project(id: ID!): Project
-    tasksByProject(projectId: ID!): [Task!]!
-    logs(projectId: ID): [ActivityLog!]!
-    myTasks: [Task!]!
+    tasksByProject(projectId: ID!): [Task!]
+    logs(projectId: ID): [ActivityLog!]
+    myTasks: [Task!]
+    allTasks: [Task!]
     myNotifications: [Notification!]
-    allTasks: [Task!]!
   }
 
   type Mutation {

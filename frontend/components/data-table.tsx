@@ -1399,8 +1399,7 @@ function TableCellViewer({ item }: { item: Project }) {
   const [fileAvis, setFileAvis] = React.useState<File | null>(null);
   const [fileTech, setFileTech] = React.useState<File | null>(null);
   const [fileEstimate, setFileEstimate] = React.useState<File | null>(null);
-  const [fileAsset, setFileAsset] = React.useState<File | null>(null); // <-- ZIDNA HADA
-
+  const [fileAsset, setFileAsset] = React.useState<File | null>(null);
   const [adminFormData, setAdminFormData] = React.useState({
     status: item.preparationStatus,
     projectManagerId: item.projectManagers[0]?.id || ''
@@ -1425,51 +1424,46 @@ function TableCellViewer({ item }: { item: Project }) {
   });
   // ---------------------------
 
-  // --- L-Mutations ---
+  // --- L-Mutations (Bqaw b7al b7al) ---
   const [updateProject, { loading: loadingUpdate }] = useMutation(UPDATE_PROJECT_MUTATION, {
     onCompleted: () => toast.success("Projet mis à jour!"),
     onError: (error) => toast.error(`Erreur: ${error.message}`),
-    refetchQueries: [GET_PROJECTS_FEED] // <-- ZEDNA REFETCH
+    refetchQueries: [GET_PROJECTS_FEED]
   });
-  const [uploadDocument, { loading: loadingUpload }] = useMutation(UPLOAD_DOCUMENT_MUTATION, {
-    // Handled by handleFileUploadAndMutate
-  });
+  const [uploadDocument, { loading: loadingUpload }] = useMutation(UPLOAD_DOCUMENT_MUTATION);
   const [submitForReview, { loading: loadingSubmit }] = useMutation(SUBMIT_REVIEW_MUTATION, {
     onCompleted: () => toast.success("Projet soumis pour révision!"),
     onError: (error) => toast.error(`Erreur: ${error.message}`),
-    refetchQueries: [GET_PROJECTS_FEED] // <-- ZEDNA REFETCH
+    refetchQueries: [GET_PROJECTS_FEED]
   });
   const [adminAssignProject, { loading: loadingAssign }] = useMutation(ADMIN_ASSIGN_PROJECT_MUTATION, {
     onCompleted: () => toast.success("Projet assigné!"),
     onError: (error) => toast.error(`Erreur: ${error.message}`),
-    refetchQueries: [GET_PROJECTS_FEED] // <-- ZEDNA REFETCH
+    refetchQueries: [GET_PROJECTS_FEED]
   });
   const [cpUploadEstimate, { loading: loadingEstimate }] = useMutation(CP_UPLOAD_ESTIMATE_MUTATION, {
-    // Handled by handleFileUploadAndMutate
-    refetchQueries: [GET_PROJECTS_FEED] // <-- ZEDNA REFETCH
+    refetchQueries: [GET_PROJECTS_FEED]
   });
   const [adminRunFeasibility, { loading: loadingFeasibility }] = useMutation(ADMIN_RUN_FEASIBILITY_MUTATION, {
-    onCompleted: () => toast.info("Check de faisabilité mis à jour."), // Info alert
+    onCompleted: () => toast.info("Check de faisabilité mis à jour."),
     onError: (error) => toast.error(`Erreur: ${error.message}`),
-    refetchQueries: [GET_PROJECTS_FEED] // <-- ZEDNA REFETCH
+    refetchQueries: [GET_PROJECTS_FEED]
   });
   const [adminLaunchProject, { loading: loadingLaunch }] = useMutation(ADMIN_LAUNCH_PROJECT_MUTATION, {
     onCompleted: () => toast.success("Projet lancé!"),
     onError: (error) => toast.error(`Erreur: ${error.message}`),
-    refetchQueries: [GET_PROJECTS_FEED] // <-- ZEDNA REFETCH
+    refetchQueries: [GET_PROJECTS_FEED]
   });
   const [financeRequestCaution, { loading: loadingCaution }] = useMutation(FINANCE_REQUEST_CAUTION_MUTATION, {
     onCompleted: () => toast.success("Demande de caution enregistrée!"),
     onError: (error) => toast.error(`Erreur: ${error.message}`),
-    refetchQueries: [GET_PROJECTS_FEED] // <-- ZEDNA REFETCH
+    refetchQueries: [GET_PROJECTS_FEED]
   });
   const [cpAssignTeam, { loading: loadingTeam }] = useMutation(CP_ASSIGN_TEAM_MUTATION, {
     onCompleted: () => toast.success("Équipe assignée!"),
     onError: (error) => toast.error(`Erreur: ${error.message}`),
-    refetchQueries: [GET_PROJECTS_FEED] // <-- ZEDNA REFETCH
+    refetchQueries: [GET_PROJECTS_FEED]
   });
-
-  // --- L-Mutations l-khrin (Déja mzyanin b l-alerts o refetch) ---
   const [createTask, { loading: loadingTaskCreate }] = useMutation(PM_CREATE_TASK_MUTATION, {
     onCompleted: () => {
       toast.success("Tâche créée!");
@@ -1494,14 +1488,13 @@ function TableCellViewer({ item }: { item: Project }) {
   const [updateTaskStatus, { loading: loadingTaskUpdate }] = useMutation(PM_UPDATE_TASK_STATUS_MUTATION, {
     onCompleted: () => toast.success("Status de la tâche mis à jour!"),
     onError: (error) => toast.error(`Error: ${error.message}`),
-    refetchQueries: [GET_PROJECTS_FEED] // <-- ZEDNA REFETCH
+    refetchQueries: [GET_PROJECTS_FEED]
   });
   const [cpUploadAsset, { loading: loadingAsset }] = useMutation(CP_UPLOAD_ASSET_MUTATION, {
     onCompleted: () => { toast.success("Asset uploadé!"); setFileAsset(null); },
     onError: (error) => toast.error(`Error: ${error.message}`),
     refetchQueries: [{ query: GET_PROJECTS_FEED }],
   });
-
   // --- L-Queries (Bqaw b7al b7al) ---
   const { data: pmData, loading: loadingPMs } = useQuery(GET_PROJECT_MANAGERS, {
     skip: userRole !== 'ADMIN'
@@ -1514,10 +1507,9 @@ function TableCellViewer({ item }: { item: Project }) {
     skip: !item.id,
   });
 
-  // --- L-Functions dyal l-Forms ---
+  // --- L-Functions (Bqaw b7al b7al) ---
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => { setFormData({ ...formData, [e.target.id]: e.target.value }); };
   const handleSelectChange = (id: string, value: string) => { setFormData({ ...formData, [id]: value }); };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     updateProject({
@@ -1536,18 +1528,15 @@ function TableCellViewer({ item }: { item: Project }) {
   const handleAvisFormChange = (field: string, value: string) => {
     setAvisData(prev => ({ ...prev, [field]: value }));
   };
-
   const handleSubmitAvis = () => {
     if (!avisData.status) {
       toast.error("Veuillez sélectionner une décision");
       return;
     }
-
     if (avisData.status === 'NOT_ACCEPTED' && !avisData.reason.trim()) {
       toast.error("Veuillez saisir la raison du refus");
       return;
     }
-
     giveProposalAvis({
       variables: {
         projectId: item.id,
@@ -1556,7 +1545,6 @@ function TableCellViewer({ item }: { item: Project }) {
       }
     });
   };
-
   const handleAdminFormChange = (id: string, value: string) => {
     setAdminFormData(prev => ({ ...prev, [id]: value }));
   };
@@ -1582,10 +1570,8 @@ function TableCellViewer({ item }: { item: Project }) {
   const handleRequestCaution = () => {
     financeRequestCaution({ variables: { projectId: item.id } });
   };
-
-  // Function dyal l-upload l-jdida (b REST)
   const handleFileUploadAndMutate = async (
-    file: File | null, // <-- HADA HOWA L-FILE LI DÉJA OPTIMISÉ
+    file: File | null,
     mutation: Function,
     docType: string,
     stageName?: string
@@ -1600,11 +1586,14 @@ function TableCellViewer({ item }: { item: Project }) {
     try {
       toast.loading(`Uploading ${file.name}...`);
       const response = await fetch(`https://backoffice.urbagroupe.ma/api/upload/${projectId}`, { method: 'POST', body: formDataRest });
-      if (!response.ok) throw new Error('File upload failed.');
+      if (!response.ok) {
+        toast.dismiss();
+        toast.error(`Erreur ${response.status}: Upload a échoué. (Fichier kbir?)`);
+        throw new Error('File upload failed.');
+      }
       const result = await response.json();
       const fileUrl = result.fileUrl;
       toast.dismiss();
-
       await mutation({
         variables: {
           projectId: projectId,
@@ -1614,7 +1603,6 @@ function TableCellViewer({ item }: { item: Project }) {
           fileUrl: fileUrl,
         },
       });
-      // --- L-MODIFICATION HNA ---
       toast.success(`Fichier uploadé avec succès! (${(file.size / 1024 / 1024).toFixed(2)} MB)`);
       return true;
     } catch (error: any) {
@@ -1630,22 +1618,34 @@ function TableCellViewer({ item }: { item: Project }) {
   const handleAssignTeam = () => {
     cpAssignTeam({ variables: { input: { projectId: item.id, ...teamData } } });
   };
-
-  // --- S777NA HADI (2) ---
   const handleSubmitForReview = async () => {
     if (!fileCPS || !fileRC || !fileAvis) {
       toast.error("Il faut sélectionner les 3 fichiers (CPS, RC, Avis) d'abord.");
       return;
     }
-
+    const uploadToastId = toast.loading("Uploading des fichiers requis...");
     const cpsOK = await handleFileUploadAndMutate(fileCPS, uploadDocument, 'CPS', 'administrative');
+    if (!cpsOK) {
+      toast.dismiss(uploadToastId);
+      toast.error("Échec d'upload du CPS.");
+      return;
+    }
     const rcOK = await handleFileUploadAndMutate(fileRC, uploadDocument, 'RC', 'administrative');
+    if (!rcOK) {
+      toast.dismiss(uploadToastId);
+      toast.error("Échec d'upload du RC.");
+      return;
+    }
     const avisOK = await handleFileUploadAndMutate(fileAvis, uploadDocument, 'Avis', 'administrative');
-
+    if (!avisOK) {
+      toast.dismiss(uploadToastId);
+      toast.error("Échec d'upload de l'Avis.");
+      return;
+    }
     if (fileTech) {
       await handleFileUploadAndMutate(fileTech, uploadDocument, 'Fichier Technique', 'technical');
     }
-
+    toast.dismiss(uploadToastId);
     if (cpsOK && rcOK && avisOK) {
       submitForReview({ variables: { projectId: item.id } });
     } else {
@@ -1667,20 +1667,29 @@ function TableCellViewer({ item }: { item: Project }) {
       return { ...prev, [type]: newIds };
     });
   };
-
-  // L-Function l-jdida dyal l-tasks
   const handleCreateTask = () => {
     if (!newTaskDesc || !newTaskAssignee || !newTaskDept) {
       toast.error("Description, Assignation, et Département sont requis.");
       return;
     }
+    // S77E7NA L-LOGIC DYAL 'dept' HNA
+    const assignedUser = teamData.infographisteIds.includes(newTaskAssignee) ? teamMembers.infographistes.find((u: any) => u.id === newTaskAssignee) :
+      teamData.team3DIds.includes(newTaskAssignee) ? teamMembers.team3D.find((u: any) => u.id === newTaskAssignee) :
+        teamData.assistantIds.includes(newTaskAssignee) ? teamMembers.assistants.find((u: any) => u.id === newTaskAssignee) : null;
+
+    // N-3RFO L-DEPT MN L-ROLE L-S7I7
+    let department = 'UNKNOWN';
+    if (assignedUser && teamMembers.infographistes.some((u: any) => u.id === assignedUser.id)) department = 'CREATIVE';
+    else if (assignedUser && teamMembers.team3D.some((u: any) => u.id === assignedUser.id)) department = '3D_ARTIST';
+    else if (assignedUser && teamMembers.assistants.some((u: any) => u.id === assignedUser.id)) department = 'ASSISTANT_PM';
+
     createTask({
       variables: {
         input: {
           projectId: item.id,
           description: newTaskDesc,
           assignedToId: newTaskAssignee,
-          department: newTaskDept,
+          department: department, // Nst3mlo l-dept l-s7i7
         }
       }
     });
@@ -1692,8 +1701,6 @@ function TableCellViewer({ item }: { item: Project }) {
       variables: { taskId: taskId, status: newStatus }
     });
   };
-
-  // --- FUNCTION JDIDA L-CP ASSET ---
   const handleSubmitAsset = () => {
     handleFileUploadAndMutate(fileAsset, cpUploadAsset, 'ASSET', 'technical');
   };
@@ -1904,9 +1911,9 @@ function TableCellViewer({ item }: { item: Project }) {
       }
 
       const allTeamMembers = [
-        ...(teamMembers?.infographistes || []),
-        ...(teamMembers?.team3D || []),
-        ...(teamMembers?.assistants || [])
+        ...(teamMembers?.infographistes.map((u: any) => ({ ...u, dept: 'CREATIVE' })) || []),
+        ...(teamMembers?.team3D.map((u: any) => ({ ...u, dept: '3D_ARTIST' })) || []),
+        ...(teamMembers?.assistants.map((u: any) => ({ ...u, dept: 'ASSISTANT_PM' })) || [])
       ];
 
       // --- L-BDIL L-JDID (L-LOGIC 4) ---
@@ -2107,11 +2114,9 @@ function TableCellViewer({ item }: { item: Project }) {
 
     // 3. L-Footer dyal l-CP (Upload Estimate)
     if (userPermissions.includes('manage_assigned_projects') && isToPrepare) {
-      return (
-        <Button onClick={handleSubmitEstimate} disabled={loading || !fileEstimate}>
-          {loadingEstimate ? "Uploading..." : "Uploader l'Estimation"}
-        </Button>
-      );
+      // HNA L-BDIL: L-BUTTON DYAL ESTIMATE MABQACH HNA, DKHOL L-BLOC 3 L-FOQ
+      // WALAKIN L-BUTTON DYAL AVIS BAQI HNA
+      return null; // L-buttons déja kaynin f l-content
     }
 
     // 4. L-Footer dyal l-Admin (Launch Project)
@@ -2139,152 +2144,7 @@ function TableCellViewer({ item }: { item: Project }) {
     // --- HNA L-BDIL L-JDID (L-FORM DYAL L-TEAM + L-TASKS + ASSETS) ---
     // 6. L-7ala dyal l-CP w l-Admin (Production)
     if ((userPermissions.includes('assign_creative_tasks') || userRole === 'ADMIN') && isInProduction) {
-      if (loadingTeamMembers) {
-        return <Skeleton className="h-40 w-full" />;
-      }
-
-      const allTeamMembers = [
-        ...(teamMembers?.infographistes.map((u: any) => ({ ...u, dept: 'CREATIVE' })) || []),
-        ...(teamMembers?.team3D.map((u: any) => ({ ...u, dept: '3D_ARTIST' })) || []),
-        ...(teamMembers?.assistants.map((u: any) => ({ ...u, dept: 'ASSISTANT_PM' })) || [])
-      ];
-
-      const assignedTeamMembers = allTeamMembers.filter(member =>
-        teamData.infographisteIds.includes(member.id) ||
-        teamData.team3DIds.includes(member.id) ||
-        teamData.assistantIds.includes(member.id)
-      );
-
-      return (
-        <div className="flex flex-col gap-6 w-full">
-          {/* --- BLOC 1: ASSIGNATION ÉQUIPE (UI JDID) --- */}
-          <div className="flex flex-col gap-4 rounded-lg border p-4">
-            <h4 className="font-semibold">Étape: Assignation Équipe</h4>
-            <div className="grid grid-cols-3 gap-4">
-              <div className="flex flex-col gap-2">
-                <Label>Infographistes</Label>
-                <MultiSelectPopover
-                  title="Choisir..."
-                  options={teamMembers?.infographistes || []}
-                  selectedIds={teamData.infographisteIds}
-                  onChange={(id, checked) => handleTeamChange('infographisteIds', id, checked)}
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label>Équipe 3D</Label>
-                <MultiSelectPopover
-                  title="Choisir..."
-                  options={teamMembers?.team3D || []}
-                  selectedIds={teamData.team3DIds}
-                  onChange={(id, checked) => handleTeamChange('team3DIds', id, checked)}
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label>Assistants</Label>
-                <MultiSelectPopover
-                  title="Choisir..."
-                  options={teamMembers?.assistants || []}
-                  selectedIds={teamData.assistantIds}
-                  onChange={(id, checked) => handleTeamChange('assistantIds', id, checked)}
-                />
-              </div>
-            </div>
-            <Button onClick={handleAssignTeam} disabled={loadingTeam} size="sm" className="mt-2 w-fit self-end">
-              {loadingTeam ? "Assignation..." : "Enregistrer l'Équipe"}
-            </Button>
-          </div>
-
-          {/* --- BLOC 2: UPLOAD ASSETS (JDID L-CP) --- */}
-          <div className="flex flex-col gap-4 rounded-lg border p-4">
-            <h4 className="font-semibold">Étape: Assets & Inspiration</h4>
-            <p className="text-xs text-muted-foreground">
-              Uploadez les assets (inspiration, charte, etc.) pour l'équipe.
-            </p>
-            <FileUpload label="Fichier Asset" onFileSelect={(file) => setFileAsset(file)} />
-            <Button onClick={handleSubmitAsset} disabled={loadingAsset || !fileAsset} size="sm" className="mt-2 w-fit self-end">
-              {loadingAsset ? "Uploading..." : "Uploader Asset"}
-            </Button>
-            {/* TODO: Affichi l-lista dyal l-assets li t-uploadaw */}
-          </div>
-
-          <Separator />
-
-          {/* --- BLOC 3: GESTION DES TÂCHES --- */}
-          <div className="flex flex-col gap-4 rounded-lg border p-4">
-            <h4 className="font-semibold">Étape: Gestion des Tâches</h4>
-
-            {/* L-Form dyal l-Ajout */}
-            <div className="flex items-end gap-2">
-              <div className="flex-grow flex flex-col gap-2">
-                <Label htmlFor="new-task-desc">Nouvelle Tâche</Label>
-                <Input
-                  id="new-task-desc"
-                  placeholder="Description (ex: Design 3D Stand...)"
-                  value={newTaskDesc}
-                  onChange={(e) => setNewTaskDesc(e.target.value)}
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="new-task-assign">Assigner à</Label>
-                <Select
-                  value={newTaskAssignee}
-                  onValueChange={(value) => {
-                    const selected = assignedTeamMembers.find(m => m.id === value);
-                    setNewTaskAssignee(value);
-                    const dept = allTeamMembers.find(m => m.id === value)?.dept || '';
-                    setNewTaskDept(dept);
-                  }}
-                >
-                  <SelectTrigger id="new-task-assign" className="w-[180px]">
-                    <SelectValue placeholder="Choisir un membre..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {assignedTeamMembers.map((user: any) => (
-                      <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button onClick={handleCreateTask} disabled={loadingTaskCreate} size="icon">
-                <IconPlus className="h-4 w-4" />
-              </Button>
-            </div>
-
-            <Separator className="my-2" />
-
-            {/* --- L-TABLE L-JDIDA DYAL L-TASKS (UI JDID) --- */}
-            <h5 className="font-medium">Tâches Actuelles</h5>
-            <div className="max-h-48 overflow-y-auto border rounded-lg">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Tâche</TableHead>
-                    <TableHead>Assigné à</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {taskLoading && (
-                    <TableRow><TableCell colSpan={3}><Skeleton className="h-8 w-full" /></TableCell></TableRow>
-                  )}
-                  {taskData && taskData.tasksByProject.length === 0 && (
-                    <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground">Aucune tâche créée.</TableCell></TableRow>
-                  )}
-                  {taskData?.tasksByProject.map((task: any) => (
-                    <TableRow key={task.id}>
-                      <TableCell className="font-medium">{task.description}</TableCell>
-                      <TableCell>{task.assignedTo.name}</TableCell>
-                      <TableCell>
-                        <TaskStatusPill status={task.status} />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </div>
-        </div>
-      );
+      return null; // L-buttons déja kaynin f l-content
     }
     // ---------------------------------
     // 7iydnah mn hna, drnah f l-bloc dyal l-assignation (Button "Enregistrer l'Équipe")

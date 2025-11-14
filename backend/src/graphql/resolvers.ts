@@ -148,6 +148,60 @@ export const resolvers = {
                 .sort({ createdAt: -1 });
         },
 
+        // --- HNA L-FIX: ZID HADA L-QUERY L-JDID ---
+        projects: async (_: unknown, { filter }: { filter?: { preparationStatus?: string } }, context: IContext) => {
+            if (!context.user) throw new ApolloError('Not authenticated', 'UNAUTHENTICATED');
+
+            // N-buildiw l-filter dyalna
+            const queryFilter: any = {};
+            if (filter?.preparationStatus) {
+                queryFilter.preparationStatus = filter.preparationStatus;
+            }
+
+            // N-jib l-projects b nafs l-populates
+            let projectQuery = Project.find(queryFilter)
+                .sort({ updatedAt: -1 })
+                .populate({ path: 'projectManagers', select: userSelect })
+                .populate({ path: 'createdBy', select: userSelect })
+                .populate({ path: 'assignedTeam', select: userSelect })
+                .populate({ path: 'proposalAvis.givenBy', select: userSelect });
+
+            for (const p of stagePopulates) projectQuery = projectQuery.populate(p as any);
+            for (const p of teamPopulates) projectQuery = projectQuery.populate(p as any);
+
+            const projects = await projectQuery.exec();
+
+            // N-fixiw l-users li 'null' (nafs l-code dyal projects_feed)
+            projects.forEach((project: any) => {
+                if (!project.createdBy) project.createdBy = defaultUser;
+                project.projectManagers = (project.projectManagers || []).filter(pm => pm).map(pm => pm || defaultUser);
+                if (project.team) {
+                    project.team.infographistes = (project.team.infographistes || []).filter(u => u).map(u => u || defaultUser);
+                    project.team.team3D = (project.team.team3D || []).filter(u => u).map(u => u || defaultUser);
+                    project.team.assistants = (project.team.assistants || []).filter(u => u).map(u => u || defaultUser);
+                }
+                if (project.stages) {
+                    Object.keys(project.stages).forEach(stageKey => {
+                        const stage = (project.stages as any)[stageKey];
+                        if (stage && Array.isArray(stage.documents)) {
+                            stage.documents = stage.documents.filter(doc => doc).map((doc: any) => {
+                                if (doc && !doc.uploadedBy) {
+                                    doc.uploadedBy = defaultUser;
+                                }
+                                return doc;
+                            });
+                        }
+                    });
+                }
+
+                if (project.proposalAvis && !project.proposalAvis.givenBy) {
+                    project.proposalAvis.givenBy = defaultUser;
+                }
+            });
+
+            return projects;
+        },
+
         // -------- FEED (HNA L-MODIFICATION L-KBERA) --------
         projects_feed: async (_: unknown, __: unknown, context: IContext) => {
             if (!context.user) throw new ApolloError('Not authenticated', 'UNAUTHENTICATED');
@@ -369,8 +423,8 @@ export const resolvers = {
                         status: 1,
                         department: 1,
                         dueDate: 1,
-                        createdAt: 1,
-                        updatedAt: 1,
+                        createdAt: 1, // <-- ZIDNA HADI
+                        updatedAt: 1, // <-- ZIDNA HADI
                         'project.id': '$project._id',
                         'project.title': 1,
                         'project.object': 1,
