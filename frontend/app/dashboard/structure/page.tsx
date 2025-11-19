@@ -23,6 +23,7 @@ const GET_PROJECTS_FEED_FOR_STRUCTURE = gql`
         title
         object
         preparationStatus
+        generalStatus
         projectManagers { id name }
         submissionDeadline
         team {
