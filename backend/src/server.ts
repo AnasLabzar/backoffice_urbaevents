@@ -146,25 +146,31 @@ const startServer = async () => {
     }));
     // --- FIN DYAL L-MODIFICATION ---
 
-    // --- 3. ZID L-ENDPOINT L-STATIC (Bach n-affichiw l-fichiers) ---
-    app.use('/uploads', express.static('/root/backoffice_urbaevents/uploads'));
+    // --- FIX 1: DYNAMIC PATH FOR STATIC FILES ---
+    // Instead of hardcoding '/root/...', we use path.join relative to this file.
+    // Assuming server.ts is in backend/src, this goes up 2 levels to 'backoffice_urbaevents/uploads'
+    app.use('/uploads', express.static(path.join(__dirname, '../../uploads')));
 
-    // --- 4. ZID L-LOGIC DYAL MULTER (Modifié: Sanitize Filename) ---
+    // --- FIX 2: SANITIZE FILENAMES (Remove spaces) ---
     const storage = multer.diskStorage({
         destination: (req, file, cb) => {
             const projectId = req.params.projectId;
-            // Hna path relative l-backend/src awla backend/dist
+            // Ensure this path matches the static path above
             const uploadDir = path.join(__dirname, `../../uploads/${projectId}`);
+
             if (!fs.existsSync(uploadDir)) {
                 fs.mkdirSync(uploadDir, { recursive: true });
             }
             cb(null, uploadDir);
         },
         filename: (req, file, cb) => {
-            // --- HNA L-FIX L-MOHIM ---
-            // Kan-b3d mn l-espaces ( ) kan-rddohm (_)
-            // w kan-b3d mn l-accents bach l-URL ykon nqi
-            const sanitizedName = file.originalname.replace(/\s+/g, '_').replace(/[()]/g, '');
+            // REPLACES SPACES WITH UNDERSCORES & REMOVES PARENTHESES
+            // Example: "CPS (2).pdf" becomes "CPS_2.pdf"
+            const sanitizedName = file.originalname
+                .replace(/\s+/g, '_') // Space -> _
+                .replace(/[()]/g, '') // Remove ( and )
+                .replace(/[^a-zA-Z0-9._-]/g, ''); // Remove anything else weird
+
             cb(null, sanitizedName);
         }
     });
