@@ -816,11 +816,12 @@ export const resolvers = {
             await checkPermission(context, 'assign_project_managers');
             const { projectId, projectManagerIds, status } = input;
 
+            // FIXED: Removed the syntax error "Ï" that was here
             const project = await Project.findByIdAndUpdate(
                 projectId,
                 { projectManagers: projectManagerIds, preparationStatus: status, currentStage: 'ADMINISTRATIVE' },
-                { new: true } // Kan-récupéré l-projet b les infos jdad
-            );
+                { new: true }
+            ).populate({ path: 'projectManagers', select: userSelect });
 
             if (!project) throw new ApolloError('Project not found', 'NOT_FOUND');
 
@@ -893,7 +894,18 @@ export const resolvers = {
             }
             // --- NIHAYA DYAL L-CODE L-JDID ---
 
-            return project;
+            // 2. FIX: Convert to Object and force ID string conversion
+            const projectObj = project.toObject();
+            projectObj.id = project._id.toString();
+
+            if (projectObj.projectManagers) {
+                projectObj.projectManagers = projectObj.projectManagers.map((pm: any) => ({
+                    ...pm,
+                    id: pm._id ? pm._id.toString() : pm.id,
+                }));
+            }
+
+            return JSON.parse(JSON.stringify(project));
         },
 
         admin_assignTeams: async (_: unknown, { projectId, teamMemberIds }: any, context: IContext) => {
@@ -1561,6 +1573,27 @@ export const resolvers = {
         }
         // ---------------------------------------
     },
+
+    // --- GLOBAL TYPE RESOLVERS ---
+    // This fixes the "Buffer" error globally
+    User: {
+        id: (parent: any) => parent._id ? parent._id.toString() : parent.id
+    },
+    Project: {
+        id: (parent: any) => parent._id ? parent._id.toString() : parent.id
+    },
+    Task: {
+        id: (parent: any) => parent._id ? parent._id.toString() : parent.id
+    },
+    Document: {
+        id: (parent: any) => parent._id ? parent._id.toString() : parent.id
+    },
+    Notification: {
+        id: (parent: any) => parent._id ? parent._id.toString() : parent.id
+    },
+    Role: {
+        id: (parent: any) => parent._id ? parent._id.toString() : parent.id
+    }
 
     // No special field resolvers needed; we rely on correct populates + selects.
 };

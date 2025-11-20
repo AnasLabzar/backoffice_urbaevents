@@ -12,8 +12,21 @@ import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 
-// --- 1. L-QUERIES O L-MUTATIONS L-KHASSIN B LES NOTIFS ---
+// --- HELPER FUNCTION TO FIX THE ERROR ---
+// This handles "173..." (string timestamp), number timestamp, or ISO string
+function parseDate(dateInput: string | number | null | undefined): Date {
+    if (!dateInput) return new Date(); // Fallback to now if missing
 
+    // If it's a string containing only numbers (e.g. "1732123456"), convert to number
+    if (typeof dateInput === 'string' && /^\d+$/.test(dateInput)) {
+        return new Date(parseInt(dateInput, 10));
+    }
+
+    return new Date(dateInput);
+}
+// ----------------------------------------
+
+// --- 1. L-QUERIES O L-MUTATIONS ---
 const ME_QUERY = gql` query Me { me { id role { name permissions } } }`;
 
 const MY_NOTIFICATIONS_QUERY = gql`
@@ -37,6 +50,7 @@ const NEW_NOTIFICATION_SUBSCRIPTION = gql`
       message
       link
       isRead
+      createdAt # <-- Ensure this is requested in subscription too
     }
   }
 `;
@@ -56,24 +70,18 @@ const MARK_ALL_AS_READ_MUTATION = gql`
   }
 `;
 
-// --- 2. L-COMPONENT DYAL L-"BELL" ---
-
+// --- 2. L-COMPONENT ---
 export function NotificationBell() {
     const [isOpen, setIsOpen] = React.useState(false);
-
-    // Jbed l-ID dyal l-user (bach n-tssennto l-les notifs dyalo)
     const { data: meData } = useQuery(ME_QUERY);
     const currentUserId = meData?.me?.id;
 
-    // Jbed l-lista dyal les notifications
     const { data, loading, refetch } = useQuery(MY_NOTIFICATIONS_QUERY);
 
-    // 7sseb ch7al mn wa7da ma ma-qriyach
     const unreadCount = React.useMemo(() => {
         return data?.myNotifications?.filter((n: any) => !n.isRead).length || 0;
     }, [data]);
 
-    // Tssennet l-les notifs l-jdad (Socket)
     useSubscription(NEW_NOTIFICATION_SUBSCRIPTION, {
         variables: { userId: currentUserId },
         skip: !currentUserId,
@@ -81,20 +89,17 @@ export function NotificationBell() {
             const notif = data.data.newNotification;
             console.log("⚡ Socket: New Notification!", notif);
 
-            // HNA L-ALERT L-JDIDA (b toast)
             if (notif.level === 'URGENT' || notif.level === 'DEADLINE') {
-                toast.error(notif.message, { duration: 10000 }); // Error l-l-urgent
+                toast.error(notif.message, { duration: 10000 });
             } else if (notif.level === 'IMPORTANT') {
-                toast.warning(notif.message, { duration: 7000 }); // Warning l-l-important
+                toast.warning(notif.message, { duration: 7000 });
             } else {
-                toast.info(notif.message); // Info l-l-3adi
+                toast.info(notif.message);
             }
-
-            refetch(); // 3awd jbed l-lista bach t-ban l-jdida
+            refetch();
         }
     });
 
-    // Mutations bach n-markiw "read"
     const [markAsRead] = useMutation(MARK_AS_READ_MUTATION);
     const [markAllAsRead] = useMutation(MARK_ALL_AS_READ_MUTATION, {
         onCompleted: () => {
@@ -107,21 +112,16 @@ export function NotificationBell() {
     const handleMarkAsRead = (notificationId: string) => {
         markAsRead({
             variables: { notificationId },
-            // Optimistic update (bach t-ban read nichan)
             update: (cache) => {
                 cache.modify({
                     id: cache.identify({ __typename: 'Notification', id: notificationId }),
-                    fields: {
-                        isRead: () => true,
-                    },
+                    fields: { isRead: () => true },
                 });
             }
         });
     };
 
-    const handleMarkAllAsRead = () => {
-        markAllAsRead();
-    };
+    const handleMarkAllAsRead = () => markAllAsRead();
 
     const getLevelColor = (level: string) => {
         switch (level) {
@@ -152,12 +152,7 @@ export function NotificationBell() {
                 <div className="flex items-center justify-between p-4">
                     <h4 className="font-semibold">Notifications</h4>
                     {unreadCount > 0 && (
-                        <Button
-                            variant="link"
-                            size="sm"
-                            className="p-0 h-auto"
-                            onClick={handleMarkAllAsRead}
-                        >
+                        <Button variant="link" size="sm" className="p-0 h-auto" onClick={handleMarkAllAsRead}>
                             Marquer tout comme lu
                         </Button>
                     )}
@@ -174,15 +169,16 @@ export function NotificationBell() {
                             <div
                                 key={notif.id}
                                 className={cn(
-                                    "flex items-start gap-3 rounded-lg p-3",
-                                    !notif.isRead && "bg-muted/50"
+                                    "flex items-start gap-3 rounded-lg p-3 transition-colors",
+                                    !notif.isRead ? "bg-muted/50" : "hover:bg-muted/30"
                                 )}
                             >
-                                <span className={cn("h-2 w-2 rounded-full mt-2", getLevelColor(notif.level))} />
-                                <div className="flex-1">
-                                    <p className="text-sm leading-tight">{notif.message}</p>
+                                <span className={cn("h-2 w-2 rounded-full mt-2 flex-shrink-0", getLevelColor(notif.level))} />
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm leading-tight break-words">{notif.message}</p>
                                     <p className="text-xs text-muted-foreground mt-1">
-                                        {formatDistanceToNow(new Date(notif.createdAt), { addSuffix: true, locale: fr })}
+                                        {/* FIX IS HERE: Use parseDate() */}
+                                        {formatDistanceToNow(parseDate(notif.createdAt), { addSuffix: true, locale: fr })}
                                     </p>
                                 </div>
                                 {!notif.isRead && (
@@ -190,7 +186,7 @@ export function NotificationBell() {
                                         title="Marquer comme lu"
                                         variant="ghost"
                                         size="icon"
-                                        className="h-7 w-7"
+                                        className="h-7 w-7 flex-shrink-0"
                                         onClick={() => handleMarkAsRead(notif.id)}
                                     >
                                         <IconCheck className="h-4 w-4" />
