@@ -4,11 +4,11 @@ import React, { useState } from "react"; // 1. Import useState
 import { gql, useQuery } from "@apollo/client";
 import { ColumnFiltersState } from "@tanstack/react-table"; // 2. Import Type
 
-import { columns } from "@/components/projects-data-table";
+import { columns } from "@/components/data-table";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ChartAreaInteractive } from "@/components/chart-area-interactive";
 import { ProjectsStats } from "@/components/projects-stats";
-import { DataTable } from "@/components/projects-data-table";
+import { DataTable } from "@/components/data-table";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";

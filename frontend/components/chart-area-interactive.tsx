@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Area, AreaChart, CartesianGrid, XAxis, ResponsiveContainer } from "recharts" // Import ResponsiveContainer
+import { Area, AreaChart, CartesianGrid, XAxis } from "recharts"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart"
@@ -16,7 +16,7 @@ interface ProjectData {
 }
 
 interface ChartProps {
-  projects: ProjectData[];
+  projects?: ProjectData[]; // Made optional to prevent build errors if data is missing
 }
 
 const chartConfig = {
@@ -27,9 +27,9 @@ const chartConfig = {
 
 export function ChartAreaInteractive({ projects = [] }: ChartProps) {
   const isMobile = useIsMobile()
-  const [timeRange, setTimeRange] = React.useState("90d")
+  // --- CHANGE 1: Set default state to "30d" ---
+  const [timeRange, setTimeRange] = React.useState("30d")
 
-  // ... (Keep getProjectDate and fillMissingDays helpers exactly as they were) ...
   const getProjectDate = (project: ProjectData) => {
     if (!project) return null;
     if (project.createdAt) return new Date(project.createdAt);
@@ -67,9 +67,12 @@ export function ChartAreaInteractive({ projects = [] }: ChartProps) {
       if (isDone) sparseData[dateKey].done += 1;
       else sparseData[dateKey].inProgress += 1;
     });
+
+    // Logic now defaults to 30 because of the state init
     let daysToLookBack = 90;
     if (timeRange === "30d") daysToLookBack = 30;
     if (timeRange === "7d") daysToLookBack = 7;
+
     return fillMissingDays(sparseData, daysToLookBack);
   }, [projects, timeRange]);
 
@@ -77,7 +80,6 @@ export function ChartAreaInteractive({ projects = [] }: ChartProps) {
   const totalInProgress = chartData.reduce((acc, curr) => acc + curr.inProgress, 0);
 
   return (
-    // FIX 1: Added 'h-full flex flex-col' to Card
     <Card className="h-full flex flex-col w-full">
       <CardHeader className="flex items-center gap-2 space-y-0 border-b py-5 sm:flex-row">
         <div className="grid flex-1 gap-1 text-center sm:text-left">
@@ -97,7 +99,8 @@ export function ChartAreaInteractive({ projects = [] }: ChartProps) {
           </div>
           <Select value={timeRange} onValueChange={setTimeRange}>
             <SelectTrigger className="w-[160px] rounded-lg sm:ml-auto">
-              <SelectValue placeholder="Last 3 months" />
+              {/* --- CHANGE 2: Updated placeholder text --- */}
+              <SelectValue placeholder="Last 30 days" />
             </SelectTrigger>
             <SelectContent className="rounded-xl">
               <SelectItem value="90d" className="rounded-lg">Last 3 months</SelectItem>
@@ -108,7 +111,6 @@ export function ChartAreaInteractive({ projects = [] }: ChartProps) {
         </div>
       </CardHeader>
 
-      {/* FIX 2: CardContent is flex-1 (fills remaining space) and removed fixed height */}
       <CardContent className="flex-1 px-2 pt-4 sm:px-6 sm:pt-6 min-h-0">
         <ChartContainer config={chartConfig} className="aspect-auto h-full w-full">
           <AreaChart data={chartData}>

@@ -594,6 +594,9 @@ export function DataTable({
     const { data: meData, loading: roleLoading } = useQuery(ME_QUERY);
     const userRole = meData?.me.role.name;
 
+    console.log("hahouwa user role", userRole);
+    
+
 
     const table = useReactTable({
         data,
@@ -620,19 +623,32 @@ export function DataTable({
         getFacetedUniqueValues: getFacetedUniqueValues(),
     });
 
-    // --- L-LOGIC L-S7I7 DYAL L-ROLES ---
+    // --- L-LOGIC L-S7I7 DYAL L-ROLES (MODIFIÉ) ---
     React.useEffect(() => {
         if (roleLoading) return;
-        if (userRole === 'PROPOSAL_MANAGER' || userRole === 'ADMIN') {
+
+        // 1. PROPOSAL_MANAGER: Kaychouf docs bach y-uploadihom, MAIS ma kaychoufch status wla PMs
+        if (userRole === 'PROPOSAL_MANAGER') {
             table.getColumn('project.preparationStatus')?.toggleVisibility(false);
             table.getColumn('project.projectManagers')?.toggleVisibility(false);
             table.getColumn('remainingTime')?.toggleVisibility(false);
-        } else if (userRole === 'ADMIN' || userRole === 'PROJECT_MANAGER' || userRole === 'FINANCE') {
+
+            // L-Docs 5asshom ybano lih (default) bach y-chkki 3lihom
+        }
+        // 2. ADMIN & PROJECT_MANAGER: Khasshom ychoufo KOULCHI (Docs bach y-telechargiw, Status, etc.)
+        // Donc ma n-khbbiwch 3lihom l-docs.
+        else if (userRole === 'ADMIN' || userRole === 'PROJECT_MANAGER') {
+            // HNA KAN L-GHALAT. Ma n-dirou walou hna (awla n-affichiw explicitly ila kan default hidden)
+            // table.getColumn('doc_cps')?.toggleVisibility(true); // Optional: Ila kano hidden par default
+        }
+        // 3. FINANCE: Ymqn ma 3ndoch gharad b l-docs dyal l-appel d'offre
+        else if (userRole === 'FINANCE') {
             table.getColumn('doc_cps')?.toggleVisibility(false);
             table.getColumn('doc_rc')?.toggleVisibility(false);
             table.getColumn('doc_avis')?.toggleVisibility(false);
-        } else if (userRole === 'CREATIVE' || userRole === '3D_ARTIST' || userRole === 'ASSISTANT_PM') {
-            // Team members kaychofo ghir l-columns l-assassin
+        }
+        // 4. CREATIVE / TEAM: Ma kaychofoch l-docs l-adiministratifs
+        else if (userRole === 'CREATIVE' || userRole === '3D_ARTIST' || userRole === 'ASSISTANT_PM') {
             table.getColumn('doc_cps')?.toggleVisibility(false);
             table.getColumn('doc_rc')?.toggleVisibility(false);
             table.getColumn('doc_avis')?.toggleVisibility(false);

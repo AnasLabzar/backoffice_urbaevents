@@ -1,7 +1,7 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
-import { IconUsers, IconBriefcase, IconBrush, IconUserStar, IconTrendingUp, IconTrendingDown, IconTarget, IconBolt } from "@tabler/icons-react";
+import { IconUsers, IconBriefcase, IconBrush, IconUserStar, IconTarget, IconBolt } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
 
@@ -32,7 +32,7 @@ export function StructureStats({
     const pctAssist = Math.round((totalAssistants / safeTotal) * 100);
 
     return (
-        <Card className={cn("flex flex-col shadow-sm border-border/60 h-full justify-between", className)}>
+        <Card className={cn("flex flex-col shadow-sm border-border/60 h-full justify-between bg-card", className)}>
             <div>
                 <CardHeader className="pb-4">
                     <div className="flex items-center justify-between">
@@ -43,7 +43,8 @@ export function StructureStats({
                             <CardDescription>Active team allocation</CardDescription>
                         </div>
                         <div className="flex flex-col items-end">
-                            <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-600/20">
+                            {/* Adaptive Badge */}
+                            <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2 py-1 text-xs font-medium text-blue-700 dark:text-blue-400 ring-1 ring-inset ring-blue-500/20">
                                 <IconUsers className="h-3 w-3" /> {totalResources}
                             </span>
                             <span className="text-[10px] text-muted-foreground mt-1">Active Members</span>
@@ -57,34 +58,69 @@ export function StructureStats({
                         <div className="flex items-center justify-between text-sm font-medium">
                             <span className="text-muted-foreground">Team Composition</span>
                         </div>
+                        {/* Adaptive Progress Bar Colors */}
                         <div className="h-2.5 w-full flex rounded-full overflow-hidden bg-secondary/50">
-                            <div style={{ width: `${pctPM}%` }} className="bg-indigo-500" />
-                            <div style={{ width: `${pctCreative}%` }} className="bg-purple-500" />
-                            <div style={{ width: `${pctAssist}%` }} className="bg-pink-400" />
+                            <div style={{ width: `${pctPM}%` }} className="bg-indigo-500 dark:bg-indigo-400" />
+                            <div style={{ width: `${pctCreative}%` }} className="bg-purple-500 dark:bg-purple-400" />
+                            <div style={{ width: `${pctAssist}%` }} className="bg-pink-500 dark:bg-pink-400" />
                         </div>
                         <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
-                            <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-full bg-indigo-500" /><span>PMs</span></div>
-                            <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-full bg-purple-500" /><span>Creative</span></div>
-                            <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-full bg-pink-400" /><span>Support</span></div>
+                            <div className="flex items-center gap-1.5">
+                                <div className="h-2 w-2 rounded-full bg-indigo-500 dark:bg-indigo-400" />
+                                <span>PMs</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                                <div className="h-2 w-2 rounded-full bg-purple-500 dark:bg-purple-400" />
+                                <span>Creative</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                                <div className="h-2 w-2 rounded-full bg-pink-500 dark:bg-pink-400" />
+                                <span>Support</span>
+                            </div>
                         </div>
                     </div>
 
-                    <Separator />
+                    <Separator className="bg-border/60" />
 
-                    {/* Grid Stats */}
+                    {/* Grid Stats with Adaptive Styling */}
                     <div className="grid grid-cols-2 gap-3">
-                        <DetailedStat label="Projects Active" value={activeProjects} icon={<IconBriefcase className="h-4 w-4 text-blue-600" />} bg="bg-blue-100/50" borderColor="border-blue-200" />
-                        <DetailedStat label="Managers" value={totalPMs} icon={<IconUserStar className="h-4 w-4 text-indigo-600" />} bg="bg-indigo-100/50" borderColor="border-indigo-200" />
-                        <DetailedStat label="Creatives" value={totalCreatives} icon={<IconBrush className="h-4 w-4 text-purple-600" />} bg="bg-purple-100/50" borderColor="border-purple-200" />
-                        <DetailedStat label="Assistants" value={totalAssistants} icon={<IconUsers className="h-4 w-4 text-pink-600" />} bg="bg-pink-100/50" borderColor="border-pink-200" />
+                        <DetailedStat
+                            label="Projects Active"
+                            value={activeProjects}
+                            icon={<IconBriefcase className="h-4 w-4 text-blue-600 dark:text-blue-400" />}
+                            bg="bg-blue-500/10"
+                            borderColor="border-blue-200 dark:border-blue-800/50"
+                        />
+                        <DetailedStat
+                            label="Managers"
+                            value={totalPMs}
+                            icon={<IconUserStar className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />}
+                            bg="bg-indigo-500/10"
+                            borderColor="border-indigo-200 dark:border-indigo-800/50"
+                        />
+                        <DetailedStat
+                            label="Creatives"
+                            value={totalCreatives}
+                            icon={<IconBrush className="h-4 w-4 text-purple-600 dark:text-purple-400" />}
+                            bg="bg-purple-500/10"
+                            borderColor="border-purple-200 dark:border-purple-800/50"
+                        />
+                        <DetailedStat
+                            label="Assistants"
+                            value={totalAssistants}
+                            icon={<IconUsers className="h-4 w-4 text-pink-600 dark:text-pink-400" />}
+                            bg="bg-pink-500/10"
+                            borderColor="border-pink-200 dark:border-pink-800/50"
+                        />
                     </div>
                 </CardContent>
             </div>
 
-            <CardFooter className="pt-2 pb-6 bg-muted/20 border-t mt-auto">
+            {/* Footer with border fix */}
+            <CardFooter className="pt-2 pb-6 bg-muted/20 border-t border-border/50 mt-auto">
                 <div className="grid grid-cols-2 w-full gap-4">
                     <div className="flex items-center gap-3">
-                        <div className="p-2 bg-background rounded-full shadow-sm border">
+                        <div className="p-2 bg-background rounded-full shadow-sm border border-border/60">
                             <IconTarget className="h-4 w-4 text-muted-foreground" />
                         </div>
                         <div>
@@ -93,7 +129,7 @@ export function StructureStats({
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
-                        <div className="p-2 bg-background rounded-full shadow-sm border">
+                        <div className="p-2 bg-background rounded-full shadow-sm border border-border/60">
                             <IconBolt className="h-4 w-4 text-muted-foreground" />
                         </div>
                         <div>
@@ -109,7 +145,7 @@ export function StructureStats({
 
 function DetailedStat({ label, value, icon, bg, borderColor }: any) {
     return (
-        <div className={cn("relative flex flex-col gap-1 p-3 rounded-lg border border-dashed hover:bg-accent/5 transition-colors", borderColor)}>
+        <div className={cn("relative flex flex-col gap-1 p-3 rounded-lg border border-dashed hover:bg-accent/50 transition-colors", borderColor)}>
             <div className="flex items-center justify-between mb-1">
                 <div className={cn("p-1.5 rounded-md", bg)}>
                     {icon}

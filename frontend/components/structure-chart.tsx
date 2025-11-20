@@ -29,25 +29,22 @@ interface StructureChartProps {
     data: any[];
 }
 
-// --- CONFIG: Matches ChartAreaInteractive Colors ---
 const chartConfig = {
     visitors: { label: "Total Assignments" },
     technical: {
         label: "Creative Team",
-        // Using var(--ring) to match the white/bright line of the other chart
         color: "var(--ring)",
     },
     management: {
         label: "Management",
-        // Using var(--border) to match the gray line of the other chart
         color: "var(--border)",
     },
 } satisfies ChartConfig
 
 export function StructureChart({ data = [] }: StructureChartProps) {
-    const [timeRange, setTimeRange] = React.useState("90d")
+    // --- CHANGE 1: Set default state to "30d" ---
+    const [timeRange, setTimeRange] = React.useState("30d")
 
-    // --- HELPER: Extract Date safely ---
     const getProjectDate = (item: any) => {
         if (!item) return null;
         if (item.createdAt) return new Date(item.createdAt);
@@ -58,7 +55,6 @@ export function StructureChart({ data = [] }: StructureChartProps) {
         return new Date();
     };
 
-    // --- HELPER: Process Data ---
     const chartData = React.useMemo(() => {
         const sparseData: Record<string, { date: string; technical: number; management: number }> = {};
 
@@ -79,9 +75,10 @@ export function StructureChart({ data = [] }: StructureChartProps) {
             if (hasPM) sparseData[dateKey].management += 1;
         });
 
-        // Fill missing days
         const filledData = [];
         const today = new Date();
+
+        // Logic matches the state "30d"
         let daysToLookBack = 90;
         if (timeRange === "30d") daysToLookBack = 30;
         if (timeRange === "7d") daysToLookBack = 7;
@@ -113,23 +110,21 @@ export function StructureChart({ data = [] }: StructureChartProps) {
                 </div>
 
                 <div className="flex gap-4 items-center">
-                    {/* Summary Stats in Header */}
                     <div className="flex gap-4 text-sm mr-4 hidden md:flex">
                         <div className="flex flex-col items-end">
                             <span className="text-muted-foreground text-xs">Creative</span>
-                            {/* Uses --ring (Bright/White) */}
                             <span className="font-bold" style={{ color: "var(--ring)" }}>{totalTechnical}</span>
                         </div>
                         <div className="flex flex-col items-end">
                             <span className="text-muted-foreground text-xs">Management</span>
-                            {/* Uses --border (Gray) */}
                             <span className="font-bold" style={{ color: "var(--border)" }}>{totalManagement}</span>
                         </div>
                     </div>
 
                     <Select value={timeRange} onValueChange={setTimeRange}>
                         <SelectTrigger className="w-[160px] rounded-lg sm:ml-auto">
-                            <SelectValue placeholder="Last 3 months" />
+                            {/* --- CHANGE 2: Update Placeholder text --- */}
+                            <SelectValue placeholder="Last 30 days" />
                         </SelectTrigger>
                         <SelectContent className="rounded-xl">
                             <SelectItem value="90d" className="rounded-lg">Last 3 months</SelectItem>
@@ -144,7 +139,6 @@ export function StructureChart({ data = [] }: StructureChartProps) {
                 <ChartContainer config={chartConfig} className="aspect-auto h-full w-full">
                     <AreaChart data={chartData}>
                         <defs>
-                            {/* GRADIENTS: Matched Opacity 0.8 to 0.1 */}
                             <linearGradient id="fillTechnical" x1="0" y1="0" x2="0" y2="1">
                                 <stop offset="5%" stopColor="var(--color-technical)" stopOpacity={0.8} />
                                 <stop offset="95%" stopColor="var(--color-technical)" stopOpacity={0.1} />
@@ -166,7 +160,6 @@ export function StructureChart({ data = [] }: StructureChartProps) {
                         <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="dot" />} />
                         <ChartLegend content={<ChartLegendContent />} />
 
-                        {/* AREA: Matched strokeWidth={2} */}
                         <Area
                             dataKey="management"
                             type="monotone"

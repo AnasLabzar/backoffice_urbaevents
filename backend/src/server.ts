@@ -147,7 +147,7 @@ const startServer = async () => {
     // --- FIN DYAL L-MODIFICATION ---
 
     // --- 3. ZID L-ENDPOINT L-STATIC (Bach n-affichiw l-fichiers) ---
-    app.use('/uploads', express.static(path.join(__dirname, '../../uploads')));
+    app.use('/uploads', express.static('/root/backoffice_urbaevents/uploads'));
 
     // --- 4. ZID L-LOGIC DYAL MULTER (L-UPLOAD) ---
     const storage = multer.diskStorage({
