@@ -4,10 +4,10 @@ import DocumentModel, { IDocument } from './Document';
 
 // --- L-SCHEMA DYAL L-AVIS ---
 const ProposalAvisSchema: Schema = new Schema({
-  status: { 
-    type: String, 
-    enum: ['ACCEPTED', 'NOT_ACCEPTED'], 
-    required: true 
+  status: {
+    type: String,
+    enum: ['ACCEPTED', 'NOT_ACCEPTED'],
+    required: true
   },
   reason: { type: String },
   givenBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
@@ -49,7 +49,7 @@ export interface IProject extends Document {
   projectType: 'PUBLIC_TENDER' | 'CONFIRMED' | 'INTERNAL';
   createdBy: IUser['_id'];
 
-  // 2. Proposal Details (Mn 3nd "Yassmin")
+  // 2. Proposal Details
   title: string;
   object: string;
   referenceAO: string;
@@ -60,7 +60,7 @@ export interface IProject extends Document {
   estimatedBudget: number;
   cautionAmount: number;
 
-  // 3. Management Details (Mn 3nd l-Admin)
+  // 3. Management Details
   preparationStatus: PreparationStatus;
   projectManagers: IUser['_id'][];
   assignedTeam: IUser['_id'][];
@@ -105,7 +105,11 @@ export interface IProject extends Document {
   };
 
   // Fichiers l-finaliyin
-  finalSubmission?: { type: Object, required: false }
+  finalSubmission?: { type: Object, required: false };
+
+  // --- FIX: Explicitly add Timestamps to Interface ---
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 const ProjectSchema: Schema = new Schema(
@@ -156,7 +160,7 @@ const ProjectSchema: Schema = new Schema(
     },
 
     // --- L-AVIS L-JDID ---
-    proposalAvis: ProposalAvisSchema, // <-- MAINTENANT IL EST DÉFINI
+    proposalAvis: ProposalAvisSchema,
 
     caution: {
       status: { type: String, enum: ['PENDING', 'REQUESTED'], default: 'PENDING' },

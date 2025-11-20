@@ -1,17 +1,15 @@
 "use client";
 
-import { gql } from "@apollo/client";
-import { useQuery } from "@apollo/client/react";
-import { columns } from "@/components/data-table";
-
+import { gql, useQuery } from "@apollo/client";
+import { columns } from "@/components/projects-data-table";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ChartAreaInteractive } from "@/components/chart-area-interactive";
-import { DataTable } from "@/components/data-table";
+import { ProjectsStats } from "@/components/projects-stats";
+import { DataTable } from "@/components/projects-data-table";
 import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
 
-// QUERY UPDATED: Removed 'createdAt' to fix 400 Error
 const GET_PROJECTS_FEED = gql`
   query GetProjectsFeed {
     projects_feed {
@@ -21,11 +19,10 @@ const GET_PROJECTS_FEED = gql`
         object
         status: generalStatus
         preparationStatus
-        # createdAt field removed to prevent 400 Bad Request
         projectManagers { id name }
         stages { 
           administrative { documents { id fileName fileUrl } } 
-          technical { documents { id fileName fileUrl } } 
+          technical { documents { id fileName fileUrl originalFileName } } 
         }
         submissionDeadline
         cautionRequestDate
@@ -42,55 +39,93 @@ const GET_PROJECTS_FEED = gql`
           team3D { id name }
           assistants { id name }
         }
+        proposalAvis {
+          status
+          reason
+          givenBy { name }
+          givenAt
+        }
       }
       latestTask { id description status createdAt }
     }
   }
 `;
 
-export default function Page() {
+export default function ProjectsPage() {
   const { data, loading, error } = useQuery(GET_PROJECTS_FEED);
-  const tableData = data?.projects_feed || [];
+  const rawData = data?.projects_feed || [];
+  const tableData = rawData;
+  const projectsOnly = rawData.map((item: any) => item.project);
+
+  const stats = {
+    total: projectsOnly.length,
+    inProgress: projectsOnly.filter((p: any) => p.preparationStatus === 'IN_PRODUCTION' || p.preparationStatus === 'TO_PREPARE').length,
+    completed: projectsOnly.filter((p: any) => p.preparationStatus === 'DONE').length,
+    pending: projectsOnly.filter((p: any) => ['TO_CONFIRM', 'FEASIBILITY_PENDING', 'CAUTION_PENDING'].includes(p.preparationStatus)).length,
+  };
 
   return (
     <SidebarProvider
-      style={
-        {
-          "--sidebar-width": "calc(var(--spacing) * 72)",
-          "--header-height": "calc(var(--spacing) * 12)",
-        } as React.CSSProperties
-      }
+      style={{
+        "--sidebar-width": "calc(var(--spacing) * 72)",
+        "--header-height": "calc(var(--spacing) * 12)",
+      } as React.CSSProperties}
     >
       <AppSidebar variant="inset" />
       <SidebarInset>
         <SiteHeader />
-        <div className="flex flex-1 flex-col">
+        <div className="flex flex-1 flex-col bg-muted/10 min-h-screen">
           <div className="@container/main flex flex-1 flex-col gap-2">
-            <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-              
-              {/* CHART CONTAINER */}
-              <div className="px-4 mb-20 lg:px-6 h-96"> 
-                 {loading ? (
+            {/* FIX 1: Increased gap-10 to gap-12 */}
+            <div className="flex flex-col gap-12 py-6 px-4 lg:px-8">
+
+              {/* --- SECTION 1: CHART & STATS --- */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-auto lg:h-[450px]">
+                {/* Chart */}
+                <div className="lg:col-span-2 h-full">
+                  {loading ? (
                     <Skeleton className="h-full w-full rounded-xl" />
-                 ) : (
-                    <ChartAreaInteractive projects={tableData} />
-                 )}
+                  ) : (
+                    <ChartAreaInteractive projects={projectsOnly} />
+                  )}
+                </div>
+
+                {/* Stats */}
+                <div className="lg:col-span-1 h-full">
+                  {loading ? (
+                    <Skeleton className="h-full w-full rounded-xl" />
+                  ) : (
+                    <ProjectsStats
+                      className="h-full"
+                      total={stats.total}
+                      inProgress={stats.inProgress}
+                      completed={stats.completed}
+                      pending={stats.pending}
+                    />
+                  )}
+                </div>
               </div>
 
-              {/* TABLE CONTAINER */}
-              {loading ? (
-                <div className="px-4 lg:px-6 space-y-2">
-                  <Skeleton className="h-12 w-full" />
-                  <Skeleton className="h-12 w-full" />
-                  <Skeleton className="h-12 w-full" />
-                </div>
-              ) : error ? (
-                <div className="mt-4 px-4 lg:px-6">
-                  <p className="text-red-500">Error: {error.message}</p>
-                </div>
-              ) : (
-                <DataTable columns={columns} data={tableData} />
-              )}
+              {/* FIX 2: Explicit Spacer Div to force separation */}
+              <div className="hidden lg:block h-8 w-full" />
+
+              {/* --- SECTION 2: TABLE --- */}
+              {/* FIX 3: Added mt-8 (Margin Top) explicitly */}
+              <div className="w-full mt-8 ">
+                <h2 className="text-xl font-semibold mb-4 px-1">Liste des Projets</h2>
+                {loading ? (
+                  <div className="space-y-3">
+                    <Skeleton className="h-12 w-full" />
+                    <Skeleton className="h-12 w-full" />
+                  </div>
+                ) : error ? (
+                  <div className="p-4 text-red-500 bg-red-50 border border-red-200 rounded-md">Error: {error.message}</div>
+                ) : (
+                  <div className="bg-card rounded-xl border shadow-sm overflow-hidden py-8">
+                    <DataTable columns={columns} data={tableData} />
+                  </div>
+                )}
+              </div>
 
             </div>
           </div>
