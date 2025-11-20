@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { Area, AreaChart, CartesianGrid, XAxis } from "recharts"
+import { useIsMobile } from "@/hooks/use-mobile"
 import {
     Card,
     CardContent,
@@ -42,8 +43,14 @@ const chartConfig = {
 } satisfies ChartConfig
 
 export function StructureChart({ data = [] }: StructureChartProps) {
-    // --- CHANGE 1: Set default state to "30d" ---
+    const isMobile = useIsMobile()
     const [timeRange, setTimeRange] = React.useState("30d")
+
+    React.useEffect(() => {
+        if (isMobile) {
+            setTimeRange("7d")
+        }
+    }, [isMobile])
 
     const getProjectDate = (item: any) => {
         if (!item) return null;
@@ -78,7 +85,6 @@ export function StructureChart({ data = [] }: StructureChartProps) {
         const filledData = [];
         const today = new Date();
 
-        // Logic matches the state "30d"
         let daysToLookBack = 90;
         if (timeRange === "30d") daysToLookBack = 30;
         if (timeRange === "7d") daysToLookBack = 7;
@@ -123,8 +129,7 @@ export function StructureChart({ data = [] }: StructureChartProps) {
 
                     <Select value={timeRange} onValueChange={setTimeRange}>
                         <SelectTrigger className="w-[160px] rounded-lg sm:ml-auto">
-                            {/* --- CHANGE 2: Update Placeholder text --- */}
-                            <SelectValue placeholder="Last 30 days" />
+                            <SelectValue />
                         </SelectTrigger>
                         <SelectContent className="rounded-xl">
                             <SelectItem value="90d" className="rounded-lg">Last 3 months</SelectItem>
@@ -135,8 +140,12 @@ export function StructureChart({ data = [] }: StructureChartProps) {
                 </div>
             </CardHeader>
 
-            <CardContent className="flex-1 px-2 pt-4 sm:px-6 sm:pt-6 min-h-0">
-                <ChartContainer config={chartConfig} className="aspect-auto h-full w-full">
+            {/* --- FIX IS HERE: Changed min-h-0 to min-h-[250px] --- */}
+            <CardContent className="flex-1 px-2 pt-4 sm:px-6 sm:pt-6 min-h-[250px]">
+                <ChartContainer
+                    config={chartConfig}
+                    className="aspect-auto h-[250px] w-full lg:h-full"
+                >
                     <AreaChart data={chartData}>
                         <defs>
                             <linearGradient id="fillTechnical" x1="0" y1="0" x2="0" y2="1">

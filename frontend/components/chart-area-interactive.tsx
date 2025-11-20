@@ -16,7 +16,7 @@ interface ProjectData {
 }
 
 interface ChartProps {
-  projects?: ProjectData[]; // Made optional to prevent build errors if data is missing
+  projects?: ProjectData[];
 }
 
 const chartConfig = {
@@ -27,8 +27,14 @@ const chartConfig = {
 
 export function ChartAreaInteractive({ projects = [] }: ChartProps) {
   const isMobile = useIsMobile()
-  // --- CHANGE 1: Set default state to "30d" ---
   const [timeRange, setTimeRange] = React.useState("30d")
+
+  // --- CHANGE 1: Effect to set default to 7d on mobile ---
+  React.useEffect(() => {
+    if (isMobile) {
+      setTimeRange("7d")
+    }
+  }, [isMobile])
 
   const getProjectDate = (project: ProjectData) => {
     if (!project) return null;
@@ -68,7 +74,6 @@ export function ChartAreaInteractive({ projects = [] }: ChartProps) {
       else sparseData[dateKey].inProgress += 1;
     });
 
-    // Logic now defaults to 30 because of the state init
     let daysToLookBack = 90;
     if (timeRange === "30d") daysToLookBack = 30;
     if (timeRange === "7d") daysToLookBack = 7;
@@ -82,11 +87,12 @@ export function ChartAreaInteractive({ projects = [] }: ChartProps) {
   return (
     <Card className="h-full flex flex-col w-full">
       <CardHeader className="flex items-center gap-2 space-y-0 border-b py-5 sm:flex-row">
-        <div className="grid flex-1 gap-1 text-center sm:text-left">
+        <div className="grid flex-1 gap-1 text-center text-left">
           <CardTitle>Project Evolution</CardTitle>
           <CardDescription>Showing created projects statistics</CardDescription>
         </div>
         <div className="flex gap-4 items-center">
+          {/* Hidden on small screens, visible on md+ */}
           <div className="flex gap-4 text-sm mr-4 hidden md:flex">
             <div className="flex flex-col items-end">
               <span className="text-muted-foreground text-xs">Done</span>
@@ -99,8 +105,8 @@ export function ChartAreaInteractive({ projects = [] }: ChartProps) {
           </div>
           <Select value={timeRange} onValueChange={setTimeRange}>
             <SelectTrigger className="w-[160px] rounded-lg sm:ml-auto">
-              {/* --- CHANGE 2: Updated placeholder text --- */}
-              <SelectValue placeholder="Last 30 days" />
+              {/* --- CHANGE 2: Removed hardcoded placeholder so it updates dynamically --- */}
+              <SelectValue />
             </SelectTrigger>
             <SelectContent className="rounded-xl">
               <SelectItem value="90d" className="rounded-lg">Last 3 months</SelectItem>
@@ -111,7 +117,7 @@ export function ChartAreaInteractive({ projects = [] }: ChartProps) {
         </div>
       </CardHeader>
 
-      <CardContent className="flex-1 px-2 pt-4 sm:px-6 sm:pt-6 min-h-0">
+      <CardContent className="flex-1 px-2 pt-4 sm:px-6 sm:pt-6 min-h-[250px]">
         <ChartContainer config={chartConfig} className="aspect-auto h-full w-full">
           <AreaChart data={chartData}>
             <defs>
