@@ -627,13 +627,23 @@ export const columns: ColumnDef<ProjectFeedItem>[] = [
 export function DataTable({
   columns,
   data,
+  // 1. Add these two props here
+  columnFilters,
+  onColumnFiltersChange,
 }: {
   columns: ColumnDef<ProjectFeedItem>[];
   data: ProjectFeedItem[];
+  // 2. Add the types for these props
+  columnFilters: ColumnFiltersState;
+  onColumnFiltersChange: React.Dispatch<React.SetStateAction<ColumnFiltersState>>;
 }) {
   const [rowSelection, setRowSelection] = React.useState({});
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
+
+  // 3. DELETE or COMMENT OUT the internal state below, 
+  // because you are now passing it from the parent (page.tsx)
+  // const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]); 
+
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [pagination, setPagination] = React.useState({
     pageIndex: 0,
@@ -646,7 +656,7 @@ export function DataTable({
   const { data: meData, loading: roleLoading, refetch: refetchFeed } = useQuery(ME_QUERY);
   const userRole = meData?.me.role.name;
   console.log("user role", userRole);
-  
+
   const currentUserId = meData?.me.id;
   // --------------------------
 
@@ -655,13 +665,17 @@ export function DataTable({
     data,
     columns,
     state: {
-      sorting, columnVisibility, rowSelection, columnFilters, pagination,
+      sorting,
+      columnVisibility,
+      rowSelection,
+      columnFilters, // This now refers to the prop, which is correct
+      pagination,
     },
     getRowId: (row) => row.project.id,
     enableRowSelection: true,
     onRowSelectionChange: setRowSelection,
     onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
+    onColumnFiltersChange: onColumnFiltersChange, // Use the prop setter here
     onColumnVisibilityChange: setColumnVisibility,
     onPaginationChange: setPagination,
     getCoreRowModel: getCoreRowModel(),
