@@ -149,10 +149,11 @@ const startServer = async () => {
     // --- 3. ZID L-ENDPOINT L-STATIC (Bach n-affichiw l-fichiers) ---
     app.use('/uploads', express.static('/root/backoffice_urbaevents/uploads'));
 
-    // --- 4. ZID L-LOGIC DYAL MULTER (L-UPLOAD) ---
+    // --- 4. ZID L-LOGIC DYAL MULTER (Modifié: Sanitize Filename) ---
     const storage = multer.diskStorage({
         destination: (req, file, cb) => {
             const projectId = req.params.projectId;
+            // Hna path relative l-backend/src awla backend/dist
             const uploadDir = path.join(__dirname, `../../uploads/${projectId}`);
             if (!fs.existsSync(uploadDir)) {
                 fs.mkdirSync(uploadDir, { recursive: true });
@@ -160,10 +161,13 @@ const startServer = async () => {
             cb(null, uploadDir);
         },
         filename: (req, file, cb) => {
-            cb(null, file.originalname); // Nkhliw smiya 3adia
+            // --- HNA L-FIX L-MOHIM ---
+            // Kan-b3d mn l-espaces ( ) kan-rddohm (_)
+            // w kan-b3d mn l-accents bach l-URL ykon nqi
+            const sanitizedName = file.originalname.replace(/\s+/g, '_').replace(/[()]/g, '');
+            cb(null, sanitizedName);
         }
     });
-
     // --- L-BDIL L-JDID HNA ---
     const upload = multer({
         storage: storage,
