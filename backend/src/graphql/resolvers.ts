@@ -48,6 +48,32 @@ const teamPopulates = [
 const defaultUser = { _id: 'DELETED_USER_ID', id: 'DELETED_USER_ID', name: 'Utilisateur Supprimé', email: '', role: null };
 // ------------------------------------
 
+// -------------------- PM Candidates --------------------
+// Hadou homa l-roles li l-Admin y9dr ykhtarhoum PM (Zainab, Khalid, Anas Labzar, Zakaria, Ziyad)
+const DYNAMIC_PM_CANDIDATE_ROLES = [
+    'PROJECT_MANAGER', // PM Permanent
+    'DIRECTOR_EVENT',  // Zakaria's new role
+    'IT_MANAGER',      // Anas Labzar's role
+    'CREATIVE',        // Zainab's role (assuming Zainab = CREATIVE)
+    'TEAM_MEMBER',     // Ziyad/Khalid/Mehdi's generic role (we need specific roles for all candidates in the future)
+    'ASSISTANT_PM' // Ila bghina nzidoha
+] as const;
+
+/**
+ * Kat-checki wach l-user 3ndu l-role bach ykoun dynamic PM
+ */
+const isDynamicPmCandidate = async (userId: string): Promise<boolean> => {
+    try {
+        const user = await User.findById(userId).populate('role');
+        const roleName = (user?.role as any)?.name;
+        if (!roleName) return false;
+        return DYNAMIC_PM_CANDIDATE_ROLES.includes(roleName as any);
+    } catch (error) {
+        console.error('Error checking dynamic PM candidate:', error);
+        return false;
+    }
+};
+// ---------------------------------------------------
 
 /**
  * Helper jdid: Kay-jib ga3 l-IDs dyal l-users li 3ndhom wa7d l-role
@@ -121,7 +147,7 @@ export const resolvers = {
             return user;
         },
 
-        users: async (_: unknown, { role }: { role?: string }, context: IContext) => {
+        users: async (_: unknown, { role, roles }: { role?: string, roles?: string[] }, context: IContext) => { // Zidna 'roles'
             if (!context.user) throw new ApolloError('Not authenticated', 'UNAUTHENTICATED');
             const userRole = await Role.findById(context.user.role);
             if (!userRole || !userRole.permissions) {
@@ -133,11 +159,23 @@ export const resolvers = {
             ) {
                 throw new ApolloError('Forbidden: Not authorized to view user lists.', 'FORBIDDEN');
             }
+            
+            let findQuery: any = {};
+
             if (role) {
                 const roleDoc = await Role.findOne({ name: role });
                 if (!roleDoc) throw new ApolloError('Role not found', 'NOT_FOUND');
-                return User.find({ role: roleDoc._id }).populate('role');
+                findQuery.role = roleDoc._id;
+            } else if (roles && roles.length > 0) { // New logic for array of roles
+                const roleDocs = await Role.find({ name: { $in: roles } });
+                const roleIds = roleDocs.map(doc => doc._id);
+                findQuery.role = { $in: roleIds };
             }
+
+            if (Object.keys(findQuery).length > 0) {
+                return User.find(findQuery).populate('role');
+            }
+
             return User.find().populate('role');
         },
 
@@ -627,6 +665,45 @@ export const resolvers = {
     },
 
     Mutation: {
+        // --- NEW MUTATION: ASSIGN DYNAMIC PROJECT MANAGER ---
+        assignDynamicProjectManager: async (_: unknown, { projectId, newPmId }: { projectId: string, newPmId: string }, context: IContext) => {
+            // 1. L-Permission: Ghandirolha ghir l-ADMIN (ola li 3ndu 'assign_dynamic_pm')
+            await checkPermission(context, 'assign_dynamic_pm');
+
+            // 2. N-verifiw wach l-candidate kayn f la liste dyal l-PM l-possible
+            const isCandidate = await isDynamicPmCandidate(newPmId);
+            if (!isCandidate) {
+                throw new ApolloError('Forbidden: User is not an authorized candidate for Project Manager.', 'FORBIDDEN');
+            }
+
+            // 3. N-assigniw l-PM l-project
+            const updatedProject = await Project.findByIdAndUpdate(
+                projectId,
+                { $addToSet: { projectManagers: newPmId } }, // Nzidohom Project Manager
+                { new: true }
+            )
+                .populate({ path: 'projectManagers', select: userSelect });
+
+            if (!updatedProject) {
+                throw new ApolloError('Project not found or update failed.', 'NOT_FOUND');
+            }
+
+            // 4. L-Log w L-Notification
+            const newPm = updatedProject.projectManagers.find(pm => (pm as any)._id.toString() === newPmId);
+            await logActivity(context.user.id, `Assigned new dynamic PM: ${newPm?.name || newPmId} to project: ${updatedProject.title}`, 'PROJECT_UPDATE', projectId);
+
+            // Create notification for the new PM
+            await createNotification({
+                title: `You have been assigned as Project Manager for: ${updatedProject.title}`,
+                body: `You are now a Project Manager for project ${updatedProject.projectCode}.`,
+                level: NotificationLevel.ALERT,
+                project: new Types.ObjectId(projectId),
+                users: [new Types.ObjectId(newPmId)],
+            });
+
+            return updatedProject;
+        },
+
         register: async (_: unknown, { name, email, password }: any) => {
             const existingUser = await User.findOne({ email });
             if (existingUser) throw new ApolloError('User with this email already exists', 'USER_ALREADY_EXISTS');

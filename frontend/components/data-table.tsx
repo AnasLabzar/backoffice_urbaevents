@@ -486,7 +486,7 @@ export type ProjectFeedItem = z.infer<typeof feedItemSchema>;
 type Project = z.infer<typeof projectSchema>;
 type TeamMember = { id: string, name: string };
 
-// --- L-COMPONENT L-JDID DYAL L-CELL ---
+// --- L-COMPONENT L-JDID DYAL L-CELL (FIXED URL) ---
 const FileStatusCell = ({ row, docType }: { row: any, docType: string }) => {
   const { data: meData } = useQuery(ME_QUERY);
   const userRole = meData?.me.role.name;
@@ -504,8 +504,25 @@ const FileStatusCell = ({ row, docType }: { row: any, docType: string }) => {
 
   // For other roles: Show download button if file exists
   if (file && file.fileUrl) {
-    // FIX: Properly construct the download URL
-    const downloadUrl = `https://backoffice.urbagroupe.ma/${file.fileUrl}`;
+
+    // --- L-FIX HNA: Detecter l-environnement (Local vs Prod) ---
+    // N.B: had logic kat-khdm côté client (browser)
+    let baseUrl = 'http://localhost:5001'; // Par défaut Local
+
+    if (typeof window !== 'undefined') {
+      const hostname = window.location.hostname;
+      // Ila manach f localhost, ra 7na f production
+      if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+        baseUrl = 'https://backoffice.urbagroupe.ma';
+      }
+    }
+
+    // N-mshi sur ma ndirouch double slash (//)
+    // database: "uploads/id/file.pdf" -> cleanPath: "uploads/id/file.pdf"
+    const cleanPath = file.fileUrl.startsWith('/') ? file.fileUrl.slice(1) : file.fileUrl;
+
+    const downloadUrl = `${baseUrl}/${cleanPath}`;
+    // -----------------------------------------------------------
 
     return (
       <a
@@ -525,7 +542,6 @@ const FileStatusCell = ({ row, docType }: { row: any, docType: string }) => {
   // No file available
   return <span className="text-muted-foreground mx-auto">N/A</span>;
 };
-// ------------------------------------
 
 // --- L-COLUMNS ARRAY (Jdid b l-columns jdad) ---
 export const columns: ColumnDef<ProjectFeedItem>[] = [

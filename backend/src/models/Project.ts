@@ -144,8 +144,14 @@ const ProjectSchema: Schema = new Schema(
 
     stages: {
       administrative: { ...StageSchema.obj, responsible: { type: [String], default: ['PROPOSAL_MANAGER'] } },
-      technical: { ...StageSchema.obj, responsible: { type: [String], default: ['PROPOSAL_MANAGER', 'PROJECT_MANAGER', 'ASSISTANT_PM'] } },
-      technicalOffer: { ...StageSchema.obj, responsible: { type: [String], default: ['PROJECT_MANAGER'] } },
+      technical: {
+        // Zidna l-possible PM l-jddad ila kan 3ndhom chi rôle f technical stage
+        ...StageSchema.obj,
+        responsible: {
+          type: [String], default: ['PROPOSAL_MANAGER', 'PROJECT_MANAGER', 'ASSISTANT_PM', 'DIRECTOR_EVENT', 'IT_MANAGER']
+        }
+      },
+      technicalOffer: { ...StageSchema.obj, responsible: { type: [String], default: ['PROJECT_MANAGER', 'DIRECTOR_EVENT', 'IT_MANAGER'] } },
       financialOffer: { ...StageSchema.obj, responsible: { type: [String], default: ['PROPOSAL_MANAGER', 'PROJECT_MANAGER'] } },
       printing: StageSchema,
       workshop: StageSchema,

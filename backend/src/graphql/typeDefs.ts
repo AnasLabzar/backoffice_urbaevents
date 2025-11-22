@@ -172,6 +172,13 @@ export const typeDefs = gql`
     department: String!
     dueDate: String
   }
+  
+  # --- NEW INPUT FOR DYNAMIC PM ASSIGNMENT ---
+  input DynamicPMAssignmentInput {
+    projectId: ID!
+    newPmId: ID!
+  }
+  # -------------------------------------------
 
   input CreateUserInput {
     name: String!
@@ -192,7 +199,8 @@ export const typeDefs = gql`
 
   type Query {
     me: User
-    users(role: String): [User!]
+    # ⚠️ FIX: Update 'users' to allow filtering by multiple roles (array)
+    users(role: String, roles: [String!]): [User!] 
     projects_proposals: [Project!]
     
     # --- ZID HADA L-QUERY L-JDID ---
@@ -232,6 +240,10 @@ export const typeDefs = gql`
     admin_runFeasibility(input: AdminFeasibilityInput!): Project!
     admin_launchProject(projectId: ID!): Project!
     
+    # --- NEW MUTATION: DYNAMIC PM ASSIGNMENT ---
+    assignDynamicProjectManager(input: DynamicPMAssignmentInput!): Project!
+    # -------------------------------------------
+
     # Project Manager
     pm_createTask(input: PMCreateTaskInput!): Task!
     pm_updateTaskStatus(taskId: ID!, status: String!): Task!
@@ -286,5 +298,4 @@ export const typeDefs = gql`
     URGENT
     DEADLINE
   }
-    
 `;

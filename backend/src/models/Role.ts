@@ -12,13 +12,19 @@ export type Permission =
   | 'view_all_analytics'
   // Proposal Manager (Yassmin's Role)
   | 'create_project_proposal'
-  // Project Manager (CP)
+  // Project Manager (CP) 
   | 'manage_assigned_projects'
   | 'assign_creative_tasks'
   | 'add_photographiste'
   | 'update_workflow_stage'
   | 'view_team_logs'
-  | 'view_team_analytics';
+  | 'view_team_analytics'
+  // --- NEW PERMISSIONS ---
+  | 'assign_dynamic_pm' // Permisssion l-Admin bach ykhter l-PM l-dynamic
+  // --- END NEW PERMISSIONS ---
+  | 'manage_own_tasks' // déjà kayn, kanzidoh ghir bach ykoun explicit
+  | 'upload_methodology' // déjà kayn
+;
 
 export interface IRole extends Document {
   name: string; // e.g., 'ADMIN', 'PROPOSAL_MANAGER', 'PROJECT_MANAGER'
