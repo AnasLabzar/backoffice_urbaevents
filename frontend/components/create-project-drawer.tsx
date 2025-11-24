@@ -9,6 +9,9 @@ import { IconCalendar as CalendarIcon, IconPlus } from "@tabler/icons-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 
+import { PriceInput } from "@/components/ui/price-input"; // Import dyal l-PriceInput
+
+
 // Imports dyal l-UI
 import { Button } from "@/components/ui/button";
 import {
@@ -164,13 +167,24 @@ function ProjectFormContent({
             <Label htmlFor="referenceAO">Référence AO</Label>
             <Input id="referenceAO" value={formData.referenceAO} onChange={handleChange} />
           </div>
-          <div className="flex flex-col gap-3">
-            <Label htmlFor="estimatedBudget">Estimation (DH)</Label>
-            <Input id="estimatedBudget" type="number" value={formData.estimatedBudget} onChange={handleChange} />
+          <div className="flex flex-col gap-2 mt-2">
+            <Label htmlFor="estimate-price">Montant Estimatif</Label>
+            <PriceInput
+              id="estimate-price"
+              value={formData.estimatedBudget || ""} // Assurer que formData 3ndha had l-field
+              onChange={(val) => handleSelectChange("estimatedBudget", val)} // Stocki l-value string b commas
+              placeholder="ex:  1,000,000.00"
+            />
           </div>
-          <div className="flex flex-col gap-3">
-            <Label htmlFor="cautionAmount">Caution (DH)</Label>
-            <Input id="cautionAmount" type="number" value={formData.cautionAmount} onChange={handleChange} />
+
+          <div className="flex flex-col gap-2 mt-2">
+            <Label htmlFor="caution-amount">Montant Caution</Label>
+            <PriceInput
+              id="caution-amount"
+              value={formData.cautionAmount || ""}
+              onChange={(val) => handleSelectChange("cautionAmount", val)}
+              placeholder="ex:   20,000.00"
+            />
           </div>
         </div>
 

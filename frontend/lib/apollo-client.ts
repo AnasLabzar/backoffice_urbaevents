@@ -3,20 +3,27 @@
 import { ApolloClient, InMemoryCache, createHttpLink } from "@apollo/client";
 import { setContext } from "@apollo/client/link/context";
 
-// Rg3nah l-createHttpLink l-3adi
+// --- HNA L-CHANGE ---
+// Kan-golo lih: Ila kayn variable f .env st3mlha, sinu st3ml localhost par défaut
 const httpLink = createHttpLink({
-  uri: "https://backoffice.urbagroupe.ma/graphql",
+  uri: process.env.NEXT_PUBLIC_GRAPHQL_URI || "http://localhost:5001/graphql",
 });
+// --------------------
 
 const authLink = setContext((_, { headers }) => {
-  const token = localStorage.getItem('auth-token');
+  // Check sur wach code khdam f browser (localStorage makaynch f server side)
+  let token = "";
+  if (typeof window !== "undefined") {
+    token = localStorage.getItem('auth-token') || "";
+  }
+
   return {
     headers: { ...headers, authorization: token ? `Bearer ${token}` : "" }
   }
 });
 
 const client = new ApolloClient({
-  link: authLink.concat(httpLink), // L-Link l-3adi
+  link: authLink.concat(httpLink),
   cache: new InMemoryCache(),
 });
 

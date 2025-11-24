@@ -17,7 +17,7 @@ import * as path from 'path';
 
 // L-Imports dyalna
 import { typeDefs } from './graphql/typeDefs';
-import { resolvers } from './graphql/resolvers';
+import { resolvers } from './graphql/resolvers/index';
 import { verifyToken, DecodedToken } from './utils/jwt';
 
 // --- IMPORTS CRON & MODELS ---
@@ -31,11 +31,33 @@ export interface IContext {
     user: DecodedToken | null;
 }
 
-// ---- 1. L-Database Connection ----
+// ---- 1. L-Database Connection (UPDATED) ----
 const connectDB = async () => {
     try {
-        const conn = await mongoose.connect(process.env.MONGO_URI as string);
-        console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
+        // Hna kan-checkiw l-mode
+        const isProduction = process.env.NODE_ENV === 'production';
+
+        // Kan-khtaro l-URI 3la 7sab l-mode
+        const dbURI = isProduction
+            ? process.env.MONGO_URI_PROD
+            : process.env.MONGO_URI_DEV;
+
+        if (!dbURI) {
+            throw new Error(`❌ MONGO_URI is missing for environment: ${process.env.NODE_ENV}`);
+        }
+
+        const conn = await mongoose.connect(dbURI);
+
+        console.log(`------------------------------------------------`);
+        if (isProduction) {
+            console.log(`🚨 ATTENTION: CONNECTED TO PRODUCTION DB (REAL DATA)`);
+        } else {
+            console.log(`👨‍💻 SAFE MODE: CONNECTED TO DEV DB (FAKE DATA)`);
+        }
+        console.log(`✅ MongoDB Host: ${conn.connection.host}`);
+        console.log(`🗄️  Database Name: ${conn.connection.name}`); // Bach t-t2kd mn smiyat DB
+        console.log(`------------------------------------------------`);
+
     } catch (error: any) {
         console.error(`❌ Error connecting to MongoDB: ${error.message}`);
         process.exit(1);

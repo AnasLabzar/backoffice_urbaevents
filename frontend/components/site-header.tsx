@@ -2,7 +2,7 @@ import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { ThemeSelector } from "./theme-selector";
 import { ModeSwitcher } from "./mode-switcher";
-import { NotificationBell } from "@/components/notification-bell"; // L-path dyal file l-jdid
+import { NotificationBell } from "@/components/ui/notification-bell"; // L-path dyal file l-jdid
 
 export function SiteHeader() {
   return (

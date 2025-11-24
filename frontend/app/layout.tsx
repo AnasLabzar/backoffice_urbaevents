@@ -1,35 +1,28 @@
-import { cookies } from "next/headers";
-// ZIDNA Viewport hna
 import type { Metadata, Viewport } from "next";
-
+import { cookies } from "next/headers";
 import "./globals.css";
-
 import { cn } from "@/lib/utils";
-
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { ActiveThemeProvider } from "@/components/active-theme";
 import { ApolloClientProvider } from "@/components/providers/apollo-provider";
 
-// --- 1. CONFIGURATION DYAL VIEWPORT (Theme Color) ---
+// --- 1. CONFIGURATION VIEWPORT ---
 export const viewport: Viewport = {
-  themeColor: "#1f2937", // L-lon li ayban f chrejo dyal telephone/pc
+  themeColor: "#1f2937",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
 };
 
-// --- 2. CONFIGURATION DYAL METADATA (Icons & Manifest) ---
+// --- 2. CONFIGURATION METADATA ---
 export const metadata: Metadata = {
   title: "Urba Events Dashboard",
-  description:
-    "A fully responsive analytics dashboard featuring dynamic charts, interactive tables, a collapsible sidebar.",
-  // Hna fin kan-rebto l-manifest
+  description: "A fully responsive analytics dashboard.",
   manifest: "/manifest.json",
-  // Hna fin kan-dkhlo l-icons
   icons: {
     icon: "/favicon.ico",
     shortcut: "/favicon.ico",
-    apple: "/logo192.png", // Icone pour iPhone/iPad
+    apple: "/logo192.png",
     other: {
       rel: "apple-touch-icon-precomposed",
       url: "/logo192.png",
@@ -38,9 +31,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     title: "UrbaEvents",
     statusBarStyle: "black-translucent",
-    startupImage: [
-      "/logo512.png",
-    ],
+    startupImage: ["/logo512.png"],
   },
 };
 
@@ -56,6 +47,7 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
+        suppressHydrationWarning
         className={cn(
           "bg-background overscroll-none font-sans antialiased",
           activeThemeValue ? `theme-${activeThemeValue}` : "",

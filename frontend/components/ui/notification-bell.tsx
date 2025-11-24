@@ -12,7 +12,7 @@ import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 
-// --- HELPER: Fix Invalid Date Error ---
+// --- HELPER ---
 function parseDate(dateInput: string | number | null | undefined): Date {
     if (!dateInput) return new Date();
     if (typeof dateInput === 'string' && /^\d+$/.test(dateInput)) {
@@ -21,7 +21,7 @@ function parseDate(dateInput: string | number | null | undefined): Date {
     return new Date(dateInput);
 }
 
-// --- GRAPHQL DEFINITIONS ---
+// --- GRAPHQL ---
 const ME_QUERY = gql` query Me { me { id role { name permissions } } }`;
 
 const MY_NOTIFICATIONS_QUERY = gql`
@@ -71,23 +71,23 @@ export function NotificationBell() {
     const { data: meData } = useQuery(ME_QUERY);
     const currentUserId = meData?.me?.id;
 
-    // 1. Get Notifications
     const { data, loading, refetch } = useQuery(MY_NOTIFICATIONS_QUERY);
 
-    // 2. Calculate Unread Count
     const unreadCount = React.useMemo(() => {
         return data?.myNotifications?.filter((n: any) => !n.isRead).length || 0;
     }, [data]);
 
-    // 3. Real-time Updates
+    // --- SOCKET LOGIC (FIXED) ---
     useSubscription(NEW_NOTIFICATION_SUBSCRIPTION, {
         variables: { userId: currentUserId },
         skip: !currentUserId,
         onData: ({ data }) => {
-            const notif = data.data.newNotification;
+            // ✅ SAFETY CHECK
+            const notif = data.data?.newNotification;
+            if (!notif) return;
+
             console.log("⚡ Socket: New Notification!", notif);
 
-            // Show Toast based on level
             if (notif.level === 'URGENT' || notif.level === 'DEADLINE') {
                 toast.error(notif.message, { duration: 10000 });
             } else if (notif.level === 'IMPORTANT') {
@@ -95,11 +95,10 @@ export function NotificationBell() {
             } else {
                 toast.info(notif.message);
             }
-            refetch(); // Refresh list
+            refetch();
         }
     });
 
-    // 4. Mutations
     const [markAsRead] = useMutation(MARK_AS_READ_MUTATION);
     const [markAllAsRead] = useMutation(MARK_ALL_AS_READ_MUTATION, {
         onCompleted: () => {
@@ -137,21 +136,18 @@ export function NotificationBell() {
         <Popover open={isOpen} onOpenChange={setIsOpen}>
             <PopoverTrigger asChild>
                 <Button variant="ghost" size="icon" className="relative group">
-                    {/* Bell Icon */}
                     <IconBell className="h-5 w-5 text-muted-foreground group-hover:text-foreground transition-colors" />
-
-                    {/* --- PROFESSIONAL BADGE --- */}
                     {unreadCount > 0 && (
                         <Badge
                             variant="destructive"
                             className={cn(
-                                "absolute -top-0.5 -right-0.5", // Tighter position
-                                "min-w-[1.1rem] h-[1.1rem]",   // Dynamic width (pill shape)
+                                "absolute -top-0.5 -right-0.5",
+                                "min-w-[1.1rem] h-[1.1rem]",
                                 "flex items-center justify-center",
-                                "p-0 px-[3px]", // Padding for the text
+                                "p-0 px-[3px]",
                                 "text-[10px] font-bold leading-none",
                                 "rounded-full",
-                                "border-[2px] border-background", // The "Cutout" border effect
+                                "border-[2px] border-background",
                                 "shadow-sm",
                                 "pointer-events-none"
                             )}
@@ -159,7 +155,6 @@ export function NotificationBell() {
                             {unreadCount > 9 ? "9+" : unreadCount}
                         </Badge>
                     )}
-                    {/* -------------------------- */}
                 </Button>
             </PopoverTrigger>
 
@@ -167,12 +162,7 @@ export function NotificationBell() {
                 <div className="flex items-center justify-between p-4">
                     <h4 className="font-semibold text-sm">Notifications</h4>
                     {unreadCount > 0 && (
-                        <Button
-                            variant="link"
-                            size="sm"
-                            className="p-0 h-auto text-xs text-muted-foreground hover:text-primary"
-                            onClick={handleMarkAllAsRead}
-                        >
+                        <Button variant="link" size="sm" className="p-0 h-auto text-xs text-muted-foreground hover:text-primary" onClick={handleMarkAllAsRead}>
                             Tout marquer lu
                         </Button>
                     )}
@@ -191,35 +181,15 @@ export function NotificationBell() {
                         {data?.myNotifications?.map((notif: any) => (
                             <div
                                 key={notif.id}
-                                className={cn(
-                                    "relative flex items-start gap-3 rounded-lg p-3 transition-colors group",
-                                    !notif.isRead ? "bg-blue-50/50 dark:bg-blue-900/10" : "hover:bg-muted/50"
-                                )}
+                                className={cn("relative flex items-start gap-3 rounded-lg p-3 transition-colors group", !notif.isRead ? "bg-blue-50/50 dark:bg-blue-900/10" : "hover:bg-muted/50")}
                             >
-                                {/* Status Dot */}
                                 <span className={cn("h-2 w-2 rounded-full mt-1.5 flex-shrink-0 shadow-sm", getLevelColor(notif.level))} />
-
                                 <div className="flex-1 min-w-0 space-y-1">
-                                    <p className={cn("text-sm leading-tight break-words", !notif.isRead && "font-medium text-foreground")}>
-                                        {notif.message}
-                                    </p>
-                                    <p className="text-[10px] text-muted-foreground/80">
-                                        {formatDistanceToNow(parseDate(notif.createdAt), { addSuffix: true, locale: fr })}
-                                    </p>
+                                    <p className={cn("text-sm leading-tight break-words", !notif.isRead && "font-medium text-foreground")}>{notif.message}</p>
+                                    <p className="text-[10px] text-muted-foreground/80">{formatDistanceToNow(parseDate(notif.createdAt), { addSuffix: true, locale: fr })}</p>
                                 </div>
-
-                                {/* Mark Read Button (Visible on Hover or if Unread) */}
                                 {!notif.isRead && (
-                                    <Button
-                                        title="Marquer comme lu"
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-6 w-6 flex-shrink-0 text-muted-foreground hover:text-primary hover:bg-transparent"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleMarkAsRead(notif.id);
-                                        }}
-                                    >
+                                    <Button title="Marquer comme lu" variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0 text-muted-foreground hover:text-primary hover:bg-transparent" onClick={(e) => { e.stopPropagation(); handleMarkAsRead(notif.id); }}>
                                         <IconCheck className="h-3.5 w-3.5" />
                                     </Button>
                                 )}
