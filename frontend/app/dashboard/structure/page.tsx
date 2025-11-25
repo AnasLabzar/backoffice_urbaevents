@@ -19,7 +19,7 @@ import { StructureChart } from "@/components/structure-chart";
 // --- 1. USE THE EXISTING QUERY (Same as ProjectsPage) ---
 // src/lib/graphql/projects.ts
 
-export const GET_PROJECTS_FEED = gql`
+const GET_PROJECTS_FEED = gql`
   query GetProjectsFeed {
     projects_feed {
       project {
