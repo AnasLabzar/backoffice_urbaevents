@@ -111,7 +111,11 @@ export function ProjectEditDrawer({ item }: { item: any }) {
     const handleTeamChange = (type: 'infographisteIds' | 'team3DIds' | 'assistantIds', userId: string, isChecked: boolean) => {
         setTeamData(prev => {
             const currentIds = prev[type] || [];
-            const newIds = isChecked ? [...currentIds, userId] : currentIds.filter(id => id !== userId);
+            // ✅ FIX: On ajoute (id: string) explicitement ici pour corriger l'erreur "implicitly has an 'any' type"
+            const newIds = isChecked
+                ? [...currentIds, userId]
+                : currentIds.filter((id: string) => id !== userId);
+
             return { ...prev, [type]: newIds };
         });
     };
