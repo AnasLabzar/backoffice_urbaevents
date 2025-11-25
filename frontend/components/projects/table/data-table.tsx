@@ -73,17 +73,28 @@ export function DataTable({ data, columnFilters, onColumnFiltersChange }: {
 
     React.useEffect(() => {
         if (roleLoading) return;
+
+        // 1. PROPOSAL MANAGER (inchangé)
         if (userRole === 'PROPOSAL_MANAGER') {
             table.getColumn('project.preparationStatus')?.toggleVisibility(false);
             table.getColumn('project.projectManagers')?.toggleVisibility(false);
             table.getColumn('remainingTime')?.toggleVisibility(false);
-        } else if (userRole === 'FINANCE') {
+        }
+        // 2. FINANCE (inchangé)
+        else if (userRole === 'FINANCE') {
             table.getColumn('doc_cps')?.toggleVisibility(false);
             table.getColumn('doc_rc')?.toggleVisibility(false);
             table.getColumn('doc_avis')?.toggleVisibility(false);
-        } else if (['CREATIVE', '3D_ARTIST', 'ASSISTANT_PM'].includes(userRole)) {
-            ['doc_cps', 'doc_rc', 'doc_avis', 'project.preparationStatus', 'project.projectManagers', 'remainingTime', 'latestTask.description', 'latestTask.status'].forEach(col => table.getColumn(col)?.toggleVisibility(false));
+            table.getColumn('doc_bpe')?.toggleVisibility(false); // <-- Masquer BPE pour finance aussi
         }
+        // 3. CREATIVE / TEAM (inchangé)
+        else if (['CREATIVE', '3D_ARTIST', 'ASSISTANT_PM'].includes(userRole)) {
+            ['doc_cps', 'doc_rc', 'doc_avis', 'doc_bpe', /*...*/].forEach(col => table.getColumn(col)?.toggleVisibility(false));
+        }
+
+        // NOTE: Pour le PROJECT_MANAGER (PM), on ne cache RIEN par défaut concernant les docs.
+        // Donc il verra automatiquement la nouvelle colonne 'doc_bpe' ajoutée dans columns.tsx.
+
     }, [userRole, roleLoading, table]);
 
     return (

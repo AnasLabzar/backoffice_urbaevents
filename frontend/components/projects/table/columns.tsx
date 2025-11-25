@@ -31,6 +31,14 @@ export const columns: ColumnDef<ProjectFeedItem>[] = [
     { id: 'doc_cps', header: 'CPS', cell: ({ row }) => <FileStatusCell row={row} docType="CPS" />, enableHiding: true },
     { id: 'doc_rc', header: 'RC', cell: ({ row }) => <FileStatusCell row={row} docType="RC" />, enableHiding: true },
     { id: 'doc_avis', header: 'Avis', cell: ({ row }) => <FileStatusCell row={row} docType="Avis" />, enableHiding: true },
+    // --- 🆕 NOUVELLE COLONNE : BPE (Bordereau Prix Estimatif) ---
+    {
+        id: 'doc_bpe',
+        header: 'BPE',
+        cell: ({ row }) => <FileStatusCell row={row} docType="BPE" />, // On utilise le même composant mais avec docType="BPE"
+        enableHiding: true
+    },
+    // ----------------------------------------------------------
     {
         accessorKey: "project.preparationStatus",
         header: "Status Préparation",

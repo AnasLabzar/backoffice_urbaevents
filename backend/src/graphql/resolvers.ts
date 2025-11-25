@@ -159,7 +159,7 @@ export const resolvers = {
             ) {
                 throw new ApolloError('Forbidden: Not authorized to view user lists.', 'FORBIDDEN');
             }
-            
+
             let findQuery: any = {};
 
             if (role) {
@@ -1305,9 +1305,17 @@ export const resolvers = {
             const project = await Project.findById(projectId);
             if (!project) throw new ApolloError('Project not found');
 
-            // T2kd b l-workflow
-            if (project.preparationStatus !== 'TO_PREPARE') {
-                throw new ApolloError('Project must be in TO_PREPARE status to upload estimate');
+            // 🔴 AVANT (Trop strict) :
+            // if (project.preparationStatus !== 'TO_PREPARE') {
+            //    throw new ApolloError('Project must be in TO_PREPARE status to upload estimate');
+            // }
+
+            // ✅ APRÈS (Correction) :
+            // On autorise l'upload si on est en Préparation OU en Attente de Faisabilité
+            const allowedStatuses = ['TO_PREPARE', 'FEASIBILITY_PENDING'];
+
+            if (!allowedStatuses.includes(project.preparationStatus)) {
+                throw new ApolloError(`Impossible d'uploader l'estimation. Statut actuel : ${project.preparationStatus}`);
             }
 
             const newDocument = await handleUpload(fileUrl, originalFileName, 'CP_ESTIMATE', context.user.id);

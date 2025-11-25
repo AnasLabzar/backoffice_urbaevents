@@ -16,7 +16,7 @@ import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
 
-const GET_PROJECTS_FEED = gql`
+export const GET_PROJECTS_FEED = gql`
   query GetProjectsFeed {
     projects_feed {
       project {
@@ -25,10 +25,16 @@ const GET_PROJECTS_FEED = gql`
         object
         status: generalStatus
         preparationStatus
+        
+        # 👇 CES DEUX LIGNES SONT-ELLES BIEN ICI ? 👇
+        marketEstimate
+        estimatedBudget
+        # 👆 SI ELLES MANQUENT, C'EST ÇA LE PROBLÈME 👆
+        
         projectManagers { id name }
         stages { 
-          administrative { documents { id fileName fileUrl } } 
-          technical { documents { id fileName fileUrl originalFileName } } 
+          administrative { documents { id fileName fileUrl } }
+          technical { documents { id fileName fileUrl originalFileName } }
         }
         submissionDeadline
         cautionRequestDate

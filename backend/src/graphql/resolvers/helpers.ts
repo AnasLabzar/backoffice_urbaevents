@@ -81,31 +81,46 @@ export const getRoleUserIds = async (roleName: string): Promise<string[]> => {
 };
 
 export function buildProjectFilter(permissions: string[], userId: string) {
+    // 1. Admin ou Super-User (Voit tout sauf les brouillons)
     if (permissions.includes('view_all_analytics')) {
         return { preparationStatus: { $ne: 'DRAFT' } };
     }
-    if (permissions.includes('manage_assigned_projects')) {
-        return { projectManagers: userId, preparationStatus: { $ne: 'DRAFT' } };
-    }
+
+    // 2. Proposal Manager (Voit ce qu'il a créé OU ce qu'il gère explicitement)
     if (permissions.includes('create_project_proposal')) {
-        return { createdBy: userId };
+        return {
+            $or: [
+                { createdBy: userId },
+                { projectManagers: userId } // Au cas où il serait aussi PM sur un autre projet
+            ]
+        };
     }
+
+    // 3. Finance (Voit les cautions)
     if (permissions.includes('manage_cautions')) {
         return { preparationStatus: 'CAUTION_PENDING' };
     }
-    if (permissions.includes('manage_own_tasks' as any) || permissions.includes('upload_methodology' as any)) {
-        return {
-            $or: [
-                { 'team.infographistes': userId },
-                { 'team.team3D': userId },
-                { 'team.assistants': userId },
-            ],
-            preparationStatus: 'IN_PRODUCTION',
-        };
-    }
-    return { _id: null };
-}
 
+    // 4. TOUS LES AUTRES (PM, Assistant, Creative, 3D, etc.)
+    // Règle d'or : "Si mon ID est quelque part dans le projet, je le vois."
+    return {
+        $and: [
+            // Condition 1 : Ne pas montrer les brouillons (sauf si on est le créateur, mais géré plus haut)
+            { preparationStatus: { $ne: 'DRAFT' } },
+            
+            // Condition 2 : Être impliqué dans le projet
+            {
+                $or: [
+                    { projectManagers: userId },       // <-- Assigné comme Chef de Projet
+                    { assignedTeam: userId },          // <-- Assigné dans l'équipe globale
+                    { 'team.infographistes': userId }, // <-- Assigné comme Infographiste
+                    { 'team.team3D': userId },         // <-- Assigné comme 3D
+                    { 'team.assistants': userId }      // <-- Assigné comme Assistant
+                ]
+            }
+        ]
+    };
+}
 /**
  * Helper to patch null users in a project object to avoid frontend crashes
  */

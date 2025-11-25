@@ -8,11 +8,30 @@ import { logActivity } from '../../utils/logger';
 import { createNotification } from '../../utils/notifications';
 import { NotificationLevel } from '../../models/Notification';
 import { pubsub, NEW_TASK_EVENT } from '../../utils/pubsub';
-import { 
-    checkPermission, defaultUser, handleUpload, stagePopulates, 
-    teamPopulates, userSelect, buildProjectFilter, isDynamicPmCandidate, 
-    getRoleUserIds, patchProjectUsers 
+import {
+    checkPermission, defaultUser, handleUpload, stagePopulates,
+    teamPopulates, userSelect, buildProjectFilter, isDynamicPmCandidate,
+    getRoleUserIds, patchProjectUsers
 } from './helpers';
+
+// --- ✅ HELPER JDID: CHECK PM ACCESS (HYBRIDE) ---
+// Hada kay-chouf wach nta Admin WLA nta m-assigné f had l-projet b dbt
+const checkPMAccess = async (context: IContext, project: any, requiredPermission: string) => {
+    const userId = context.user?.id;
+
+    // 1. Check wach ana f la liste dyal projectManagers dyal had l-projet
+    const isAssigned = project.projectManagers.some((pm: any) => pm.toString() === userId);
+
+    if (isAssigned) return true; // ✅ Duz, nta howa moulchi f had l-projet
+
+    // 2. Ila ma kntich m-assigné, checki wach nta Admin (Global Permission)
+    try {
+        await checkPermission(context, requiredPermission);
+        return true; // ✅ Duz, nta Admin
+    } catch (e) {
+        return false; // ❌ Barra
+    }
+};
 
 export const projectResolvers = {
     Query: {
@@ -42,6 +61,15 @@ export const projectResolvers = {
             for (const p of teamPopulates) projectQuery = projectQuery.populate(p as any);
 
             const projects = await projectQuery.exec();
+
+            // 👇 AJOUTEZ CETTE LIGNE POUR DÉBUGGER
+            // if (projects.length > 0) {
+            //     console.log("🔎 DEBUG BACKEND PROJET 0:", {
+            //         title: projects[0].title,
+            //         market: projects[0].marketEstimate,
+            //         budget: projects[0].estimatedBudget
+            //     });
+            // }
 
             projects.forEach((project: any) => patchProjectUsers(project));
 
@@ -73,9 +101,17 @@ export const projectResolvers = {
 
             const projects = await projectQuery.exec();
 
+            // 👇 AJOUTEZ CETTE LIGNE POUR DÉBUGGER
+            // if (projects.length > 0) {
+            //     console.log("🔎 DEBUG BACKEND PROJET 0:", {
+            //         title: projects[0].title,
+            //         market: projects[0].marketEstimate,
+            //         budget: projects[0].estimatedBudget
+            //     });
+            // }
+
             projects.forEach((project: any) => patchProjectUsers(project));
 
-            // Latest task per project logic
             const projectIds = projects.map((p) => p._id as Types.ObjectId);
             let latestByProject: Record<string, any> = {};
 
@@ -165,12 +201,11 @@ export const projectResolvers = {
     },
 
     Mutation: {
+        // Admin assign PM
         assignDynamicProjectManager: async (_: unknown, { projectId, newPmId }: { projectId: string, newPmId: string }, context: IContext) => {
             await checkPermission(context, 'assign_dynamic_pm');
             const isCandidate = await isDynamicPmCandidate(newPmId);
-            if (!isCandidate) {
-                throw new ApolloError('Forbidden: User is not an authorized candidate for Project Manager.', 'FORBIDDEN');
-            }
+            if (!isCandidate) throw new ApolloError('Forbidden: User is not an authorized candidate.', 'FORBIDDEN');
 
             const updatedProject = await Project.findByIdAndUpdate(
                 projectId,
@@ -178,14 +213,14 @@ export const projectResolvers = {
                 { new: true }
             ).populate({ path: 'projectManagers', select: userSelect });
 
-            if (!updatedProject) throw new ApolloError('Project not found or update failed.', 'NOT_FOUND');
+            if (!updatedProject) throw new ApolloError('Project not found', 'NOT_FOUND');
 
             const newPm = updatedProject.projectManagers.find(pm => (pm as any)._id.toString() === newPmId);
-            await logActivity(context.user.id, `Assigned new dynamic PM: ${newPm?.name || newPmId} to project: ${updatedProject.title}`, 'PROJECT_UPDATE', projectId);
+            await logActivity(context.user.id, `Assigned new dynamic PM: ${newPm?.name || newPmId}`, 'PROJECT_UPDATE', projectId);
 
             await createNotification({
-                title: `You have been assigned as Project Manager for: ${updatedProject.title}`,
-                body: `You are now a Project Manager for project ${updatedProject.projectCode}.`,
+                title: `You have been assigned as Project Manager`,
+                body: `You are now a Project Manager for project ${updatedProject.title}.`,
                 level: NotificationLevel.ALERT,
                 project: new Types.ObjectId(projectId),
                 users: [new Types.ObjectId(newPmId)],
@@ -194,19 +229,26 @@ export const projectResolvers = {
             return updatedProject;
         },
 
+        // Update general info
         updateProject: async (_: unknown, { id, input }: any, context: IContext) => {
-            await checkPermission(context, 'manage_assigned_projects');
-            const project = await Project.findByIdAndUpdate(id, { $set: input }, { new: true });
-            if (!project) throw new ApolloError('Project not found', 'NOT_FOUND');
+            const project = await Project.findById(id);
+            if (!project) throw new ApolloError('Project not found');
+
+            // ✅ FIX: On utilise checkPMAccess ici aussi
+            const canEdit = await checkPMAccess(context, project, 'manage_assigned_projects');
+            if (!canEdit) throw new ApolloError('Forbidden', 'FORBIDDEN');
+
+            const updatedProject = await Project.findByIdAndUpdate(id, { $set: input }, { new: true });
             await logActivity({
                 userId: context.user.id,
                 action: 'PROJECT_UPDATE',
-                project: project._id,
-                details: `Project details updated for: "${project.title}"`,
+                project: updatedProject!._id,
+                details: `Project details updated`,
             });
-            return project;
+            return updatedProject;
         },
 
+        // Proposal Manager creation
         proposal_createProject: async (_: unknown, { input }: any, context: IContext) => {
             await checkPermission(context, 'create_project_proposal');
             const projectCount = await Project.countDocuments();
@@ -231,12 +273,7 @@ export const projectResolvers = {
                 },
             });
 
-            await logActivity({
-                userId: context.user.id,
-                action: 'PROPOSAL_CREATE',
-                project: project._id,
-                details: `Proposal draft created: "${project.title}"`,
-            });
+            await logActivity({ userId: context.user.id, action: 'PROPOSAL_CREATE', project: project._id, details: `Draft created: "${project.title}"` });
             return project;
         },
 
@@ -253,8 +290,18 @@ export const projectResolvers = {
                 userId: context.user.id,
                 action: 'FILE_UPLOAD',
                 project: project._id,
-                details: `File uploaded: "${docType}" (${originalFileName})`,
+                details: `Document uploadé: "${docType}" (${originalFileName})`,
             });
+
+            if (stageName === 'administrative' && project.projectManagers.length > 0) {
+                await createNotification({
+                    userIds: project.projectManagers.map(pm => pm.toString()),
+                    level: NotificationLevel.INFO,
+                    message: `Nouveau document administratif ajouté : ${docType}`,
+                    link: `/dashboard/projects/${project._id}`,
+                    project: project._id.toString()
+                });
+            }
 
             await project.populate({
                 path: `stages.${stageName}.documents`,
@@ -322,7 +369,6 @@ export const projectResolvers = {
                 });
             }
 
-            // General Task Creation Logic
             if (projectManagerIds && projectManagerIds.length > 0) {
                 const projectEndDate = project.endDate ? new Date(project.endDate) : null;
                 const generalTaskDescription = `Suivi et gestion générale du projet "${project.title}"`;
@@ -497,24 +543,15 @@ export const projectResolvers = {
             return project;
         },
 
+        // --- ✅ FIX: CP DONNE AVIS (AVEC CHECKPMACCESS) ---
         giveProposalAvis: async (_: unknown, { projectId, status, reason }: any, context: IContext) => {
-            if (!context.user) throw new ApolloError('Not authenticated', 'UNAUTHENTICATED');
-            const user = await User.findById(context.user.id).populate('role');
-            const userRole = user?.role as any;
-            if (!userRole || userRole.name !== 'PROJECT_MANAGER') {
-                throw new ApolloError('Forbidden - Only PROJECT_MANAGER can give avis', 'FORBIDDEN');
-            }
-
+            if (!context.user) throw new ApolloError('Not authenticated');
             const project = await Project.findById(projectId);
             if (!project) throw new ApolloError('Project not found');
 
-            if (project.preparationStatus !== 'TO_PREPARE') {
-                throw new Error('Project must be in TO_PREPARE status for avis');
-            }
-
-            if (!['ACCEPTED', 'NOT_ACCEPTED'].includes(status)) {
-                throw new ApolloError('Invalid avis status - must be ACCEPTED or NOT_ACCEPTED');
-            }
+            // Utilisation de la nouvelle fonction de sécurité
+            const canAccess = await checkPMAccess(context, project, 'assign_project_managers');
+            if (!canAccess) throw new ApolloError('Forbidden - You must be the assigned Project Manager or Admin', 'FORBIDDEN');
 
             project.proposalAvis = {
                 status,
@@ -525,25 +562,19 @@ export const projectResolvers = {
 
             if (status === 'ACCEPTED') {
                 project.preparationStatus = 'FEASIBILITY_PENDING';
-            } else {
+            } else if (status === 'NOT_ACCEPTED') {
                 project.preparationStatus = 'NO';
             }
 
             await project.save();
-
-            await logActivity({
-                userId: context.user.id,
-                action: 'GIVE_PROPOSAL_AVIS',
-                project: project._id,
-                details: `Avis donné: ${status}${reason ? ` (raison: ${reason})` : ''}`,
-            });
+            await logActivity({ userId: context.user.id, action: 'GIVE_PROPOSAL_AVIS', project: project._id, details: `Avis: ${status}` });
 
             const adminIds = await getRoleUserIds('ADMIN');
             if (adminIds.length > 0) {
                 await createNotification({
                     userIds: adminIds,
                     level: NotificationLevel.IMPORTANT,
-                    message: `Avis [${status}] donné par le PM pour le projet: "${project.object}"`,
+                    message: `Avis [${status}] donné par le PM pour "${project.object}"`,
                     link: `/dashboard/projects/`,
                     project: project._id.toString()
                 });
@@ -552,30 +583,25 @@ export const projectResolvers = {
             return project;
         },
 
+        // --- ✅ FIX: CP UPLOAD ESTIMATE (AVEC CHECKPMACCESS) ---
         cp_uploadEstimate: async (_: unknown, { projectId, fileUrl, originalFileName }: any, context: IContext) => {
-            await checkPermission(context, 'manage_assigned_projects');
             const project = await Project.findById(projectId);
             if (!project) throw new ApolloError('Project not found');
 
-            if (project.preparationStatus !== 'TO_PREPARE') {
-                throw new ApolloError('Project must be in TO_PREPARE status to upload estimate');
+            // Utilisation de la nouvelle fonction de sécurité
+            const canAccess = await checkPMAccess(context, project, 'manage_assigned_projects');
+            if (!canAccess) throw new ApolloError('Forbidden', 'FORBIDDEN');
+
+            const allowedStatuses = ['TO_PREPARE', 'FEASIBILITY_PENDING'];
+            if (!allowedStatuses.includes(project.preparationStatus)) {
+                throw new ApolloError(`Statut invalide pour upload estimation: ${project.preparationStatus}`);
             }
 
             const newDocument = await handleUpload(fileUrl, originalFileName, 'CP_ESTIMATE', context.user.id);
             project.stages.technical.documents.push(newDocument._id);
 
-            await logActivity({
-                userId: context.user.id,
-                action: 'CP_UPLOAD_ESTIMATE',
-                project: project._id,
-                details: `CP uploaded estimate: "${originalFileName}"`,
-            });
-
-            await project.populate({
-                path: 'stages.technical.documents',
-                populate: { path: 'uploadedBy', select: userSelect },
-            });
-
+            await logActivity({ userId: context.user.id, action: 'CP_UPLOAD_ESTIMATE', project: project._id, details: `Estimation uploadée` });
+            await project.populate({ path: 'stages.technical.documents', populate: { path: 'uploadedBy', select: userSelect } });
             await project.save();
 
             const adminIds = await getRoleUserIds('ADMIN');
@@ -588,42 +614,37 @@ export const projectResolvers = {
                     project: project._id.toString()
                 });
             }
-
             return project;
         },
 
+        // --- ✅ FIX: CP ASSIGN TEAM (AVEC CHECKPMACCESS) ---
         cp_assignTeam: async (_: unknown, { input }: any, context: IContext) => {
-            await checkPermission(context, 'assign_creative_tasks');
             const { projectId, infographisteIds, team3DIds, assistantIds } = input;
             const project = await Project.findById(projectId);
             if (!project) throw new ApolloError('Project not found');
+
+            const canAccess = await checkPMAccess(context, project, 'assign_creative_tasks');
+            if (!canAccess) throw new ApolloError('Forbidden', 'FORBIDDEN');
+
             project.team.infographistes = infographisteIds || [];
             project.team.team3D = team3DIds || [];
             project.team.assistants = assistantIds || [];
-            await logActivity({
-                userId: context.user.id,
-                action: 'CP_ASSIGN_TEAM',
-                project: project._id,
-                details: `Project team assigned.`,
-            });
+
+            const allIds = [...new Set([...infographisteIds, ...team3DIds, ...assistantIds])];
+            project.assignedTeam = allIds;
+
+            await logActivity({ userId: context.user.id, action: 'CP_ASSIGN_TEAM', project: project._id, details: `Team updated` });
             await project.save();
 
-            const allAssignedIds = [
-                ...(infographisteIds || []),
-                ...(team3DIds || []),
-                ...(assistantIds || [])
-            ];
-
-            if (allAssignedIds.length > 0) {
+            if (allIds.length > 0) {
                 await createNotification({
-                    userIds: [...new Set(allAssignedIds)],
+                    userIds: allIds,
                     level: NotificationLevel.STANDARD,
                     message: `Vous avez été assigné à l'équipe du projet: "${project.object}"`,
                     link: `/dashboard/projects/`,
                     project: project._id.toString()
                 });
             }
-
             return project;
         },
 

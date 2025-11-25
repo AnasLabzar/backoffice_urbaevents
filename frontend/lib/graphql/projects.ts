@@ -1,44 +1,64 @@
+// src/lib/graphql/projects.ts
 import { gql } from "@apollo/client";
 
 export const ME_QUERY = gql` query Me { me { id role { name permissions } } }`;
 
-export const GET_PROJECTS_FEED = gql`
-    query GetProjectsFeed {
-        projects_feed {
-        project {
-            id
-            title
-            object
-            status: generalStatus
-            preparationStatus
-            projectManagers { id name }
-            stages { 
-            administrative { documents { id fileName fileUrl } } 
-            technical { documents { id fileName fileUrl originalFileName } } 
-            }
-            submissionDeadline
-            cautionRequestDate
-            feasibilityChecks {
-            administrative
-            technical
-            financial
-            }
-            caution { status }
-            team {
-            infographistes { id name }
-            team3D { id name }
-            assistants { id name }
-            }
-            proposalAvis {
-            status
-            reason
-            givenBy { name }
-            givenAt
-            }
-        }
-        latestTask { id description status createdAt }
-        }
+// ✅ AJOUTEZ CETTE REQUÊTE (Indispensable pour le panier Admin)
+export const GET_ALL_USERS = gql`
+  query GetAllUsers {
+    users { 
+      id 
+      name 
+      email 
+      role { name } 
     }
+  }
+`;
+
+export const GET_PROJECTS_FEED = gql`
+  query GetProjectsFeed {
+    projects_feed {
+      project {
+        id
+        title
+        object
+        status: generalStatus
+        preparationStatus
+        
+        # Les champs financiers
+        marketEstimate
+        estimatedBudget
+        
+        projectManagers { id name }
+        stages { 
+          administrative { documents { id fileName fileUrl } }
+          technical { documents { id fileName fileUrl originalFileName } }
+        }
+        submissionDeadline
+        cautionRequestDate
+        feasibilityChecks {
+          administrative
+          technical
+          financial
+        }
+        caution {
+          status
+        }
+        team {
+          infographistes { id name }
+          team3D { id name }
+          assistants { id name }
+        }
+        proposalAvis {
+          status
+          reason
+          givenBy { name }
+          givenAt
+        }
+      }
+      latestTask { id description status createdAt }
+    }
+  }
 `;
 
 export const GET_PROJECT_MANAGERS = gql`
@@ -88,6 +108,7 @@ export const TASK_CREATED_SUBSCRIPTION = gql`
         description
         status
         project { id }
+        assignedTo { id }
       }
     }
 `;
@@ -217,4 +238,3 @@ export const GIVE_PROPOSAL_AVIS_MUTATION = gql`
     }
   }
 `;
-

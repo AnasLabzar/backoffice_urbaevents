@@ -31,7 +31,7 @@ export const typeDefs = gql`
     givenAt: String!
   }
 
-  type Project {
+type Project {
     id: ID!
     projectCode: String!
     projectType: String!
@@ -43,7 +43,6 @@ export const typeDefs = gql`
     location: String
     submissionDeadline: String!
     cautionRequestDate: String
-    estimatedBudget: Float
     cautionAmount: Float
     preparationStatus: String!
     projectManagers: [User!]!
@@ -54,6 +53,10 @@ export const typeDefs = gql`
     feasibilityChecks: FeasibilityChecks!
     proposalAvis: ProposalAvis
     caution: Caution!
+    
+    marketEstimate: Float
+    estimatedBudget: Float
+    
     team: Team!
     finalSubmission: String
   }
@@ -144,6 +147,10 @@ export const typeDefs = gql`
     title: String
     object: String
     status: String
+    
+    # ✅ AJOUTEZ CES DEUX LIGNES :
+    marketEstimate: Float
+    estimatedBudget: Float
   }
 
   input AdminAssignProjectInput {

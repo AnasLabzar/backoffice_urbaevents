@@ -57,8 +57,9 @@ export interface IProject extends Document {
   location: string;
   submissionDeadline: Date;
   cautionRequestDate: Date;
-  estimatedBudget: number;
-  cautionAmount: number;
+  estimatedBudget: Number;
+  marketEstimate: Number;
+  cautionAmount: Number;
 
   // 3. Management Details
   preparationStatus: PreparationStatus;
@@ -124,8 +125,10 @@ const ProjectSchema: Schema = new Schema(
     location: { type: String },
     submissionDeadline: { type: Date, required: true },
     cautionRequestDate: { type: Date },
+    marketEstimate: { type: Number, default: 0 },
     estimatedBudget: { type: Number },
     cautionAmount: { type: Number },
+    // ✅ AJOUTE CES DEUX LIGNES :
 
     preparationStatus: {
       type: String,

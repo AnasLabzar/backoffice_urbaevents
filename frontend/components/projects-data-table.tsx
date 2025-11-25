@@ -76,7 +76,9 @@ import { format, differenceInDays, subDays } from "date-fns";
 import { cn } from "@/lib/utils";
 
 // --- L-QUERIES L-MOHIMIN ---
-const GET_PROJECTS_FEED = gql`
+// src/lib/graphql/projects.ts
+
+export const GET_PROJECTS_FEED = gql`
   query GetProjectsFeed {
     projects_feed {
       project {
@@ -85,8 +87,14 @@ const GET_PROJECTS_FEED = gql`
         object
         status: generalStatus
         preparationStatus
+        
+        # 👇 CES DEUX LIGNES SONT-ELLES BIEN ICI ? 👇
+        marketEstimate
+        estimatedBudget
+        # 👆 SI ELLES MANQUENT, C'EST ÇA LE PROBLÈME 👆
+        
         projectManagers { id name }
-        stages {
+        stages { 
           administrative { documents { id fileName fileUrl } }
           technical { documents { id fileName fileUrl originalFileName } }
         }
@@ -105,7 +113,7 @@ const GET_PROJECTS_FEED = gql`
           team3D { id name }
           assistants { id name }
         }
-        proposalAvis { # <-- ZID HNA
+        proposalAvis {
           status
           reason
           givenBy { name }

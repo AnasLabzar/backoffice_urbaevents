@@ -19,7 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import {
     IconCheck, IconFileText, IconUpload, IconDownload, IconAlertCircle, IconLoader,
     IconChartPie, IconTrendingUp, IconTrendingDown, IconCalculator, IconBuildingBank, IconTools, IconFiles,
-    IconUserShield
+    IconUserShield, IconCalendar, IconBuilding
 } from "@tabler/icons-react";
 
 import { MultiSelectPopover } from "../team-selector";
@@ -30,10 +30,12 @@ import {
     ADMIN_LAUNCH_PROJECT_MUTATION, FINANCE_REQUEST_CAUTION_MUTATION, CP_ASSIGN_TEAM_MUTATION,
     PM_CREATE_TASK_MUTATION, PM_UPDATE_TASK_STATUS_MUTATION, CP_UPLOAD_ASSET_MUTATION,
     GIVE_PROPOSAL_AVIS_MUTATION,
-    GET_ALL_USERS // ✅ C'est importé depuis le fichier qu'on vient de modifier
+    GET_ALL_USERS // <--- N'OUBLIE PAS D'IMPORTER ÇA
 } from "@/lib/graphql/projects";
 
-// --- HELPER UPLOAD ---
+// ... (Garder uploadFileWithProgress et DocumentRow et MarginCalculator inchangés ...)
+// Je remets juste DocumentRow et MarginCalculator pour la complétude, mais si tu les as déjà, tu peux garder les tiens.
+
 const uploadFileWithProgress = (file: File, url: string, onProgress: (percent: number) => void): Promise<any> => {
     return new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
@@ -41,26 +43,18 @@ const uploadFileWithProgress = (file: File, url: string, onProgress: (percent: n
         formData.append('file', file);
         xhr.open('POST', url, true);
         xhr.upload.onprogress = (e) => {
-            if (e.lengthComputable) {
-                const percentComplete = (e.loaded / e.total) * 100;
-                onProgress(percentComplete);
-            }
+            if (e.lengthComputable) { const percentComplete = (e.loaded / e.total) * 100; onProgress(percentComplete); }
         };
         xhr.onload = () => {
-            if (xhr.status >= 200 && xhr.status < 300) resolve(JSON.parse(xhr.responseText));
-            else reject(new Error('Upload failed'));
+            if (xhr.status >= 200 && xhr.status < 300) resolve(JSON.parse(xhr.responseText)); else reject(new Error('Upload failed'));
         };
         xhr.onerror = () => reject(new Error('Network Error'));
         xhr.send(formData);
     });
 };
 
-// --- DOCUMENT ROW ---
 function DocumentRow({ label, type, existingDoc, file, setFile, progress, isOptional = false }: any) {
-    const isUploaded = !!existingDoc;
-    const isSelected = !!file;
-    const isUploading = progress > 0 && progress < 100;
-
+    const isUploaded = !!existingDoc; const isSelected = !!file; const isUploading = progress > 0 && progress < 100;
     return (
         <div className="flex items-center justify-between p-3 border rounded-lg bg-card hover:bg-accent/5 transition-colors group relative overflow-hidden">
             {isUploading && <div className="absolute bottom-0 left-0 h-1 bg-blue-500 transition-all duration-300 ease-out" style={{ width: `${progress}%` }} />}
@@ -70,24 +64,14 @@ function DocumentRow({ label, type, existingDoc, file, setFile, progress, isOpti
                 </div>
                 <div className="flex flex-col min-w-0">
                     <div className="flex items-center gap-2"><span className="font-medium text-sm truncate text-foreground">{label}</span>{isOptional && <Badge variant="outline" className="text-[10px] h-5 px-1.5">Optionnel</Badge>}</div>
-                    <div className="text-xs text-muted-foreground truncate max-w-[200px] mt-0.5">
-                        {isUploading ? <span className="text-blue-600 font-medium animate-pulse">Upload en cours...</span> : file ? <span className="text-blue-600 font-medium">Prêt: {file.name}</span> : isUploaded ? <a href={`https://backoffice.urbagroupe.ma/${existingDoc.fileUrl}`} target="_blank" className="hover:underline flex items-center gap-1 text-green-600">{existingDoc.originalFileName || existingDoc.fileName} <IconDownload size={12} /></a> : <span>Non uploadé</span>}
-                    </div>
+                    <div className="text-xs text-muted-foreground truncate max-w-[200px] mt-0.5">{isUploading ? <span className="text-blue-600 font-medium animate-pulse">Upload en cours...</span> : file ? <span className="text-blue-600 font-medium">Prêt: {file.name}</span> : isUploaded ? <a href={`https://backoffice.urbagroupe.ma/${existingDoc.fileUrl}`} target="_blank" className="hover:underline flex items-center gap-1 text-green-600">{existingDoc.originalFileName || existingDoc.fileName} <IconDownload size={12} /></a> : <span>Non uploadé</span>}</div>
                 </div>
             </div>
-            <div className="flex-shrink-0 ml-2 z-10">
-                <div className="relative">
-                    <input type="file" id={`upload-${type}`} disabled={isUploading} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed" onChange={(e) => { if (e.target.files && e.target.files[0]) setFile(e.target.files[0]); }} />
-                    <Button variant={isUploaded || isSelected ? "outline" : "secondary"} size="sm" disabled={isUploading} className={cn("pointer-events-none h-8 text-xs", isUploaded && "border-green-200 text-green-700 hover:bg-green-50")}>
-                        {isUploading ? <IconLoader className="animate-spin h-3 w-3" /> : isUploaded ? "Remplacer" : isSelected ? "Changer" : "Choisir"}
-                    </Button>
-                </div>
-            </div>
+            <div className="flex-shrink-0 ml-2 z-10"><div className="relative"><input type="file" id={`upload-${type}`} disabled={isUploading} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed" onChange={(e) => { if (e.target.files && e.target.files[0]) setFile(e.target.files[0]); }} /><Button variant={isUploaded || isSelected ? "outline" : "secondary"} size="sm" disabled={isUploading} className={cn("pointer-events-none h-8 text-xs", isUploaded && "border-green-200 text-green-700 hover:bg-green-50")}>{isUploading ? <IconLoader className="animate-spin h-3 w-3" /> : isUploaded ? "Remplacer" : isSelected ? "Changer" : "Choisir"}</Button></div></div>
         </div>
     );
 }
 
-// --- MARGIN CALCULATOR ---
 function MarginCalculator({ marketPrice, costPrice }: { marketPrice: number, costPrice: number }) {
     const market = Number(marketPrice) || 0; const cost = Number(costPrice) || 0; const margin = market - cost;
     const marginPercent = market > 0 ? (margin / market) * 100 : 0;
@@ -102,15 +86,12 @@ function MarginCalculator({ marketPrice, costPrice }: { marketPrice: number, cos
     );
 }
 
-// --- MAIN COMPONENT ---
+// --- 3. MAIN COMPONENT ---
 export function ProjectEditDrawer({ item }: { item: any }) {
     const isMobile = useIsMobile();
     const { data: meData } = useQuery(ME_QUERY);
     const userRole = meData?.me.role.name;
     const userPermissions = meData?.me.role.permissions || [];
-
-    // ✅ Check PM Assignment
-    const isAssignedPM = item.projectManagers?.some((pm: any) => pm.id === meData?.me?.id);
 
     // State
     const [fileCPS, setFileCPS] = React.useState<File | null>(null);
@@ -127,6 +108,7 @@ export function ProjectEditDrawer({ item }: { item: any }) {
     const [feasibilityData, setFeasibilityData] = React.useState({ administrative: item.feasibilityChecks.administrative, technical: item.feasibilityChecks.technical, financial: item.feasibilityChecks.financial });
     const [teamData, setTeamData] = React.useState({ infographisteIds: item.team.infographistes.map((u: any) => u.id), team3DIds: item.team.team3D.map((u: any) => u.id), assistantIds: item.team.assistants.map((u: any) => u.id) });
 
+    // FORM DATA
     const [formData, setFormData] = React.useState({
         ...item,
         marketEstimate: item.marketEstimate || 0,
@@ -138,12 +120,12 @@ export function ProjectEditDrawer({ item }: { item: any }) {
     const [newTaskDept, setNewTaskDept] = React.useState("");
     const [avisData, setAvisData] = React.useState({ status: '', reason: '' });
 
-    // Mutations
+    // Mutations (garder les vôtres, pas de changement)
     const [updateProject, { loading: loadingUpdate }] = useMutation(UPDATE_PROJECT_MUTATION, { onCompleted: () => toast.success("Projet mis à jour!"), onError: (err) => toast.error(err.message), refetchQueries: [GET_PROJECTS_FEED] });
     const [uploadDocument, { loading: loadingUpload }] = useMutation(UPLOAD_DOCUMENT_MUTATION);
     const [submitForReview, { loading: loadingSubmit }] = useMutation(SUBMIT_REVIEW_MUTATION, { onCompleted: () => toast.success("Projet soumis avec succès!"), refetchQueries: [GET_PROJECTS_FEED] });
     const [adminAssignProject, { loading: loadingAssign }] = useMutation(ADMIN_ASSIGN_PROJECT_MUTATION, { onCompleted: () => toast.success("Projet assigné!"), refetchQueries: [GET_PROJECTS_FEED] });
-    const [cpUploadEstimate, { loading: loadingEstimate }] = useMutation(CP_UPLOAD_ESTIMATE_MUTATION, { onCompleted: () => toast.success("Estimation uploadée!"), refetchQueries: [GET_PROJECTS_FEED] });
+    const [cpUploadEstimate, { loading: loadingEstimate }] = useMutation(CP_UPLOAD_ESTIMATE_MUTATION, { refetchQueries: [GET_PROJECTS_FEED] });
     const [adminRunFeasibility, { loading: loadingFeasibility }] = useMutation(ADMIN_RUN_FEASIBILITY_MUTATION, { onCompleted: () => toast.info("Faisabilité mise à jour."), refetchQueries: [GET_PROJECTS_FEED] });
     const [adminLaunchProject, { loading: loadingLaunch }] = useMutation(ADMIN_LAUNCH_PROJECT_MUTATION, { onCompleted: () => toast.success("Projet lancé!"), refetchQueries: [GET_PROJECTS_FEED] });
     const [financeRequestCaution, { loading: loadingCaution }] = useMutation(FINANCE_REQUEST_CAUTION_MUTATION, { onCompleted: () => toast.success("Caution demandée!"), refetchQueries: [GET_PROJECTS_FEED] });
@@ -153,10 +135,8 @@ export function ProjectEditDrawer({ item }: { item: any }) {
     const [updateTaskStatus] = useMutation(PM_UPDATE_TASK_STATUS_MUTATION, { onCompleted: () => toast.success("Status MAJ!"), refetchQueries: [GET_PROJECTS_FEED] });
     const [cpUploadAsset, { loading: loadingAsset }] = useMutation(CP_UPLOAD_ASSET_MUTATION, { onCompleted: () => { toast.success("Asset uploadé!"); setFileAsset(null); }, refetchQueries: [{ query: GET_PROJECTS_FEED }] });
 
-    // Queries
-    // ✅ UTILISATION DE GET_ALL_USERS pour la liste Admin
+    // --- ✅ CHANGEMENT ICI : ON RÉCUPÈRE TOUS LES USERS ---
     const { data: allUsersData, loading: loadingUsers } = useQuery(GET_ALL_USERS, { skip: userRole !== 'ADMIN' });
-    const { data: pmData, loading: loadingPMs } = useQuery(GET_PROJECT_MANAGERS, { skip: userRole !== 'ADMIN' });
     const { data: teamMembers, loading: loadingTeamMembers } = useQuery(GET_TEAM_MEMBERS, { skip: !(userRole === 'ADMIN' || userPermissions.includes('assign_creative_tasks')) });
 
     const existingDocs = item.stages?.administrative?.documents || [];
@@ -164,6 +144,7 @@ export function ProjectEditDrawer({ item }: { item: any }) {
     const existingTechDocs = item.stages?.technical?.documents || [];
     const getTechDoc = (type: string) => existingTechDocs.find((d: any) => d.fileName === type);
 
+    // Handlers
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => { setFormData({ ...formData, [e.target.id]: e.target.value }); };
     const handleSelectChange = (id: string, value: string) => { setFormData({ ...formData, [id]: value }); };
     const handleSubmit = (e: React.FormEvent) => {
@@ -278,75 +259,20 @@ export function ProjectEditDrawer({ item }: { item: any }) {
             );
         }
 
-        // ✅ VUE ADMIN: Panneau de Validation Professionnel
+        // --- VUE ADMIN (VALIDATION ASSIGNATION) ---
         if (userRole === 'ADMIN' && isPendingAdminReview) {
             return (
-                <form id="admin-assign-form" className="flex flex-col gap-6" onSubmit={handleAdminSubmit}>
-                    <div className="bg-muted/30 border rounded-lg p-4 space-y-3">
-                        <div className="flex items-center gap-2 text-primary font-semibold">
-                            <IconUserShield size={20} />
-                            <span>Espace Validation</span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div><span className="text-xs text-muted-foreground uppercase">Client</span><p className="font-medium">{item.title}</p></div>
-                            <div><span className="text-xs text-muted-foreground uppercase">Date Limite</span><p className="font-medium">{new Date(parseInt(item.submissionDeadline)).toLocaleDateString('fr-FR')}</p></div>
-                        </div>
-                    </div>
-
-                    <div className="space-y-3">
-                        <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Décision Administrative</h4>
-                        <div className="flex flex-col gap-3">
-                            <Select value={adminFormData.status} onValueChange={(v) => handleAdminFormChange("status", v)}>
-                                <SelectTrigger className="h-10 bg-background"><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="TO_PREPARE">✅ Valider (Passer à Préparer)</SelectItem>
-                                    <SelectItem value="NO">❌ Refuser le Projet</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </div>
-
-                    <div className="space-y-3">
-                        <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Assignation Chef de Projet</h4>
-                        {loadingUsers ? <Skeleton className="h-10" /> : (
-                            <Select
-                                value={adminFormData.projectManagerId}
-                                onValueChange={(v) => handleAdminFormChange("projectManagerId", v)}
-                            >
-                                <SelectTrigger className="h-10 bg-background">
-                                    <SelectValue placeholder="Sélectionner un responsable..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectGroup>
-                                        <SelectLabel>Chefs de Projet & Directeurs</SelectLabel>
-                                        {allUsersData?.users
-                                            .filter((u: any) => ['PROJECT_MANAGER', 'DIRECTOR_EVENT', 'ADMIN'].includes(u.role.name))
-                                            .map((pm: any) => (
-                                                <SelectItem key={pm.id} value={pm.id}>
-                                                    {pm.name} <span className="text-muted-foreground text-xs ml-2">({pm.role.name})</span>
-                                                </SelectItem>
-                                            ))}
-                                    </SelectGroup>
-                                    <SelectGroup>
-                                        <SelectLabel>Autres Utilisateurs</SelectLabel>
-                                        {allUsersData?.users
-                                            .filter((u: any) => !['PROJECT_MANAGER', 'DIRECTOR_EVENT', 'ADMIN'].includes(u.role.name))
-                                            .map((pm: any) => (
-                                                <SelectItem key={pm.id} value={pm.id}>
-                                                    {pm.name} <span className="text-muted-foreground text-xs ml-2">({pm.role.name})</span>
-                                                </SelectItem>
-                                            ))}
-                                    </SelectGroup>
-                                </SelectContent>
-                            </Select>
-                        )}
-                        <p className="text-[10px] text-muted-foreground">Vous pouvez assigner n'importe quel utilisateur comme responsable principal.</p>
-                    </div>
+                <form id="admin-assign-form" className="flex flex-col gap-4" onSubmit={handleAdminSubmit}>
+                    <h4 className="font-semibold">Validation Administrative</h4>
+                    <Select value={adminFormData.status} onValueChange={(v) => handleAdminFormChange("status", v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="TO_PREPARE">Valider (À Préparer)</SelectItem><SelectItem value="NO">Refuser</SelectItem></SelectContent></Select>
+                    <Label>Assigner Chef de Projet</Label>
+                    {loadingPMs ? <Skeleton className="h-10" /> : <Select value={adminFormData.projectManagerId} onValueChange={(v) => handleAdminFormChange("projectManagerId", v)}><SelectTrigger><SelectValue placeholder="Choisir CP..." /></SelectTrigger><SelectContent>{pmData?.users.map((pm: any) => <SelectItem key={pm.id} value={pm.id}>{pm.name}</SelectItem>)}</SelectContent></Select>}
                 </form>
             );
         }
 
-        if ((userPermissions.includes('manage_assigned_projects') || isAssignedPM) && isToPrepare) {
+        // --- VUE CP (PREPARATION ESTIMATION) ---
+        if (userPermissions.includes('manage_assigned_projects') && isToPrepare) {
             return (
                 <div className="flex flex-col gap-6 w-full">
                     <div className="bg-blue-50 border border-blue-200 text-blue-800 p-3 rounded-md text-sm flex items-center gap-2"><IconChartPie size={18} />Préparer l'estimation financière.</div>
@@ -374,41 +300,96 @@ export function ProjectEditDrawer({ item }: { item: any }) {
             );
         }
 
+        // --- ✅ FIX: VUE ADMIN (FEASIBILITY DASHBOARD) ---
         if (userRole === 'ADMIN' && isFeasibilityPending) {
             return (
                 <div className="flex flex-col gap-6">
+                    {/* 1. Carte Financière */}
                     <div className="rounded-lg border bg-card text-card-foreground shadow-sm p-4">
-                        <h4 className="text-sm font-semibold mb-3 flex items-center gap-2"><IconChartPie className="h-4 w-4 text-blue-500" />Analyse Financière (Données CP)</h4>
-                        <MarginCalculator marketPrice={Number(formData.marketEstimate) || 0} costPrice={Number(formData.estimatedBudget) || 0} />
+                        <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                            <IconChartPie className="h-4 w-4 text-blue-500" />
+                            Analyse Financière (Données CP)
+                        </h4>
+
+                        {/* ✅ FIX: Ajout de || 0 pour éviter le NaN */}
+                        <MarginCalculator
+                            marketPrice={Number(formData.marketEstimate) || 0}
+                            costPrice={Number(formData.estimatedBudget) || 0}
+                        />
                     </div>
+
+                    {/* 2. Téléchargement Estimation */}
                     <div className="space-y-3">
                         <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Documents de Référence</h4>
                         {getTechDoc('CP_ESTIMATE') ? (
                             <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/20">
-                                <div className="flex items-center gap-3"><div className="h-8 w-8 rounded-full bg-green-100 text-green-600 flex items-center justify-center"><IconFileText size={16} /></div><div className="flex flex-col"><span className="text-sm font-medium">Estimation Détaillée (Excel)</span><span className="text-xs text-muted-foreground">Uploadé par le CP</span></div></div>
-                                <Button variant="outline" size="sm" asChild><a href={`https://backoffice.urbagroupe.ma/${getTechDoc('CP_ESTIMATE').fileUrl}`} target="_blank"><IconDownload size={14} className="mr-2" /> Télécharger</a></Button>
+                                <div className="flex items-center gap-3">
+                                    <div className="h-8 w-8 rounded-full bg-green-100 text-green-600 flex items-center justify-center">
+                                        <IconFileText size={16} />
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-medium">Estimation Détaillée (Excel)</span>
+                                        <span className="text-xs text-muted-foreground">Uploadé par le CP</span>
+                                    </div>
+                                </div>
+                                <Button variant="outline" size="sm" asChild>
+                                    <a href={`https://backoffice.urbagroupe.ma/${getTechDoc('CP_ESTIMATE').fileUrl}`} target="_blank">
+                                        <IconDownload size={14} className="mr-2" /> Télécharger
+                                    </a>
+                                </Button>
                             </div>
-                        ) : <div className="p-3 border border-dashed rounded-lg text-center text-sm text-muted-foreground">⚠️ Aucune estimation Excel.</div>}
+                        ) : (
+                            <div className="p-3 border border-dashed rounded-lg text-center text-sm text-muted-foreground">
+                                ⚠️ Aucune estimation Excel n'a été uploadée par le CP.
+                            </div>
+                        )}
                     </div>
+
                     <Separator />
+
+                    {/* 3. Contrôles de Validation */}
                     <div className="space-y-4">
                         <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Validation des Critères</h4>
-                        {['administrative', 'technical', 'financial'].map(type => (
-                            <div key={type} className="flex items-center justify-between p-3 border rounded-md bg-card">
-                                <div className="flex items-center gap-3"><IconBuildingBank className="text-muted-foreground" size={20} /><Label className="font-medium capitalize">Faisabilité {type}</Label></div>
-                                <Select value={(feasibilityData as any)[type]} onValueChange={(v) => handleFeasibilityChange(type, v)}>
-                                    <SelectTrigger className="w-[130px] h-8"><SelectValue /></SelectTrigger>
-                                    <SelectContent><SelectItem value="PENDING">En cours</SelectItem><SelectItem value="PASS">✅ Valider</SelectItem><SelectItem value="FAIL">❌ Rejeter</SelectItem></SelectContent>
-                                </Select>
+                        {/* Administrative */}
+                        <div className="flex items-center justify-between p-3 border rounded-md bg-card">
+                            <div className="flex items-center gap-3">
+                                <IconFiles className="text-muted-foreground" size={20} />
+                                <Label className="font-medium">Faisabilité Administrative</Label>
                             </div>
-                        ))}
+                            <Select value={feasibilityData.administrative} onValueChange={(v) => handleFeasibilityChange('administrative', v)}>
+                                <SelectTrigger className="w-[130px] h-8"><SelectValue /></SelectTrigger>
+                                <SelectContent><SelectItem value="PENDING">En cours</SelectItem><SelectItem value="PASS">✅ Valider</SelectItem><SelectItem value="FAIL">❌ Rejeter</SelectItem></SelectContent>
+                            </Select>
+                        </div>
+                        {/* Technical */}
+                        <div className="flex items-center justify-between p-3 border rounded-md bg-card">
+                            <div className="flex items-center gap-3">
+                                <IconTools className="text-muted-foreground" size={20} />
+                                <Label className="font-medium">Faisabilité Technique</Label>
+                            </div>
+                            <Select value={feasibilityData.technical} onValueChange={(v) => handleFeasibilityChange('technical', v)}>
+                                <SelectTrigger className="w-[130px] h-8"><SelectValue /></SelectTrigger>
+                                <SelectContent><SelectItem value="PENDING">En cours</SelectItem><SelectItem value="PASS">✅ Valider</SelectItem><SelectItem value="FAIL">❌ Rejeter</SelectItem></SelectContent>
+                            </Select>
+                        </div>
+                        {/* Financial */}
+                        <div className="flex items-center justify-between p-3 border rounded-md bg-card">
+                            <div className="flex items-center gap-3">
+                                <IconBuildingBank className="text-muted-foreground" size={20} />
+                                <Label className="font-medium">Faisabilité Financière</Label>
+                            </div>
+                            <Select value={feasibilityData.financial} onValueChange={(v) => handleFeasibilityChange('financial', v)}>
+                                <SelectTrigger className="w-[130px] h-8"><SelectValue /></SelectTrigger>
+                                <SelectContent><SelectItem value="PENDING">En cours</SelectItem><SelectItem value="PASS">✅ Valider</SelectItem><SelectItem value="FAIL">❌ Rejeter</SelectItem></SelectContent>
+                            </Select>
+                        </div>
                     </div>
                 </div>
             );
         }
 
         if (userPermissions.includes('manage_cautions') && isCautionPending) return <div className="p-4 border rounded-lg"><h4 className="font-semibold">Demande de Caution</h4><p className="text-muted-foreground text-sm">Veuillez confirmer la demande.</p></div>;
-        if ((userPermissions.includes('assign_creative_tasks') || userRole === 'ADMIN') && isInProduction) { return <div>Interface Production...</div>; }
+        if ((userPermissions.includes('assign_creative_tasks') || userRole === 'ADMIN') && isInProduction) { /* ... Code Production inchangé ... */ return <div>...Production...</div>; }
         if (userRole === 'ADMIN' || userRole === 'PROJECT_MANAGER') return <form id="update-dossier-form" className="flex flex-col gap-4" onSubmit={handleSubmit}><div className="flex flex-col gap-3"><Label>Nom Projet</Label><Input id="object" value={formData.object} onChange={handleChange} /></div></form>;
 
         return <p>Accès standard.</p>;
@@ -421,7 +402,7 @@ export function ProjectEditDrawer({ item }: { item: any }) {
             return <Button onClick={handleSubmitForReview} disabled={loading || (!hasNewUploads && !isDraft) || (isDraft && !hasMandatory)} className={cn("w-full transition-all", !isDraft ? "bg-blue-600 hover:bg-blue-700" : "bg-green-600 hover:bg-green-700")}>{isUploadingFiles ? "Upload en cours..." : !isDraft ? (hasNewUploads ? "Mettre à jour" : "Sélectionner un fichier") : "Valider et Soumettre"}</Button>;
         }
 
-        if ((userPermissions.includes('manage_assigned_projects') || isAssignedPM) && isToPrepare) {
+        if (userPermissions.includes('manage_assigned_projects') && isToPrepare) {
             return <div className="flex gap-2 w-full"><Button onClick={(e) => { if (fileEstimate) handleSubmitEstimate(); handleSubmit(e); }} disabled={loading} className="flex-1 bg-blue-600 hover:bg-blue-700">{isUploadingFiles ? "Upload..." : "Sauvegarder Données"}</Button></div>;
         }
 
