@@ -16,7 +16,9 @@ import { SiteHeader } from "@/components/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
 
-export const GET_PROJECTS_FEED = gql`
+// import { GET_PROJECTS_FEED } from "@/lib/graphql/projects";
+
+const GET_PROJECTS_FEED = gql`
   query GetProjectsFeed {
     projects_feed {
       project {
