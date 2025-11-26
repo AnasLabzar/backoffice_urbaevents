@@ -197,7 +197,7 @@ export function ProjectEditDrawer({ item }: { item: any }) {
         if (!file) return true;
         setUploadProgress(prev => ({ ...prev, [docType]: 1 }));
         try {
-            let uploadBaseUrl = 'http://72.61.106.134:5002';
+            let uploadBaseUrl = 'http://backoffice.urbagroupe.ma/graphql';
             if (typeof window !== 'undefined') {
                 const hostname = window.location.hostname;
                 if (hostname !== 'localhost' && hostname !== '127.0.0.1') { uploadBaseUrl = 'https://backoffice.urbagroupe.ma'; }

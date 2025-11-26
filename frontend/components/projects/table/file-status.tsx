@@ -16,7 +16,7 @@ export const FileStatusCell = ({ row, docType }: { row: any, docType: string }) 
     }
 
     if (file && file.fileUrl) {
-        let baseUrl = 'http://72.61.106.134:5002';
+        let baseUrl = 'http://backoffice.urbagroupe.ma/graphql';
         if (typeof window !== 'undefined') {
             const hostname = window.location.hostname;
             if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
