@@ -259,7 +259,7 @@ const startServer = async () => {
     await server.start();
 
     // Hna zedna cors: false bach Apollo maydirch overwrite 3la cors dyal express
-    server.applyMiddleware({ app, path: '/graphql', cors: false });
+    server.applyMiddleware({ app: app as any, path: '/graphql', cors: false });
 
     const PORT = process.env.PORT || 5001;
     httpServer.listen(PORT, () => {
