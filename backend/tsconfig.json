@@ -8,6 +8,7 @@
     "strict": false,
     "skipLibCheck": true,
     "noImplicitAny": false,
+    "noEmitOnError": false,
     "outDir": "./dist",
     "rootDir": "./src",
     "types": ["node"]
