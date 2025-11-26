@@ -261,7 +261,7 @@ const startServer = async () => {
     // Hna zedna cors: false bach Apollo maydirch overwrite 3la cors dyal express
     server.applyMiddleware({ app: app as any, path: '/graphql', cors: false });
 
-    const PORT = process.env.PORT || 5001;
+    const PORT = process.env.PORT || 5002;
     httpServer.listen(PORT, () => {
         console.log(`🚀 Server khdam 3la http://localhost:${PORT}/graphql`);
         console.log(`🌐 Subscriptions khdamin 3la ws://localhost:${PORT}/graphql`);

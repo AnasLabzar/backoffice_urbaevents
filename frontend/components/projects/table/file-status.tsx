@@ -16,7 +16,7 @@ export const FileStatusCell = ({ row, docType }: { row: any, docType: string }) 
     }
 
     if (file && file.fileUrl) {
-        let baseUrl = 'http://localhost:5001';
+        let baseUrl = 'http://localhost:5002';
         if (typeof window !== 'undefined') {
             const hostname = window.location.hostname;
             if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
