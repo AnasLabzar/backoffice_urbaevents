@@ -139,7 +139,7 @@ export const userResolvers = {
 
             const user = await User.create({ name, email, password, role: role._id });
             await logActivity({
-                userId: context.user.id,
+                userId: context.user.id as any,
                 action: 'ADMIN_CREATE_USER',
                 details: `Admin created new user: "${name}" with role ${roleName}.`,
             });
@@ -153,7 +153,7 @@ export const userResolvers = {
             if (existingRole) throw new ApolloError('Role with this name already exists', 'ROLE_ALREADY_EXISTS');
             const role = await Role.create({ name, permissions });
             await logActivity({
-                userId: context.user.id,
+                userId: context.user.id as any,
                 action: 'ADMIN_CREATE_ROLE',
                 details: `Admin created new role: "${name}"`,
             });

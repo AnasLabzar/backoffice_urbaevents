@@ -12,17 +12,19 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
-import { FileUpload } from "@/components/ui/file-upload";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+
+// Import du composant "Panier" Production qu'on a créé
+import { ProductionManager } from "./production-manager";
+
 // Icons
 import {
     IconCheck, IconFileText, IconUpload, IconDownload, IconAlertCircle, IconLoader,
-    IconChartPie, IconTrendingUp, IconTrendingDown, IconCalculator, IconBuildingBank, IconTools, IconFiles,
+    IconChartPie, IconTrendingUp, IconTrendingDown, IconCalculator, IconBuildingBank,
     IconUserShield
 } from "@tabler/icons-react";
 
-import { MultiSelectPopover } from "../team-selector";
 import {
     ME_QUERY, GET_PROJECT_MANAGERS, GET_TEAM_MEMBERS, GET_TASKS_BY_PROJECT_QUERY, GET_PROJECTS_FEED,
     UPDATE_PROJECT_MUTATION, UPLOAD_DOCUMENT_MUTATION, SUBMIT_REVIEW_MUTATION,
@@ -30,7 +32,7 @@ import {
     ADMIN_LAUNCH_PROJECT_MUTATION, FINANCE_REQUEST_CAUTION_MUTATION, CP_ASSIGN_TEAM_MUTATION,
     PM_CREATE_TASK_MUTATION, PM_UPDATE_TASK_STATUS_MUTATION, CP_UPLOAD_ASSET_MUTATION,
     GIVE_PROPOSAL_AVIS_MUTATION,
-    GET_ALL_USERS // ✅ C'est importé depuis le fichier qu'on vient de modifier
+    GET_ALL_USERS
 } from "@/lib/graphql/projects";
 
 // --- HELPER UPLOAD ---
@@ -154,7 +156,6 @@ export function ProjectEditDrawer({ item }: { item: any }) {
     const [cpUploadAsset, { loading: loadingAsset }] = useMutation(CP_UPLOAD_ASSET_MUTATION, { onCompleted: () => { toast.success("Asset uploadé!"); setFileAsset(null); }, refetchQueries: [{ query: GET_PROJECTS_FEED }] });
 
     // Queries
-    // ✅ UTILISATION DE GET_ALL_USERS pour la liste Admin
     const { data: allUsersData, loading: loadingUsers } = useQuery(GET_ALL_USERS, { skip: userRole !== 'ADMIN' });
     const { data: pmData, loading: loadingPMs } = useQuery(GET_PROJECT_MANAGERS, { skip: userRole !== 'ADMIN' });
     const { data: teamMembers, loading: loadingTeamMembers } = useQuery(GET_TEAM_MEMBERS, { skip: !(userRole === 'ADMIN' || userPermissions.includes('assign_creative_tasks')) });
@@ -197,7 +198,7 @@ export function ProjectEditDrawer({ item }: { item: any }) {
         if (!file) return true;
         setUploadProgress(prev => ({ ...prev, [docType]: 1 }));
         try {
-            let uploadBaseUrl = 'https://backoffice.urbagroupe.ma/graphql';
+            let uploadBaseUrl = 'http://localhost:5002/graphql';
             if (typeof window !== 'undefined') {
                 const hostname = window.location.hostname;
                 if (hostname !== 'localhost' && hostname !== '127.0.0.1') { uploadBaseUrl = 'https://backoffice.urbagroupe.ma'; }
@@ -253,6 +254,7 @@ export function ProjectEditDrawer({ item }: { item: any }) {
     const isToPrepare = item.preparationStatus === 'TO_PREPARE';
     const isFeasibilityPending = item.preparationStatus === 'FEASIBILITY_PENDING';
     const isCautionPending = item.preparationStatus === 'CAUTION_PENDING';
+    // ✅ STATUS PRODUCTION
     const isInProduction = item.preparationStatus === 'IN_PRODUCTION';
 
     const renderPanelContent = () => {
@@ -408,7 +410,26 @@ export function ProjectEditDrawer({ item }: { item: any }) {
         }
 
         if (userPermissions.includes('manage_cautions') && isCautionPending) return <div className="p-4 border rounded-lg"><h4 className="font-semibold">Demande de Caution</h4><p className="text-muted-foreground text-sm">Veuillez confirmer la demande.</p></div>;
-        if ((userPermissions.includes('assign_creative_tasks') || userRole === 'ADMIN') && isInProduction) { return <div>Interface Production...</div>; }
+
+        // ✅ INTEGRATION DU PRODUCTION MANAGER (PANIER)
+        if ((userPermissions.includes('assign_creative_tasks') || userRole === 'ADMIN' || isAssignedPM) && isInProduction) {
+            return (
+                <ProductionManager
+                    projectId={item.id}
+                    // On récupère tous les IDs de l'équipe déjà assignée pour les afficher
+                    initialTeamIds={[
+                        ...(item.team?.infographistes?.map((u: any) => u.id) || []),
+                        ...(item.team?.team3D?.map((u: any) => u.id) || []),
+                        ...(item.team?.assistants?.map((u: any) => u.id) || [])
+                    ]}
+                    onSave={() => {
+                        // Callback après action si nécessaire (ex: refetch data)
+                        toast.success("Production mise à jour");
+                    }}
+                />
+            );
+        }
+
         if (userRole === 'ADMIN' || userRole === 'PROJECT_MANAGER') return <form id="update-dossier-form" className="flex flex-col gap-4" onSubmit={handleSubmit}><div className="flex flex-col gap-3"><Label>Nom Projet</Label><Input id="object" value={formData.object} onChange={handleChange} /></div></form>;
 
         return <p>Accès standard.</p>;
@@ -432,6 +453,10 @@ export function ProjectEditDrawer({ item }: { item: any }) {
 
         if (userRole === 'ADMIN' && isPendingAdminReview) return <Button form="admin-assign-form" type="submit" disabled={loading} className="w-full">Confirmer l'Assignation</Button>;
         if (userPermissions.includes('manage_cautions') && isCautionPending) return <Button onClick={handleRequestCaution} disabled={loading} className="bg-blue-600 hover:bg-blue-700 w-full">Confirmer Caution</Button>;
+
+        // ✅ En production, on cache le bouton "Sauvegarder" global car le ProductionManager a ses propres boutons
+        if (isInProduction) return <Button variant="outline" className="w-full">Fermer</Button>;
+
         if (userRole === 'ADMIN' || userRole === 'PROJECT_MANAGER') return <Button form="update-dossier-form" type="submit" disabled={loading} className="w-full">Sauvegarder</Button>;
         return <Button variant="outline" className="w-full">Fermer</Button>;
     };
@@ -439,7 +464,7 @@ export function ProjectEditDrawer({ item }: { item: any }) {
     return (
         <Drawer direction={isMobile ? "bottom" : "right"}>
             <DrawerTrigger asChild><Button variant="link" className="text-foreground px-0 text-left h-auto block"><span className="block truncate max-w-[200px] md:max-w-[350px]" title={item.object}>{item.object}</span></Button></DrawerTrigger>
-            <DrawerContent className={cn("p-4", isMobile ? "h-[90vh]" : "sm:max-w-2xl")}>
+            <DrawerContent className={cn("p-4", "width-[30em]", isMobile ? "h-[90vh]" : "sm:max-w-2xl")}>
                 <DrawerHeader className="gap-1 px-0 pt-0"><DrawerTitle>{item.object}</DrawerTitle><DrawerDescription>Gestion des documents.</DrawerDescription></DrawerHeader>
                 <div className="flex-grow overflow-y-auto pr-2 -mr-4 py-4">{renderPanelContent()}</div>
                 <DrawerFooter className="px-0 pb-0">{renderPanelFooter()}<DrawerClose asChild><Button variant="ghost" className="mt-2" disabled={loading}>Annuler</Button></DrawerClose></DrawerFooter>

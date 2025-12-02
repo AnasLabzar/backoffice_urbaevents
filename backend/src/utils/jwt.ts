@@ -1,6 +1,6 @@
-import jwt from 'jsonwebtoken';
 import { IUser } from '../models/User';
-import { Request } from 'apollo-server'; // <-- ZID HADA
+import jwt from 'jsonwebtoken';
+import { Request } from 'express'; // ✅ Beddel 'apollo-server' b 'express'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'MySuperSecretKey123';
 const JWT_EXPIRES_IN = '7d';

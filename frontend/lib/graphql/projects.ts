@@ -15,6 +15,18 @@ export const GET_ALL_USERS = gql`
   }
 `;
 
+export const GENERATE_CPS_SUMMARY_MUTATION = gql`
+  mutation GenerateCPSSummary($projectId: ID!) {
+    generateCPSSummary(projectId: $projectId) {
+      id
+      aiSummary {
+        summary
+        thematic
+      }
+    }
+  }
+`;
+
 export const GET_PROJECTS_FEED = gql`
   query GetProjectsFeed {
     projects_feed {
@@ -28,6 +40,14 @@ export const GET_PROJECTS_FEED = gql`
         # Les champs financiers
         marketEstimate
         estimatedBudget
+
+        # --- AJOUTER CE BLOC POUR L'IA ---
+        aiSummary {
+            summary      # Le résumé du CPS
+            thematic     # La thématique (ex: BTP, Informatique...)
+            generatedAt  # Date de génération
+        }
+        # ---------------------------------
         
         projectManagers { id name }
         stages { 

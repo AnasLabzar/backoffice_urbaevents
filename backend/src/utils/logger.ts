@@ -15,10 +15,10 @@ export const ACTIONS = {
 
 // Interface dyal l-Options
 interface LogOptions {
-  userId: IUser['_id'];
-  action: string;
-  project?: IProject['_id']; // <-- L-BDIL 1: Smiynah "project"
-  details: string;
+    userId: any; // ✅ Reddina hadi 'any' bach ta9bel String wla ObjectId
+    action: string;
+    project?: any;
+    details: string;
 }
 
 /**

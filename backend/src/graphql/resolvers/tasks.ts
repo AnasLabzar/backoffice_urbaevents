@@ -17,8 +17,14 @@ export const taskResolvers = {
         tasksByProject: async (_: unknown, { projectId }: { projectId: string }, context: IContext) => {
             if (!context.user) throw new ApolloError('Not authenticated', 'UNAUTHENTICATED');
 
+            // ✅ FIX 1: Jm3na l-condition f whda (ma ymknch tkon 2 'project' keys f object wahed)
             const tasksAgg = await Task.aggregate([
-                { $match: { project: new Types.ObjectId(projectId), project: { $exists: true, $ne: null } } },
+                {
+                    $match: {
+                        project: new Types.ObjectId(projectId)
+                        // Note: Ila kan egal ID, ra darouri exists w not null, donc zwlna l-khrin
+                    }
+                },
                 {
                     $lookup: {
                         from: 'users',
@@ -187,7 +193,8 @@ export const taskResolvers = {
             (populatedTask as any).id = populatedTask._id.toString();
 
             await logActivity({
-                userId: context.user.id,
+                // ✅ FIX: Cast to any
+                userId: context.user!.id as any,
                 action: 'PM_CREATE_TASK',
                 project: task.project,
                 details: `Task created: "${task.description}"`,
@@ -224,7 +231,8 @@ export const taskResolvers = {
             if (!task) throw new ApolloError('Task not found', 'NOT_FOUND');
 
             await logActivity({
-                userId: context.user.id,
+                // ✅ FIX: Cast to any
+                userId: context.user.id as any,
                 action: 'PM_UPDATE_TASK_STATUS',
                 project: task.project,
                 details: `Task "${task.description}" status changed to ${task.status}`,
@@ -257,11 +265,13 @@ export const taskResolvers = {
             const task = await Task.findById(taskId);
             if (!task) throw new ApolloError('Task not found');
 
-            const newDocument = await handleUpload(fileUrl, originalFileName, 'TASK_V1', context.user.id);
-            task.v1Uploads.push(newDocument._id);
+            const newDocument = await handleUpload(fileUrl, originalFileName, 'TASK_V1', context.user!.id);
+            // ✅ FIX: Cast array to any to push ID
+            (task.v1Uploads as any).push(newDocument._id);
 
             await logActivity({
-                userId: context.user.id,
+                // ✅ FIX: Cast to any
+                userId: context.user!.id as any,
                 action: 'TEAM_UPLOAD_V1',
                 project: task.project,
                 details: `Team uploaded V1 for task "${task.description}": "${originalFileName}"`,
@@ -292,12 +302,15 @@ export const taskResolvers = {
             const task = await Task.findById(taskId);
             if (!task) throw new ApolloError('Task not found');
 
-            const newDocument = await handleUpload(fileUrl, originalFileName, 'TASK_FINAL', context.user.id);
-            task.finalUpload = newDocument._id;
+            const newDocument = await handleUpload(fileUrl, originalFileName, 'TASK_FINAL', context.user!.id);
+
+            // ✅ FIX: Cast to any
+            task.finalUpload = newDocument._id as any;
             task.status = 'DONE';
 
             await logActivity({
-                userId: context.user.id,
+                // ✅ FIX: Cast to any
+                userId: context.user!.id as any,
                 action: 'TEAM_UPLOAD_FINAL',
                 project: task.project,
                 details: `Team uploaded FINAL for task "${task.description}": "${originalFileName}"`,

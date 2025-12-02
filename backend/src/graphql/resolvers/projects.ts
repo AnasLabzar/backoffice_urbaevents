@@ -8,28 +8,27 @@ import { logActivity } from '../../utils/logger';
 import { createNotification } from '../../utils/notifications';
 import { NotificationLevel } from '../../models/Notification';
 import { pubsub, NEW_TASK_EVENT } from '../../utils/pubsub';
+import path from 'path'; // <--- ZID HADI L-FOUQ
 import {
     checkPermission, defaultUser, handleUpload, stagePopulates,
     teamPopulates, userSelect, buildProjectFilter, isDynamicPmCandidate,
     getRoleUserIds, patchProjectUsers
 } from './helpers';
+import { aiService } from '../../../services/aiService';
 
-// --- ✅ HELPER JDID: CHECK PM ACCESS (HYBRIDE) ---
-// Hada kay-chouf wach nta Admin WLA nta m-assigné f had l-projet b dbt
+// --- HELPER: CHECK PM ACCESS ---
 const checkPMAccess = async (context: IContext, project: any, requiredPermission: string) => {
     const userId = context.user?.id;
-
-    // 1. Check wach ana f la liste dyal projectManagers dyal had l-projet
+    // @ts-ignore
     const isAssigned = project.projectManagers.some((pm: any) => pm.toString() === userId);
 
-    if (isAssigned) return true; // ✅ Duz, nta howa moulchi f had l-projet
+    if (isAssigned) return true;
 
-    // 2. Ila ma kntich m-assigné, checki wach nta Admin (Global Permission)
     try {
         await checkPermission(context, requiredPermission);
-        return true; // ✅ Duz, nta Admin
+        return true;
     } catch (e) {
-        return false; // ❌ Barra
+        return false;
     }
 };
 
@@ -57,20 +56,11 @@ export const projectResolvers = {
                 .populate({ path: 'assignedTeam', select: userSelect })
                 .populate({ path: 'proposalAvis.givenBy', select: userSelect });
 
-            for (const p of stagePopulates) projectQuery = projectQuery.populate(p as any);
-            for (const p of teamPopulates) projectQuery = projectQuery.populate(p as any);
+            // ✅ FIX COMPLEXITY: On cast 'projectQuery' as any pour éviter l'erreur TS2590
+            for (const p of stagePopulates) projectQuery = (projectQuery as any).populate(p);
+            for (const p of teamPopulates) projectQuery = (projectQuery as any).populate(p);
 
             const projects = await projectQuery.exec();
-
-            // 👇 AJOUTEZ CETTE LIGNE POUR DÉBUGGER
-            // if (projects.length > 0) {
-            //     console.log("🔎 DEBUG BACKEND PROJET 0:", {
-            //         title: projects[0].title,
-            //         market: projects[0].marketEstimate,
-            //         budget: projects[0].estimatedBudget
-            //     });
-            // }
-
             projects.forEach((project: any) => patchProjectUsers(project));
 
             return projects;
@@ -96,20 +86,11 @@ export const projectResolvers = {
                 .populate({ path: 'assignedTeam', select: userSelect })
                 .populate({ path: 'proposalAvis.givenBy', select: userSelect });
 
-            for (const p of stagePopulates) projectQuery = projectQuery.populate(p as any);
-            for (const p of teamPopulates) projectQuery = projectQuery.populate(p as any);
+            // ✅ FIX COMPLEXITY
+            for (const p of stagePopulates) projectQuery = (projectQuery as any).populate(p);
+            for (const p of teamPopulates) projectQuery = (projectQuery as any).populate(p);
 
             const projects = await projectQuery.exec();
-
-            // 👇 AJOUTEZ CETTE LIGNE POUR DÉBUGGER
-            // if (projects.length > 0) {
-            //     console.log("🔎 DEBUG BACKEND PROJET 0:", {
-            //         title: projects[0].title,
-            //         market: projects[0].marketEstimate,
-            //         budget: projects[0].estimatedBudget
-            //     });
-            // }
-
             projects.forEach((project: any) => patchProjectUsers(project));
 
             const projectIds = projects.map((p) => p._id as Types.ObjectId);
@@ -187,8 +168,9 @@ export const projectResolvers = {
                 .populate({ path: 'assignedTeam', select: userSelect })
                 .populate({ path: 'proposalAvis.givenBy', select: userSelect });
 
-            for (const p of stagePopulates) q = q.populate(p as any);
-            for (const p of teamPopulates) q = q.populate(p as any);
+            // ✅ FIX COMPLEXITY
+            for (const p of stagePopulates) q = (q as any).populate(p);
+            for (const p of teamPopulates) q = (q as any).populate(p);
 
             const project: any = await q.exec();
 
@@ -201,7 +183,6 @@ export const projectResolvers = {
     },
 
     Mutation: {
-        // Admin assign PM
         assignDynamicProjectManager: async (_: unknown, { projectId, newPmId }: { projectId: string, newPmId: string }, context: IContext) => {
             await checkPermission(context, 'assign_dynamic_pm');
             const isCandidate = await isDynamicPmCandidate(newPmId);
@@ -216,31 +197,38 @@ export const projectResolvers = {
             if (!updatedProject) throw new ApolloError('Project not found', 'NOT_FOUND');
 
             const newPm = updatedProject.projectManagers.find(pm => (pm as any)._id.toString() === newPmId);
-            await logActivity(context.user.id, `Assigned new dynamic PM: ${newPm?.name || newPmId}`, 'PROJECT_UPDATE', projectId);
 
+            // ✅ FIX: logActivity prend un objet, pas 4 arguments
+            // ✅ FIX: newPm?.name avec 'as any' pour éviter l'erreur TS
+            await logActivity({
+                userId: context.user!.id as any,
+                details: `Assigned new dynamic PM: ${(newPm as any)?.name || newPmId}`,
+                action: 'PROJECT_UPDATE',
+                project: projectId
+            });
+
+            // ✅ FIX: Structure standardisée (message, userIds)
             await createNotification({
-                title: `You have been assigned as Project Manager`,
-                body: `You are now a Project Manager for project ${updatedProject.title}.`,
-                level: NotificationLevel.ALERT,
-                project: new Types.ObjectId(projectId),
-                users: [new Types.ObjectId(newPmId)],
+                userIds: [newPmId], // 'users' -> 'userIds'
+                message: `You have been assigned as Project Manager for project ${updatedProject.title}.`, // 'title' + 'body' -> 'message'
+                level: NotificationLevel.IMPORTANT,
+                project: projectId,
+                link: `/dashboard/projects/${projectId}`
             });
 
             return updatedProject;
         },
 
-        // Update general info
         updateProject: async (_: unknown, { id, input }: any, context: IContext) => {
             const project = await Project.findById(id);
             if (!project) throw new ApolloError('Project not found');
 
-            // ✅ FIX: On utilise checkPMAccess ici aussi
             const canEdit = await checkPMAccess(context, project, 'manage_assigned_projects');
             if (!canEdit) throw new ApolloError('Forbidden', 'FORBIDDEN');
 
             const updatedProject = await Project.findByIdAndUpdate(id, { $set: input }, { new: true });
             await logActivity({
-                userId: context.user.id,
+                userId: context.user!.id as any,
                 action: 'PROJECT_UPDATE',
                 project: updatedProject!._id,
                 details: `Project details updated`,
@@ -248,7 +236,6 @@ export const projectResolvers = {
             return updatedProject;
         },
 
-        // Proposal Manager creation
         proposal_createProject: async (_: unknown, { input }: any, context: IContext) => {
             await checkPermission(context, 'create_project_proposal');
             const projectCount = await Project.countDocuments();
@@ -257,7 +244,7 @@ export const projectResolvers = {
             const project = await Project.create({
                 ...input,
                 projectCode,
-                createdBy: context.user.id,
+                createdBy: context.user!.id,
                 preparationStatus: 'DRAFT',
                 generalStatus: 'IN_PROGRESS',
                 currentStage: 'PROPOSAL',
@@ -273,7 +260,7 @@ export const projectResolvers = {
                 },
             });
 
-            await logActivity({ userId: context.user.id, action: 'PROPOSAL_CREATE', project: project._id, details: `Draft created: "${project.title}"` });
+            await logActivity({ userId: context.user!.id as any, action: 'PROPOSAL_CREATE', project: project._id, details: `Draft created: "${project.title}"` });
             return project;
         },
 
@@ -282,12 +269,45 @@ export const projectResolvers = {
             const project = await Project.findById(projectId);
             if (!project) throw new ApolloError('Project not found');
 
-            const newDocument = await handleUpload(fileUrl, originalFileName, docType, context.user.id);
-            (project.stages as any)[stageName].documents.push(newDocument._id);
-            await project.save();
+            const newDocument = await handleUpload(fileUrl, originalFileName, docType, context.user!.id);
+            ((project.stages as any)[stageName].documents as any).push(newDocument._id);
+
+            // =========================================================
+            // ✅ START: ANALYSE PDF CONTENU
+            // =========================================================
+            const isCPS = docType.includes('CPS') || originalFileName.toLowerCase().includes('cps');
+
+            if (isCPS) {
+                console.log("🤖 CPS détecté, analyse contextuelle IA...");
+
+                const absoluteFilePath = path.join(process.cwd(), newDocument.fileUrl);
+
+                try {
+                    // 👇 C'EST ICI QUE TU AVAIS L'ERREUR
+                    // On ajoute 'project.title' et 'project.object'
+                    const analysis = await aiService.analyzeCPSPDF(
+                        absoluteFilePath,
+                        project.title,
+                        project.object
+                    );
+
+                    project.aiSummary = {
+                        summary: analysis.summary,
+                        thematic: analysis.thematic,
+                        risks: analysis.risks || [],
+                        generatedAt: new Date()
+                    };
+                    console.log("✅ Résumé IA généré avec succès !");
+                } catch (err) {
+                    console.error("⚠️ Echec analyse IA:", err);
+                }
+            }
+            // =========================================================
+
+            await project.save(); // Hna fin kay-tsjel kolchi (Doc + AI Summary)
 
             await logActivity({
-                userId: context.user.id,
+                userId: context.user!.id as any,
                 action: 'FILE_UPLOAD',
                 project: project._id,
                 details: `Document uploadé: "${docType}" (${originalFileName})`,
@@ -320,7 +340,7 @@ export const projectResolvers = {
             await project.save();
 
             await logActivity({
-                userId: context.user.id,
+                userId: context.user!.id as any,
                 action: 'PROPOSAL_SUBMIT',
                 project: project._id,
                 details: `Proposal submitted for review: "${project.title}"`,
@@ -353,7 +373,7 @@ export const projectResolvers = {
             if (!project) throw new ApolloError('Project not found', 'NOT_FOUND');
 
             await logActivity({
-                userId: context.user.id,
+                userId: context.user!.id as any,
                 action: 'ADMIN_ASSIGN_PM',
                 project: project._id,
                 details: `Project assigned. Status: ${status}`,
@@ -369,6 +389,7 @@ export const projectResolvers = {
                 });
             }
 
+            // Logic de création de tâches (simplifié pour TS)
             if (projectManagerIds && projectManagerIds.length > 0) {
                 const projectEndDate = project.endDate ? new Date(project.endDate) : null;
                 const generalTaskDescription = `Suivi et gestion générale du projet "${project.title}"`;
@@ -411,16 +432,6 @@ export const projectResolvers = {
                 }
             }
 
-            const projectObj = project.toObject();
-            projectObj.id = project._id.toString();
-
-            if (projectObj.projectManagers) {
-                projectObj.projectManagers = projectObj.projectManagers.map((pm: any) => ({
-                    ...pm,
-                    id: pm._id ? pm._id.toString() : pm.id,
-                }));
-            }
-
             return JSON.parse(JSON.stringify(project));
         },
 
@@ -433,7 +444,7 @@ export const projectResolvers = {
             );
             if (!project) throw new ApolloError('Project not found', 'NOT_FOUND');
             await logActivity({
-                userId: context.user.id,
+                userId: context.user!.id as any,
                 action: 'ADMIN_ASSIGN_TEAM',
                 project: project._id,
                 details: `Assigned ${teamMemberIds.length} members to project.`,
@@ -451,7 +462,7 @@ export const projectResolvers = {
             );
             if (!project) throw new ApolloError('Project not found', 'NOT_FOUND');
             await logActivity({
-                userId: context.user.id,
+                userId: context.user!.id as any,
                 action: 'ADMIN_UPDATE_STAGE',
                 project: project._id,
                 details: `Stage ${stage} updated to ${status}`,
@@ -465,8 +476,9 @@ export const projectResolvers = {
             const project = await Project.findById(projectId);
             if (!project) throw new ApolloError('Project not found');
             (project.feasibilityChecks as any)[checkType] = status;
+
             await logActivity({
-                userId: context.user.id,
+                userId: context.user!.id as any,
                 action: 'ADMIN_FEASIBILITY',
                 project: project._id,
                 details: `Feasibility check '${checkType}' set to ${status}`,
@@ -499,7 +511,7 @@ export const projectResolvers = {
             }
             project.preparationStatus = 'CAUTION_PENDING';
             await logActivity({
-                userId: context.user.id,
+                userId: context.user!.id as any,
                 action: 'ADMIN_LAUNCH',
                 project: project._id,
                 details: `Project launched. Pending caution.`,
@@ -535,7 +547,7 @@ export const projectResolvers = {
             );
             if (!project) throw new ApolloError('Project not found', 'NOT_FOUND');
             await logActivity({
-                userId: context.user.id,
+                userId: context.user!.id as any,
                 action: 'PM_VALIDATE_STAGE',
                 project: project._id,
                 details: `Stage ${stage} validated by PM.`,
@@ -543,22 +555,20 @@ export const projectResolvers = {
             return project;
         },
 
-        // --- ✅ FIX: CP DONNE AVIS (AVEC CHECKPMACCESS) ---
         giveProposalAvis: async (_: unknown, { projectId, status, reason }: any, context: IContext) => {
             if (!context.user) throw new ApolloError('Not authenticated');
             const project = await Project.findById(projectId);
             if (!project) throw new ApolloError('Project not found');
 
-            // Utilisation de la nouvelle fonction de sécurité
             const canAccess = await checkPMAccess(context, project, 'assign_project_managers');
             if (!canAccess) throw new ApolloError('Forbidden - You must be the assigned Project Manager or Admin', 'FORBIDDEN');
 
             project.proposalAvis = {
                 status,
                 reason: status === 'NOT_ACCEPTED' ? reason : undefined,
-                givenBy: context.user.id,
+                givenBy: context.user.id as any,
                 givenAt: new Date(),
-            };
+            } as any; // ✅ ZID HADI (as any)
 
             if (status === 'ACCEPTED') {
                 project.preparationStatus = 'FEASIBILITY_PENDING';
@@ -567,7 +577,7 @@ export const projectResolvers = {
             }
 
             await project.save();
-            await logActivity({ userId: context.user.id, action: 'GIVE_PROPOSAL_AVIS', project: project._id, details: `Avis: ${status}` });
+            await logActivity({ userId: context.user.id as any, action: 'GIVE_PROPOSAL_AVIS', project: project._id, details: `Avis: ${status}` });
 
             const adminIds = await getRoleUserIds('ADMIN');
             if (adminIds.length > 0) {
@@ -583,12 +593,10 @@ export const projectResolvers = {
             return project;
         },
 
-        // --- ✅ FIX: CP UPLOAD ESTIMATE (AVEC CHECKPMACCESS) ---
         cp_uploadEstimate: async (_: unknown, { projectId, fileUrl, originalFileName }: any, context: IContext) => {
             const project = await Project.findById(projectId);
             if (!project) throw new ApolloError('Project not found');
 
-            // Utilisation de la nouvelle fonction de sécurité
             const canAccess = await checkPMAccess(context, project, 'manage_assigned_projects');
             if (!canAccess) throw new ApolloError('Forbidden', 'FORBIDDEN');
 
@@ -597,10 +605,11 @@ export const projectResolvers = {
                 throw new ApolloError(`Statut invalide pour upload estimation: ${project.preparationStatus}`);
             }
 
-            const newDocument = await handleUpload(fileUrl, originalFileName, 'CP_ESTIMATE', context.user.id);
-            project.stages.technical.documents.push(newDocument._id);
+            const newDocument = await handleUpload(fileUrl, originalFileName, 'CP_ESTIMATE', context.user!.id);
+            // ✅ FIX: Cast pour push
+            (project.stages.technical.documents as any).push(newDocument._id);
 
-            await logActivity({ userId: context.user.id, action: 'CP_UPLOAD_ESTIMATE', project: project._id, details: `Estimation uploadée` });
+            await logActivity({ userId: context.user!.id as any, action: 'CP_UPLOAD_ESTIMATE', project: project._id, details: `Estimation uploadée` });
             await project.populate({ path: 'stages.technical.documents', populate: { path: 'uploadedBy', select: userSelect } });
             await project.save();
 
@@ -617,7 +626,6 @@ export const projectResolvers = {
             return project;
         },
 
-        // --- ✅ FIX: CP ASSIGN TEAM (AVEC CHECKPMACCESS) ---
         cp_assignTeam: async (_: unknown, { input }: any, context: IContext) => {
             const { projectId, infographisteIds, team3DIds, assistantIds } = input;
             const project = await Project.findById(projectId);
@@ -633,7 +641,7 @@ export const projectResolvers = {
             const allIds = [...new Set([...infographisteIds, ...team3DIds, ...assistantIds])];
             project.assignedTeam = allIds;
 
-            await logActivity({ userId: context.user.id, action: 'CP_ASSIGN_TEAM', project: project._id, details: `Team updated` });
+            await logActivity({ userId: context.user!.id as any, action: 'CP_ASSIGN_TEAM', project: project._id, details: `Team updated` });
             await project.save();
 
             if (allIds.length > 0) {
@@ -653,11 +661,12 @@ export const projectResolvers = {
             const project = await Project.findById(projectId);
             if (!project) throw new ApolloError('Project not found');
 
-            const newDocument = await handleUpload(fileUrl, originalFileName, 'FINAL_OFFER_TECH', context.user.id);
-            project.stages.technicalOffer.documents.push(newDocument._id);
+            const newDocument = await handleUpload(fileUrl, originalFileName, 'FINAL_OFFER_TECH', context.user!.id);
+            // ✅ FIX: Cast pour push
+            (project.stages.technicalOffer.documents as any).push(newDocument._id);
 
             await logActivity({
-                userId: context.user.id,
+                userId: context.user!.id as any,
                 action: 'CP_UPLOAD_FINAL_OFFER',
                 project: project._id,
                 details: `CP uploaded final offer: "${originalFileName}"`,
@@ -671,11 +680,12 @@ export const projectResolvers = {
             const project = await Project.findById(projectId);
             if (!project) throw new ApolloError('Project not found');
 
-            const newDocument = await handleUpload(fileUrl, originalFileName, 'ASSET', context.user.id);
-            project.stages.technical.documents.push(newDocument._id);
+            const newDocument = await handleUpload(fileUrl, originalFileName, 'ASSET', context.user!.id);
+            // ✅ FIX: Cast pour push
+            (project.stages.technical.documents as any).push(newDocument._id);
 
             await logActivity({
-                userId: context.user.id,
+                userId: context.user!.id as any,
                 action: 'CP_UPLOAD_ASSET',
                 project: project._id,
                 details: `CP uploaded an asset: "${originalFileName}"`,
@@ -708,11 +718,13 @@ export const projectResolvers = {
             const project = await Project.findById(projectId);
             if (!project) throw new ApolloError('Project not found');
             project.caution.status = 'REQUESTED';
-            project.caution.requestedBy = context.user.id;
+            // ✅ FIX: Cast to any
+            project.caution.requestedBy = context.user!.id as any;
             project.caution.requestedAt = new Date();
             project.preparationStatus = 'IN_PRODUCTION';
+
             await logActivity({
-                userId: context.user.id,
+                userId: context.user!.id as any,
                 action: 'FINANCE_CAUTION_REQUEST',
                 project: project._id,
                 details: `Caution requested by Finance.`,
@@ -742,11 +754,12 @@ export const projectResolvers = {
             const project = await Project.findById(projectId);
             if (!project) throw new ApolloError('Project not found');
 
-            const newDocument = await handleUpload(fileUrl, originalFileName, 'METHODOLOGY', context.user.id);
-            project.stages.technical.documents.push(newDocument._id);
+            const newDocument = await handleUpload(fileUrl, originalFileName, 'METHODOLOGY', context.user!.id);
+            // ✅ FIX: Cast pour push
+            (project.stages.technical.documents as any).push(newDocument._id);
 
             await logActivity({
-                userId: context.user.id,
+                userId: context.user!.id as any,
                 action: 'ASSISTANT_UPLOAD_METHODOLOGY',
                 project: project._id,
                 details: `Assistant uploaded methodology: "${originalFileName}"`,

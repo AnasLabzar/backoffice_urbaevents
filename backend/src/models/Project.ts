@@ -43,14 +43,27 @@ type PreparationStatus =
   | 'DONE'
   | 'NO';
 
+// --- INTERFACE AI SUMMARY ---
+interface IAiSummary {
+  summary: string;
+  thematic: string;
+  risks: string[];
+  generatedAt: Date;
+}
+
 export interface IProject extends Document {
   // 1. Type & ID
   projectCode: string;
   projectType: 'PUBLIC_TENDER' | 'CONFIRMED' | 'INTERNAL';
   createdBy: IUser['_id'];
+  endDate?: Date;
 
   // 2. Proposal Details
   title: string;
+
+  // ✅ AJOUT DANS L'INTERFACE (TypeScript)
+  aiSummary?: IAiSummary;
+
   object: string;
   referenceAO: string;
   technicalOfferRequired: boolean;
@@ -119,6 +132,15 @@ const ProjectSchema: Schema = new Schema(
     projectType: { type: String, enum: ['PUBLIC_TENDER', 'CONFIRMED', 'INTERNAL'], required: true },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     title: { type: String, required: true },
+
+    // ✅ AJOUT DANS LE SCHEMA (MongoDB)
+    aiSummary: {
+      summary: String,
+      thematic: String,
+      risks: [String],
+      generatedAt: Date
+    },
+
     object: { type: String, required: true },
     referenceAO: { type: String },
     technicalOfferRequired: { type: Boolean, default: true },
@@ -128,7 +150,6 @@ const ProjectSchema: Schema = new Schema(
     marketEstimate: { type: Number, default: 0 },
     estimatedBudget: { type: Number },
     cautionAmount: { type: Number },
-    // ✅ AJOUTE CES DEUX LIGNES :
 
     preparationStatus: {
       type: String,

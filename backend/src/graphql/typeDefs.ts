@@ -59,6 +59,8 @@ type Project {
     
     team: Team!
     finalSubmission: String
+
+    aiSummary: AiSummary
   }
 
   type Stages {
@@ -77,6 +79,36 @@ type Project {
     deadline: String
     responsible: [String!]!
     documents: [Document!]!
+  }
+
+  type Supplier {
+    id: ID!
+    name: String!
+    category: String!
+    contactName: String!
+    email: String!
+    phone: String!
+    address: String
+    createdBy: User!
+    createdAt: String!
+  }
+
+  input CreateSupplierInput {
+    name: String!
+    category: String!
+    contactName: String!
+    email: String!
+    phone: String!
+    address: String
+  }
+
+  input UpdateSupplierInput {
+    name: String
+    category: String
+    contactName: String
+    email: String
+    phone: String
+    address: String
   }
 
   type FeasibilityChecks {
@@ -204,15 +236,20 @@ type Project {
     preparationStatus: String
   }
 
+  type AiSummary {
+    summary: String
+    thematic: String
+    risks: [String]
+  }
+
   type Query {
     me: User
-    # ⚠️ FIX: Update 'users' to allow filtering by multiple roles (array)
     users(role: String, roles: [String!]): [User!] 
     projects_proposals: [Project!]
     
-    # --- ZID HADA L-QUERY L-JDID ---
     projects(filter: ProjectFilterInput): [Project!]
-
+    suppliers: [Supplier!]
+    supplier(id: ID!): Supplier
     projects_feed: [ProjectFeedItem!]
     project(id: ID!): Project
     tasksByProject(projectId: ID!): [Task!]
@@ -226,6 +263,8 @@ type Project {
     register(name: String!, email: String!, password: String!): AuthPayload!
     login(email: String!, password: String!): AuthPayload!
     updateProject(id: ID!, input: UpdateProjectInput!): Project!
+
+    generateCPSSummary(projectId: ID!): Project
     
     # Proposal Manager
     proposal_createProject(input: CreateProjectInput!): Project!
@@ -237,6 +276,10 @@ type Project {
       originalFileName: String!
     ): Project!
     proposal_submitForReview(projectId: ID!): Project!
+
+    createSupplier(input: CreateSupplierInput!): Supplier!
+    updateSupplier(id: ID!, input: UpdateSupplierInput!): Supplier!
+    deleteSupplier(id: ID!): Boolean
     
     # Admin
     admin_createUser(input: CreateUserInput!): User!

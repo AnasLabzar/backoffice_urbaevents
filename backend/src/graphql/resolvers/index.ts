@@ -3,8 +3,10 @@ import { projectResolvers } from './projects';
 import { taskResolvers } from './tasks';
 import { notificationResolvers } from './notifications';
 import { logsResolvers } from './logs';
+import { aiResolver } from './aiResolver';
+// ✅ 1. Import du nouveau resolver
+import { supplierResolvers } from './suppliers';
 
-// --- HNA L-CHANGE: "export const resolvers" blast "export default" ---
 export const resolvers = {
     Query: {
         ...userResolvers.Query,
@@ -12,6 +14,7 @@ export const resolvers = {
         ...taskResolvers.Query,
         ...notificationResolvers.Query,
         ...logsResolvers.Query,
+        ...supplierResolvers.Query // ✅ 2. Ajout Query
     },
 
     Mutation: {
@@ -19,6 +22,8 @@ export const resolvers = {
         ...projectResolvers.Mutation,
         ...taskResolvers.Mutation,
         ...notificationResolvers.Mutation,
+        ...aiResolver.Mutation,
+        ...supplierResolvers.Mutation, // ✅ 3. Ajout Mutation
     },
 
     Subscription: {
@@ -26,23 +31,13 @@ export const resolvers = {
         ...notificationResolvers.Subscription,
     },
 
-    // --- GLOBAL TYPE RESOLVERS (ID Fixes) ---
-    User: {
-        id: (parent: any) => parent._id ? parent._id.toString() : parent.id
-    },
-    Project: {
-        id: (parent: any) => parent._id ? parent._id.toString() : parent.id
-    },
-    Task: {
-        id: (parent: any) => parent._id ? parent._id.toString() : parent.id
-    },
-    Document: {
-        id: (parent: any) => parent._id ? parent._id.toString() : parent.id
-    },
-    Notification: {
-        id: (parent: any) => parent._id ? parent._id.toString() : parent.id
-    },
-    Role: {
-        id: (parent: any) => parent._id ? parent._id.toString() : parent.id
-    }
+    // Types Resolvers
+    User: { id: (parent: any) => parent._id ? parent._id.toString() : parent.id },
+    Project: { id: (parent: any) => parent._id ? parent._id.toString() : parent.id },
+    Task: { id: (parent: any) => parent._id ? parent._id.toString() : parent.id },
+    Document: { id: (parent: any) => parent._id ? parent._id.toString() : parent.id },
+    Notification: { id: (parent: any) => parent._id ? parent._id.toString() : parent.id },
+    Role: { id: (parent: any) => parent._id ? parent._id.toString() : parent.id },
+    // ✅ 4. Ajout Type Resolver pour Supplier
+    Supplier: { id: (parent: any) => parent._id ? parent._id.toString() : parent.id }
 };

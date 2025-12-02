@@ -11,7 +11,8 @@ import {
     IconCircleCheckFilled, IconX,
     IconDownload, IconListCheck,
     IconUsers, IconPlus,
-    IconCheck, IconSelector as IconChevronsUpDown // <-- S777NAHA
+    IconCheck, IconSelector as IconChevronsUpDown,
+    IconSparkles, IconBrain // <--- AJOUTER ICI
 } from "@tabler/icons-react";
 import { gql } from "@apollo/client";
 import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription, SheetFooter } from "@/components/ui/sheet";
@@ -603,7 +604,7 @@ export function DataTable({
     const userRole = meData?.me.role.name;
 
     console.log("hahouwa user role", userRole);
-    
+
 
 
     const table = useReactTable({
@@ -875,9 +876,15 @@ export function DataTable({
 // --- L-PANEL L-JDID (TableCellViewer) m3a L-LOGIC DYAL L-ROLES ---
 
 // (Hada component sghir dyal l-Preview l-l-Admin)
-function ProjectPreviewPanel({ project }: { project: Project }) {
+function ProjectPreviewPanel({ project }: { project: Project & { aiSummary?: any } }) { // On ajoute le type aiSummary
     const isMobile = useIsMobile();
     const [isOpen, setIsOpen] = React.useState(false);
+
+    // Mutation pour générer le résumé manuellement si besoin
+    const [generateSummary, { loading: loadingAI }] = useMutation(GENERATE_CPS_SUMMARY_MUTATION, {
+        onCompleted: () => toast.success("Analyse du CPS terminée !"),
+        onError: () => toast.error("Erreur lors de l'analyse IA.")
+    });
 
     const [getLogs, { data: logData, loading: logLoading }] = useLazyQuery(GET_LOGS_QUERY);
 
@@ -888,13 +895,16 @@ function ProjectPreviewPanel({ project }: { project: Project }) {
         }
     };
 
-    // 1. N-parsiw l-dates l-wlin
+    // Helper dates (inchangé)
     const submissionDate = parseDate(project.submissionDeadline);
     const cautionDate = submissionDate ? subDays(submissionDate, 7) : null;
 
+    // Vérifier si le CPS est uploadé pour activer le bouton
+    const hasCPS = project.stages?.administrative?.documents?.some((d: any) => d.fileName === 'CPS');
+
     const content = (
         <div className="flex flex-col gap-4 overflow-y-auto px-4 text-sm">
-            {/* 1. Détails */}
+            {/* 1. Détails (Inchangé) */}
             <div className="flex flex-col gap-3 rounded-lg border p-4">
                 <h4 className="font-semibold">Détails du Projet</h4>
                 <div className="grid grid-cols-2 gap-2">
@@ -905,25 +915,67 @@ function ProjectPreviewPanel({ project }: { project: Project }) {
                     <span className="text-muted-foreground">Status:</span>
                     <span><ProjectStatusPill status={project.preparationStatus} /></span>
                     <span className="text-muted-foreground">Chef de Projet:</span>
-                    <span className="font-medium">
-                        {project.projectManagers[0]?.name || "N/A"}
-                    </span>
+                    <span className="font-medium">{project.projectManagers[0]?.name || "N/A"}</span>
                 </div>
             </div>
 
-            {/* 2. L-Dates */}
+            {/* 2. Dates Clés (Inchangé) */}
             <div className="flex flex-col gap-3 rounded-lg border p-4">
                 <h4 className="font-semibold flex items-center gap-2">
-                    <IconClock className="h-4 w-4" />
-                    Dates Clés
+                    <IconClock className="h-4 w-4" /> Dates Clés
                 </h4>
                 <div className="grid grid-cols-2 gap-2">
-                    <span className="text-muted-foreground">Demande Caution (Calc.):</span>
+                    <span className="text-muted-foreground">Demande Caution:</span>
                     <span className="font-medium">{formatDate(cautionDate, "PPP")}</span>
                     <span className="text-muted-foreground">Date de Dépôt:</span>
                     <span className="font-medium text-red-500">{formatDate(submissionDate, "PPP p")}</span>
                 </div>
             </div>
+
+            {/* --- NOUVELLE SECTION : GEMINI AI ANALYSIS --- */}
+            <div className="flex flex-col gap-3 rounded-lg border border-indigo-100 bg-indigo-50/50 dark:bg-indigo-950/20 dark:border-indigo-900 p-4">
+                <div className="flex items-center justify-between">
+                    <h4 className="font-semibold flex items-center gap-2 text-indigo-700 dark:text-indigo-400">
+                        <IconSparkles className="h-4 w-4" />
+                        Analyse CPS (IA)
+                    </h4>
+                    {project.aiSummary?.thematic && (
+                        <Badge variant="outline" className="bg-indigo-100 text-indigo-700 border-indigo-200">
+                            {project.aiSummary.thematic}
+                        </Badge>
+                    )}
+                </div>
+
+                {project.aiSummary ? (
+                    <div className="space-y-2">
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                            {project.aiSummary.summary}
+                        </p>
+                        <div className="flex justify-end">
+                            <span className="text-[10px] text-indigo-400">Généré par Gemini 1.5</span>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="flex flex-col items-center justify-center py-4 text-center gap-2">
+                        <IconBrain className="h-8 w-8 text-indigo-200" />
+                        <p className="text-xs text-muted-foreground">Aucune analyse disponible.</p>
+                        {hasCPS ? (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-indigo-600 border-indigo-200 hover:bg-indigo-50 h-7 text-xs mt-1"
+                                onClick={() => generateSummary({ variables: { projectId: project.id } })}
+                                disabled={loadingAI}
+                            >
+                                {loadingAI ? "Analyse en cours..." : "Lancer l'analyse du CPS"}
+                            </Button>
+                        ) : (
+                            <p className="text-[10px] text-red-400">Veuillez uploader le CPS d'abord.</p>
+                        )}
+                    </div>
+                )}
+            </div>
+            {/* --------------------------------------------- */}
 
             {/* 3. L-BLOC L-JDID DYAL L-ÉQUIPE */}
             <div className="flex flex-col gap-3 rounded-lg border p-4">
@@ -1115,19 +1167,38 @@ function TaskChecklistPanel({ project }: { project: Project }) {
     const handleFileUploadAndMutate = async (
         file: File | null,
         mutation: Function,
-        docType: string, // "TASK_V1" or "TASK_FINAL"
-        taskId: string
+        docType: string,
+        stageName?: string
     ) => {
+        const projectId = item.id;
         if (!file) {
-            toast.error(`Aucun fichier sélectionné.`);
+            toast.error(`Aucun fichier ${docType} sélectionné.`);
             return false;
         }
         const formDataRest = new FormData();
         formDataRest.append('file', file);
+
+        // --- DEBUT DE LA CORRECTION ---
         try {
             toast.loading(`Uploading ${file.name}...`);
-            // Nst3mlo l-endpoint l-3adi dyal l-projet
-            const response = await fetch(`https://backoffice.urbagroupe.ma/api/upload/${project.id}`, { method: 'POST', body: formDataRest });
+
+            // CORRECTION: On pointe vers la racine du serveur (5002), PAS vers /graphql
+            let uploadBaseUrl = 'https://localhost:5002';
+
+            if (typeof window !== 'undefined') {
+                const hostname = window.location.hostname;
+                if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+                    uploadBaseUrl = 'https://backoffice.urbagroupe.ma';
+                }
+            }
+
+            // L'URL finale sera : https://localhost:5002/api/upload/{id}
+            const response = await fetch(`${uploadBaseUrl}/api/upload/${projectId}`, {
+                method: 'POST',
+                body: formDataRest
+            });
+            // --- FIN DE LA CORRECTION ---
+
             if (!response.ok) throw new Error('File upload failed.');
             const result = await response.json();
             const fileUrl = result.fileUrl;
@@ -1135,7 +1206,9 @@ function TaskChecklistPanel({ project }: { project: Project }) {
 
             await mutation({
                 variables: {
-                    taskId: taskId,
+                    projectId: projectId,
+                    stageName: stageName,
+                    docType: docType,
                     originalFileName: file.name,
                     fileUrl: fileUrl,
                 },
@@ -1143,7 +1216,7 @@ function TaskChecklistPanel({ project }: { project: Project }) {
             return true;
         } catch (error: any) {
             toast.dismiss();
-            toast.error(`Error uploading file: ${error.message}`);
+            toast.error(`Erreur upload: ${error.message}`);
             return false;
         }
     };
