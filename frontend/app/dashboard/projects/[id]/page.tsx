@@ -48,7 +48,7 @@ const GET_PROJECT_BY_ID = gql`
       team {
         infographistes { id name }
         team3D { id name }
-        assistants { id name }
+        coordinators { id name }
       }
       proposalAvis {
         status
@@ -288,7 +288,7 @@ export default function ProjectDetailPage() {
     const allTeamMembers = [
         ...(project?.team?.infographistes || []),
         ...(project?.team?.team3D || []),
-        ...(project?.team?.assistants || [])
+        ...(project?.team?.coordinators || [])
     ];
     const uniqueNames = [...new Set(allTeamMembers.map(member => member.name))];
     const displayTeam = uniqueNames.length > 0 ? uniqueNames.join(', ') : "N/A";

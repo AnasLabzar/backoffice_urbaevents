@@ -21,7 +21,7 @@ export const stagePopulates = [
 export const teamPopulates = [
     { path: 'team.infographistes', select: userSelect },
     { path: 'team.team3D', select: userSelect },
-    { path: 'team.assistants', select: userSelect },
+    { path: 'team.coordinators', select: userSelect },
 ] as const;
 
 export const defaultUser = { _id: 'DELETED_USER_ID', id: 'DELETED_USER_ID', name: 'Utilisateur Supprimé', email: '', role: null };
@@ -115,7 +115,7 @@ export function buildProjectFilter(permissions: string[], userId: string) {
                     { assignedTeam: userId },          // <-- Assigné dans l'équipe globale
                     { 'team.infographistes': userId }, // <-- Assigné comme Infographiste
                     { 'team.team3D': userId },         // <-- Assigné comme 3D
-                    { 'team.assistants': userId }      // <-- Assigné comme Assistant
+                    { 'team.coordinators': userId }      // <-- Assigné comme Assistant
                 ]
             }
         ]
@@ -132,7 +132,7 @@ export const patchProjectUsers = (project: any) => {
     if (project.team) {
         project.team.infographistes = (project.team.infographistes || []).filter((u: any) => u).map((u: any) => u || defaultUser);
         project.team.team3D = (project.team.team3D || []).filter((u: any) => u).map((u: any) => u || defaultUser);
-        project.team.assistants = (project.team.assistants || []).filter((u: any) => u).map((u: any) => u || defaultUser);
+        project.team.coordinators = (project.team.coordinators || []).filter((u: any) => u).map((u: any) => u || defaultUser);
     }
 
     if (project.stages) {

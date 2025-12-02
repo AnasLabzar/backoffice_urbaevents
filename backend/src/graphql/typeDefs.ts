@@ -53,7 +53,7 @@ type Project {
     feasibilityChecks: FeasibilityChecks!
     proposalAvis: ProposalAvis
     caution: Caution!
-    
+    prestations: [Prestation] # ✅ Ajout de ce champ virtuel
     marketEstimate: Float
     estimatedBudget: Float
     
@@ -61,6 +61,21 @@ type Project {
     finalSubmission: String
 
     aiSummary: AiSummary
+
+    brief: ProjectBrief
+  }
+
+  type Prestation {
+    id: ID!
+    project: ID!
+    name: String!
+    description: String
+    category: String!
+    quantity: Int!
+    unitPrice: Float!
+    totalPrice: Float!
+    status: String!
+    createdAt: String!
   }
 
   type Stages {
@@ -126,7 +141,70 @@ type Project {
   type Team {
     infographistes: [User!]!
     team3D: [User!]!
-    assistants: [User!]!
+    coordinators: [User!]! 
+    pmJuniors: [User!]!   
+  }
+
+  input AddPrestationInput {
+    projectId: ID!
+    name: String!
+    category: String! # RH, AUDIO_VISUELLE, HEBERGEMENT, etc.
+    description: String
+    quantity: Int
+    unitPrice: Float
+  }
+
+  input UpdatePrestationInput {
+    name: String
+    category: String
+    description: String
+    quantity: Int
+    unitPrice: Float
+    status: String
+  }
+
+  type ProjectBriefRequirements {
+    logistics: String
+    accommodation: String
+    catering: String
+    audiovisual: String
+    transport: String
+    digital: String
+    hr: String
+    animation: String
+  }
+
+  type ProjectBrief {
+    id: ID!
+    project: ID!
+    
+    clientName: String
+    clientNature: String
+    
+    projectName: String
+    eventFormat: String
+    toneStyle: String
+    location: String
+    locationType: String
+    visitorsCount: Int
+    startDate: String
+    endDate: String
+    durationDays: Int
+    estimatedBudget: Float
+    
+    eventGoal: String
+    targetAudience: [String]
+    mainObjective: String
+    subObjectives: [String]
+    history: String
+    themeConcept: String
+    themeDeclination: String
+    constraints: String
+    
+    requirements: ProjectBriefRequirements
+    spaces: [String]
+    
+    updatedAt: String
   }
 
   type Task {
@@ -160,6 +238,44 @@ type Project {
   type AuthPayload {
     token: String!
     user: User!
+  }
+
+  # --- INPUTS ---
+  input ProjectBriefRequirementsInput {
+    logistics: String
+    accommodation: String
+    catering: String
+    audiovisual: String
+    transport: String
+    digital: String
+    hr: String
+    animation: String
+  }
+
+  input ProjectBriefInput {
+    projectId: ID!
+    clientName: String
+    clientNature: String
+    projectName: String
+    eventFormat: String
+    toneStyle: String
+    location: String
+    locationType: String
+    visitorsCount: Int
+    startDate: String
+    endDate: String
+    durationDays: Int
+    estimatedBudget: Float
+    eventGoal: String
+    targetAudience: [String]
+    mainObjective: String
+    subObjectives: [String]
+    history: String
+    themeConcept: String
+    themeDeclination: String
+    constraints: String
+    requirements: ProjectBriefRequirementsInput
+    spaces: [String]
   }
 
   input CreateProjectInput {
@@ -201,7 +317,8 @@ type Project {
     projectId: ID!
     infographisteIds: [ID!]!
     team3DIds: [ID!]!
-    assistantIds: [ID!]!
+    coordinatorIds: [ID!]!
+    pmJuniorIds: [ID!]!
   }
 
   input PMCreateTaskInput {
@@ -240,6 +357,7 @@ type Project {
     summary: String
     thematic: String
     risks: [String]
+    generatedAt: String
   }
 
   type Query {
@@ -257,6 +375,8 @@ type Project {
     myTasks: [Task!]
     allTasks: [Task!]
     myNotifications: [Notification!]
+    getProjectBrief(projectId: ID!): ProjectBrief
+    prestationsByProject(projectId: ID!): [Prestation!]!
   }
 
   type Mutation {
@@ -319,6 +439,12 @@ type Project {
     # Notifications
     markNotificationAsRead(notificationId: ID!): Notification
     markAllNotificationsAsRead: Boolean
+
+    addPrestation(input: AddPrestationInput!): Prestation!
+    updatePrestation(id: ID!, input: UpdatePrestationInput!): Prestation!
+    deletePrestation(id: ID!): Boolean
+
+    saveProjectBrief(input: ProjectBriefInput!): ProjectBrief!
   }
 
   # Zid f Subscription

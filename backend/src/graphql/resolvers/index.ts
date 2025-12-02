@@ -6,6 +6,8 @@ import { logsResolvers } from './logs';
 import { aiResolver } from './aiResolver';
 // ✅ 1. Import du nouveau resolver
 import { supplierResolvers } from './suppliers';
+import { prestationResolvers } from './prestations';
+import { briefResolvers } from './briefs';
 
 export const resolvers = {
     Query: {
@@ -14,16 +16,20 @@ export const resolvers = {
         ...taskResolvers.Query,
         ...notificationResolvers.Query,
         ...logsResolvers.Query,
-        ...supplierResolvers.Query // ✅ 2. Ajout Query
+        ...supplierResolvers.Query, // ✅ 2. Ajout Query
+        ...prestationResolvers.Query, // ✅ AJOUT
+        ...briefResolvers.Query
     },
 
     Mutation: {
-        ...userResolvers.Mutation,
+        ...userResolvers.Mutation,  
         ...projectResolvers.Mutation,
         ...taskResolvers.Mutation,
         ...notificationResolvers.Mutation,
         ...aiResolver.Mutation,
         ...supplierResolvers.Mutation, // ✅ 3. Ajout Mutation
+        ...prestationResolvers.Mutation, // ✅ AJOUT
+        ...briefResolvers.Mutation
     },
 
     Subscription: {

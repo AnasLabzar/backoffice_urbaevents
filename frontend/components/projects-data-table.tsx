@@ -112,7 +112,7 @@ export const GET_PROJECTS_FEED = gql`
         team {
           infographistes { id name }
           team3D { id name }
-          assistants { id name }
+          coordinators { id name }
         }
         proposalAvis {
           status
@@ -137,7 +137,7 @@ const GET_TEAM_MEMBERS = gql`
   query GetTeamMembers {
     infographistes: users(role: "CREATIVE") { id name }
     team3D: users(role: "3D_ARTIST") { id name }
-    assistants: users(role: "ASSISTANT_PM") { id name }
+    coordinators: users(role: "ASSISTANT_PM") { id name }
   }
 `;
 const GET_LOGS_QUERY = gql`
@@ -233,7 +233,7 @@ const FINANCE_REQUEST_CAUTION_MUTATION = gql`
 `;
 const CP_ASSIGN_TEAM_MUTATION = gql`
   mutation CpAssignTeam($input: CPAssignTeamInput!) {
-    cp_assignTeam(input: $input) { id team { infographistes { id } team3D { id } assistants { id } } }
+    cp_assignTeam(input: $input) { id team { infographistes { id } team3D { id } coordinators { id } } }
   }
 `;
 const PM_CREATE_TASK_MUTATION = gql`
@@ -418,7 +418,7 @@ const projectSchema = z.object({
     team: z.object({
         infographistes: z.array(z.object({ id: z.string(), name: z.string() })),
         team3D: z.array(z.object({ id: z.string(), name: z.string() })),
-        assistants: z.array(z.object({ id: z.string(), name: z.string() })),
+        coordinators: z.array(z.object({ id: z.string(), name: z.string() })),
     }),
     proposalAvis: z.object({
         status: z.string(),
@@ -998,10 +998,10 @@ function ProjectPreviewPanel({ project }: { project: Project & { aiSummary?: any
                         ) : <span className="font-medium text-muted-foreground">N/A</span>}
                     </div>
 
-                    <span className="text-muted-foreground">Assistants:</span>
+                    <span className="text-muted-foreground">coordinators:</span>
                     <div className="flex flex-col">
-                        {project.team.assistants.length > 0 ? (
-                            project.team.assistants.map(u => <span key={u.id} className="font-medium">{u.name}</span>)
+                        {project.team.coordinators.length > 0 ? (
+                            project.team.coordinators.map(u => <span key={u.id} className="font-medium">{u.name}</span>)
                         ) : <span className="font-medium text-muted-foreground">N/A</span>}
                     </div>
                 </div>
@@ -1434,7 +1434,7 @@ function TableCellViewer({ item }: { item: Project }) {
     const [teamData, setTeamData] = React.useState({
         infographisteIds: item.team.infographistes.map(u => u.id),
         team3DIds: item.team.team3D.map(u => u.id),
-        assistantIds: item.team.assistants.map(u => u.id),
+        assistantIds: item.team.coordinators.map(u => u.id),
     });
     const [formData, setFormData] = React.useState({ ...item });
     const [newTaskDesc, setNewTaskDesc] = React.useState("");
@@ -1846,7 +1846,7 @@ function TableCellViewer({ item }: { item: Project }) {
             const allTeamMembers = [
                 ...(teamMembers?.infographistes.map((u: any) => ({ ...u, dept: 'CREATIVE' })) || []),
                 ...(teamMembers?.team3D.map((u: any) => ({ ...u, dept: '3D_ARTIST' })) || []),
-                ...(teamMembers?.assistants.map((u: any) => ({ ...u, dept: 'ASSISTANT_PM' })) || [])
+                ...(teamMembers?.coordinators.map((u: any) => ({ ...u, dept: 'ASSISTANT_PM' })) || [])
             ];
 
             // --- L-BDIL L-JDID (L-LOGIC 4) ---
@@ -1882,10 +1882,10 @@ function TableCellViewer({ item }: { item: Project }) {
                                 />
                             </div>
                             <div className="flex flex-col gap-2">
-                                <Label>Assistants</Label>
+                                <Label>coordinators</Label>
                                 <MultiSelectPopover
                                     title="Choisir..."
-                                    options={teamMembers?.assistants || []}
+                                    options={teamMembers?.coordinators || []}
                                     selectedIds={teamData.assistantIds}
                                     onChange={(id, checked) => handleTeamChange('assistantIds', id, checked)}
                                 />

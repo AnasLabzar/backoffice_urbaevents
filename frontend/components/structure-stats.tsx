@@ -9,7 +9,7 @@ interface StructureStatsProps {
     activeProjects: number;
     totalPMs: number;
     totalCreatives: number;
-    totalAssistants: number;
+    totalcoordinators: number;
     className?: string;
 }
 
@@ -17,19 +17,19 @@ export function StructureStats({
     activeProjects = 0,
     totalPMs = 0,
     totalCreatives = 0,
-    totalAssistants = 0,
+    totalcoordinators = 0,
     className
 }: StructureStatsProps) {
 
     // Metrics specifically for "Structure/Team"
-    const totalResources = totalPMs + totalCreatives + totalAssistants;
+    const totalResources = totalPMs + totalCreatives + totalcoordinators;
     const utilizationRate = totalResources > 0 ? Math.round((activeProjects / totalResources) * 100) : 0;
 
     // Percentages for the visual bar
     const safeTotal = totalResources > 0 ? totalResources : 1;
     const pctPM = Math.round((totalPMs / safeTotal) * 100);
     const pctCreative = Math.round((totalCreatives / safeTotal) * 100);
-    const pctAssist = Math.round((totalAssistants / safeTotal) * 100);
+    const pctAssist = Math.round((totalcoordinators / safeTotal) * 100);
 
     return (
         <Card className={cn("flex flex-col shadow-sm border-border/60 h-full justify-between bg-card", className)}>
@@ -106,8 +106,8 @@ export function StructureStats({
                             borderColor="border-purple-200 dark:border-purple-800/50"
                         />
                         <DetailedStat
-                            label="Assistants"
-                            value={totalAssistants}
+                            label="coordinators"
+                            value={totalcoordinators}
                             icon={<IconUsers className="h-4 w-4 text-pink-600 dark:text-pink-400" />}
                             bg="bg-pink-500/10"
                             borderColor="border-pink-200 dark:border-pink-800/50"

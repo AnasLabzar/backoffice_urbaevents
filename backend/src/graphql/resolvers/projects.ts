@@ -250,9 +250,9 @@ export const projectResolvers = {
                 currentStage: 'PROPOSAL',
                 stages: {
                     administrative: { responsible: ['PROPOSAL_MANAGER', 'ADMIN'], documents: [] },
-                    technical: { responsible: ['PROPOSAL_MANAGER', 'PROJECT_MANAGER', 'ASSISTANT_PM'], documents: [] },
-                    technicalOffer: { responsible: ['PROJECT_MANAGER'], documents: [] },
-                    financialOffer: { responsible: ['PROPOSAL_MANAGER', 'PROJECT_MANAGER'], documents: [] },
+                    technical: { responsible: ['PROPOSAL_MANAGER', 'PROJECT_MANAGER', 'ASSISTANT_PM', 'COORDINATOR'], documents: [] },
+                    technicalOffer: { responsible: ['PROJECT_MANAGER', 'COORDINATOR'], documents: [] },
+                    financialOffer: { responsible: ['PROPOSAL_MANAGER', 'PROJECT_MANAGER', 'COORDINATOR'], documents: [] },
                     printing: { responsible: [], documents: [] },
                     workshop: { responsible: [], documents: [] },
                     field: { responsible: [], documents: [] },
@@ -627,29 +627,48 @@ export const projectResolvers = {
         },
 
         cp_assignTeam: async (_: unknown, { input }: any, context: IContext) => {
-            const { projectId, infographisteIds, team3DIds, assistantIds } = input;
+            // On déstructure les nouveaux champs
+            const { projectId, infographisteIds, team3DIds, coordinatorIds, pmJuniorIds } = input;
+
             const project = await Project.findById(projectId);
             if (!project) throw new ApolloError('Project not found');
 
             const canAccess = await checkPMAccess(context, project, 'assign_creative_tasks');
             if (!canAccess) throw new ApolloError('Forbidden', 'FORBIDDEN');
 
+            // Mise à jour de l'objet Team
             project.team.infographistes = infographisteIds || [];
             project.team.team3D = team3DIds || [];
-            project.team.assistants = assistantIds || [];
+            project.team.coordinators = coordinatorIds || []; // 🔄 Updated
+            project.team.pmJuniors = pmJuniorIds || [];       // ✅ Added
 
-            const allIds = [...new Set([...infographisteIds, ...team3DIds, ...assistantIds])];
+            // Mise à jour de la liste globale (pour les permissions/visibilité)
+            // On combine tous les tableaux et on enlève les doublons
+            const allIds = [...new Set([
+                ...infographisteIds,
+                ...team3DIds,
+                ...coordinatorIds,
+                ...pmJuniorIds
+            ])];
+
             project.assignedTeam = allIds;
 
-            await logActivity({ userId: context.user!.id as any, action: 'CP_ASSIGN_TEAM', project: project._id, details: `Team updated` });
+            await logActivity({
+                userId: context.user!.id as any,
+                action: 'CP_ASSIGN_TEAM',
+                project: project._id,
+                details: `Team updated (Coordinators & PM Juniors added)`
+            });
+
             await project.save();
 
+            // Notification (Optionnelle)
             if (allIds.length > 0) {
                 await createNotification({
                     userIds: allIds,
                     level: NotificationLevel.STANDARD,
                     message: `Vous avez été assigné à l'équipe du projet: "${project.object}"`,
-                    link: `/dashboard/projects/`,
+                    link: `/dashboard/projects/${project._id}`,
                     project: project._id.toString()
                 });
             }
@@ -694,7 +713,7 @@ export const projectResolvers = {
             const teamIds = [
                 ...project.team.infographistes.map(u => u.toString()),
                 ...project.team.team3D.map(u => u.toString()),
-                ...project.team.assistants.map(u => u.toString()),
+                ...project.team.coordinators.map(u => u.toString()),
             ];
             if (teamIds.length > 0) {
                 await createNotification({
@@ -767,5 +786,17 @@ export const projectResolvers = {
             await project.save();
             return project;
         },
+    },
+    // ✅ AJOUTE CECI POUR LIER LES DEUX
+    Project: {
+        prestations: async (parent: any) => {
+            // Import Prestation ici ou en haut
+            const PrestationModel = require('../../models/Prestation').default;
+            return await PrestationModel.find({ project: parent._id || parent.id });
+        },
+        brief: async (parent: any) => {
+            const BriefModel = require('../../models/ProjectBrief').default;
+            return await BriefModel.findOne({ project: parent._id || parent.id });
+        }
     }
 };

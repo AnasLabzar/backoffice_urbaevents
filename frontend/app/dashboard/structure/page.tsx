@@ -52,7 +52,7 @@ const GET_PROJECTS_FEED = gql`
         team {
           infographistes { id name }
           team3D { id name }
-          assistants { id name }
+          coordinators { id name }
         }
         proposalAvis {
           status
@@ -88,27 +88,27 @@ function StructurePageContent() {
 
     // --- 3. STATS CALCULATIONS ---
     const stats = React.useMemo(() => {
-        if (!allProjects.length) return { active: 0, pms: 0, creatives: 0, assistants: 0 };
+        if (!allProjects.length) return { active: 0, pms: 0, creatives: 0, coordinators: 0 };
 
         // Active = Projects In Production
         const active = allProjects.filter((p: any) => p.preparationStatus === 'IN_PRODUCTION');
 
         const uniquePMs = new Set();
         const uniqueCreatives = new Set();
-        const uniqueAssistants = new Set();
+        const uniquecoordinators = new Set();
 
         active.forEach((p: any) => {
             p.projectManagers?.forEach((pm: any) => uniquePMs.add(pm.id));
             p.team?.infographistes?.forEach((u: any) => uniqueCreatives.add(u.id));
             p.team?.team3D?.forEach((u: any) => uniqueCreatives.add(u.id));
-            p.team?.assistants?.forEach((u: any) => uniqueAssistants.add(u.id));
+            p.team?.coordinators?.forEach((u: any) => uniquecoordinators.add(u.id));
         });
 
         return {
             active: active.length,
             pms: uniquePMs.size,
             creatives: uniqueCreatives.size,
-            assistants: uniqueAssistants.size
+            coordinators: uniquecoordinators.size
         };
     }, [allProjects]);
 
@@ -165,7 +165,7 @@ function StructurePageContent() {
                             activeProjects={stats.active}
                             totalPMs={stats.pms}
                             totalCreatives={stats.creatives}
-                            totalAssistants={stats.assistants}
+                            totalcoordinators={stats.coordinators}
                         />
                     )}
                 </div>

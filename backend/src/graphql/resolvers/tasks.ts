@@ -136,7 +136,7 @@ export const taskResolvers = {
             const roleName = (user.role as any).name;
 
             let filter: any = {};
-            if (['ADMIN', 'PROJECT_MANAGER', 'ASSISTANT_PM'].includes(roleName)) {
+            if (['ADMIN', 'PROJECT_MANAGER', 'ASSISTANT_PM', 'COORDINATOR'].includes(roleName)) {
                 filter = {};
             } else {
                 filter = { assignedTo: context.user.id };

@@ -55,8 +55,8 @@ export function ProjectPreviewPanel({ project }: { project: any }) {
                     <div className="flex flex-col">{project.team.infographistes.length > 0 ? project.team.infographistes.map((u: any) => <span key={u.id} className="font-medium">{u.name}</span>) : <span className="font-medium text-muted-foreground">N/A</span>}</div>
                     <span className="text-muted-foreground">Équipe 3D:</span>
                     <div className="flex flex-col">{project.team.team3D.length > 0 ? project.team.team3D.map((u: any) => <span key={u.id} className="font-medium">{u.name}</span>) : <span className="font-medium text-muted-foreground">N/A</span>}</div>
-                    <span className="text-muted-foreground">Assistants:</span>
-                    <div className="flex flex-col">{project.team.assistants.length > 0 ? project.team.assistants.map((u: any) => <span key={u.id} className="font-medium">{u.name}</span>) : <span className="font-medium text-muted-foreground">N/A</span>}</div>
+                    <span className="text-muted-foreground">coordinators:</span>
+                    <div className="flex flex-col">{project.team.coordinators.length > 0 ? project.team.coordinators.map((u: any) => <span key={u.id} className="font-medium">{u.name}</span>) : <span className="font-medium text-muted-foreground">N/A</span>}</div>
                 </div>
             </div>
             {/* Logs */}

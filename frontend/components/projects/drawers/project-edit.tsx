@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useMutation, useQuery } from "@apollo/client";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation"; // ✅ 1. IMPORT ROUTER
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerFooter, DrawerClose, DrawerTrigger } from "@/components/ui/drawer";
@@ -15,15 +16,15 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 
-// Import du composant "Panier" Production qu'on a créé
-import { ProductionManager } from "./production-manager";
-
 // Icons
 import {
     IconCheck, IconFileText, IconUpload, IconDownload, IconAlertCircle, IconLoader,
     IconChartPie, IconTrendingUp, IconTrendingDown, IconCalculator, IconBuildingBank,
-    IconUserShield
+    IconUserShield, IconFileDescription, IconArrowRight // ✅ 2. NOUVELLES ICONES
 } from "@tabler/icons-react";
+
+// Import du composant "Panier" Production qu'on a créé
+import { ProductionManager } from "./production-manager";
 
 import {
     ME_QUERY, GET_PROJECT_MANAGERS, GET_TEAM_MEMBERS, GET_TASKS_BY_PROJECT_QUERY, GET_PROJECTS_FEED,
@@ -107,6 +108,7 @@ function MarginCalculator({ marketPrice, costPrice }: { marketPrice: number, cos
 // --- MAIN COMPONENT ---
 export function ProjectEditDrawer({ item }: { item: any }) {
     const isMobile = useIsMobile();
+    const router = useRouter(); // ✅ 3. INITIALISATION DU ROUTER
     const { data: meData } = useQuery(ME_QUERY);
     const userRole = meData?.me.role.name;
     const userPermissions = meData?.me.role.permissions || [];
@@ -127,7 +129,7 @@ export function ProjectEditDrawer({ item }: { item: any }) {
 
     const [adminFormData, setAdminFormData] = React.useState({ status: item.preparationStatus, projectManagerId: item.projectManagers[0]?.id || '' });
     const [feasibilityData, setFeasibilityData] = React.useState({ administrative: item.feasibilityChecks.administrative, technical: item.feasibilityChecks.technical, financial: item.feasibilityChecks.financial });
-    const [teamData, setTeamData] = React.useState({ infographisteIds: item.team.infographistes.map((u: any) => u.id), team3DIds: item.team.team3D.map((u: any) => u.id), assistantIds: item.team.assistants.map((u: any) => u.id) });
+    const [teamData, setTeamData] = React.useState({ infographisteIds: item.team.infographistes.map((u: any) => u.id), team3DIds: item.team.team3D.map((u: any) => u.id), assistantIds: item.team.coordinators.map((u: any) => u.id) });
 
     const [formData, setFormData] = React.useState({
         ...item,
@@ -420,7 +422,7 @@ export function ProjectEditDrawer({ item }: { item: any }) {
                     initialTeamIds={[
                         ...(item.team?.infographistes?.map((u: any) => u.id) || []),
                         ...(item.team?.team3D?.map((u: any) => u.id) || []),
-                        ...(item.team?.assistants?.map((u: any) => u.id) || [])
+                        ...(item.team?.coordinators?.map((u: any) => u.id) || [])
                     ]}
                     onSave={() => {
                         // Callback après action si nécessaire (ex: refetch data)
@@ -454,9 +456,24 @@ export function ProjectEditDrawer({ item }: { item: any }) {
         if (userRole === 'ADMIN' && isPendingAdminReview) return <Button form="admin-assign-form" type="submit" disabled={loading} className="w-full">Confirmer l'Assignation</Button>;
         if (userPermissions.includes('manage_cautions') && isCautionPending) return <Button onClick={handleRequestCaution} disabled={loading} className="bg-blue-600 hover:bg-blue-700 w-full">Confirmer Caution</Button>;
 
-        // ✅ En production, on cache le bouton "Sauvegarder" global car le ProductionManager a ses propres boutons
-        if (isInProduction) return <Button variant="outline" className="w-full">Fermer</Button>;
-
+        // ✅ 4. MODIFICATION ICI : BOUTON VERS LA PAGE BRIEF
+        if (isInProduction) {
+            return (
+                <div className="flex flex-col gap-3 w-full">
+                    {/* Le Bouton Principal qui redirige vers la nouvelle page */}
+                    <Button 
+                        onClick={() => router.push(`/dashboard/projects/${item.id}/brief`)} 
+                        className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-6 shadow-md"
+                    >
+                        <IconFileDescription className="w-5 h-5 mr-2" />
+                        Accéder au Brief & Détails
+                        <IconArrowRight className="w-4 h-4 ml-2 opacity-70" />
+                    </Button>
+                    
+                    <Button variant="outline" className="w-full">Fermer</Button>
+                </div>
+            );
+        }
         if (userRole === 'ADMIN' || userRole === 'PROJECT_MANAGER') return <Button form="update-dossier-form" type="submit" disabled={loading} className="w-full">Sauvegarder</Button>;
         return <Button variant="outline" className="w-full">Fermer</Button>;
     };
@@ -464,7 +481,7 @@ export function ProjectEditDrawer({ item }: { item: any }) {
     return (
         <Drawer direction={isMobile ? "bottom" : "right"}>
             <DrawerTrigger asChild><Button variant="link" className="text-foreground px-0 text-left h-auto block"><span className="block truncate max-w-[200px] md:max-w-[350px]" title={item.object}>{item.object}</span></Button></DrawerTrigger>
-            <DrawerContent className={cn("p-4", "width-[30em]", isMobile ? "h-[90vh]" : "sm:max-w-2xl")}>
+            <DrawerContent className={cn("p-4", "width-[40em]", isMobile ? "h-[90vh]" : "sm:max-w-2xl")}>
                 <DrawerHeader className="gap-1 px-0 pt-0"><DrawerTitle>{item.object}</DrawerTitle><DrawerDescription>Gestion des documents.</DrawerDescription></DrawerHeader>
                 <div className="flex-grow overflow-y-auto pr-2 -mr-4 py-4">{renderPanelContent()}</div>
                 <DrawerFooter className="px-0 pb-0">{renderPanelFooter()}<DrawerClose asChild><Button variant="ghost" className="mt-2" disabled={loading}>Annuler</Button></DrawerClose></DrawerFooter>

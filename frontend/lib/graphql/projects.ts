@@ -67,7 +67,7 @@ export const GET_PROJECTS_FEED = gql`
         team {
           infographistes { id name }
           team3D { id name }
-          assistants { id name }
+          coordinators { id name }
         }
         proposalAvis {
           status
@@ -91,7 +91,7 @@ export const GET_TEAM_MEMBERS = gql`
   query GetTeamMembers {
     infographistes: users(role: "CREATIVE") { id name }
     team3D: users(role: "3D_ARTIST") { id name }
-    assistants: users(role: "ASSISTANT_PM") { id name }
+    coordinators: users(role: "ASSISTANT_PM") { id name }
   }
 `;
 
@@ -200,7 +200,7 @@ export const FINANCE_REQUEST_CAUTION_MUTATION = gql`
 
 export const CP_ASSIGN_TEAM_MUTATION = gql`
   mutation CpAssignTeam($input: CPAssignTeamInput!) {
-    cp_assignTeam(input: $input) { id team { infographistes { id } team3D { id } assistants { id } } }
+    cp_assignTeam(input: $input) { id team { infographistes { id } team3D { id } coordinators { id } } }
   }
 `;
 

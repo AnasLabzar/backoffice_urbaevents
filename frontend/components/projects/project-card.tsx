@@ -14,7 +14,7 @@ export function ProjectCard({ project }: { project: any }) {
     const projectManager = project.projectManagers?.[0]?.name || "N/A";
     const isOverdue = remainingText === "Dépassé";
 
-    const allTeamMembers = [...(project.team?.infographistes || []), ...(project.team?.team3D || []), ...(project.team?.assistants || [])];
+    const allTeamMembers = [...(project.team?.infographistes || []), ...(project.team?.team3D || []), ...(project.team?.coordinators || [])];
     const uniqueNames = [...new Set(allTeamMembers.map((member: any) => member.name))];
     const maxNamesToShow = 3;
     let displayTeam = uniqueNames.length > 0 ? uniqueNames.slice(0, maxNamesToShow).join(', ') + (uniqueNames.length > maxNamesToShow ? "..." : "") : "N/A";

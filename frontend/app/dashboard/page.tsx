@@ -51,7 +51,7 @@ const GET_PROJECTS_FEED = gql`
         team {
           infographistes { id name }
           team3D { id name }
-          assistants { id name }
+          coordinators { id name }
         }
         proposalAvis {
           status

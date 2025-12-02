@@ -145,7 +145,7 @@ export type Project = {
     team: {
         infographistes: User[];
         team3D: User[];
-        assistants: User[];
+        coordinators: User[];
     };
 };
 export type ProjectFeedItem = {
@@ -221,7 +221,7 @@ export const GET_PROJECTS_FEED = gql`
         team {
           infographistes { id name }
           team3D { id name }
-          assistants { id name }
+          coordinators { id name }
         }
         proposalAvis {
           status
@@ -264,7 +264,7 @@ function TaskChecklistPanel({ project }: { project: Project }) {
     const allTeam = [
         ...(project.team.infographistes?.map(u => ({ ...u, role: 'Infographiste' })) || []),
         ...(project.team.team3D?.map(u => ({ ...u, role: 'Artiste 3D' })) || []),
-        ...(project.team.assistants?.map(u => ({ ...u, role: 'Assistant' })) || []),
+        ...(project.team.coordinators?.map(u => ({ ...u, role: 'Assistant' })) || []),
     ];
 
     const allDocuments = [
@@ -436,7 +436,7 @@ export function TasksDataTable({ role }: { role: 'CREATIVE' | '3D_ARTIST' | 'ASS
                 case '3D_ARTIST':
                     return project.team.team3D.some(u => u.id === currentUserId);
                 case 'ASSISTANT_PM':
-                    return project.team.assistants.some(u => u.id === currentUserId);
+                    return project.team.coordinators.some(u => u.id === currentUserId);
                 default:
                     return false;
             }

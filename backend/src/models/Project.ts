@@ -115,7 +115,8 @@ export interface IProject extends Document {
   team: {
     infographistes: IUser['_id'][];
     team3D: IUser['_id'][];
-    assistants: IUser['_id'][];
+    coordinators: IUser['_id'][]; // 🔄 Renommé (ex-coordinators)
+    pmJuniors: IUser['_id'][];    // ✅ Ajouté
   };
 
   // Fichiers l-finaliyin
@@ -172,11 +173,11 @@ const ProjectSchema: Schema = new Schema(
         // Zidna l-possible PM l-jddad ila kan 3ndhom chi rôle f technical stage
         ...StageSchema.obj,
         responsible: {
-          type: [String], default: ['PROPOSAL_MANAGER', 'PROJECT_MANAGER', 'ASSISTANT_PM', 'DIRECTOR_EVENT', 'IT_MANAGER']
+          type: [String], default: ['PROPOSAL_MANAGER', 'PROJECT_MANAGER', 'ASSISTANT_PM', 'COORDINATOR', 'DIRECTOR_EVENT', 'IT_MANAGER']
         }
       },
-      technicalOffer: { ...StageSchema.obj, responsible: { type: [String], default: ['PROJECT_MANAGER', 'DIRECTOR_EVENT', 'IT_MANAGER'] } },
-      financialOffer: { ...StageSchema.obj, responsible: { type: [String], default: ['PROPOSAL_MANAGER', 'PROJECT_MANAGER'] } },
+      technicalOffer: { ...StageSchema.obj, responsible: { type: [String], default: ['PROJECT_MANAGER', 'COORDINATOR', 'DIRECTOR_EVENT', 'IT_MANAGER'] } },
+      financialOffer: { ...StageSchema.obj, responsible: { type: [String], default: ['PROPOSAL_MANAGER', 'PROJECT_MANAGER', 'COORDINATOR'] } },
       printing: StageSchema,
       workshop: StageSchema,
       field: StageSchema,
@@ -201,7 +202,12 @@ const ProjectSchema: Schema = new Schema(
     team: {
       infographistes: [{ type: Schema.Types.ObjectId, ref: 'User' }],
       team3D: [{ type: Schema.Types.ObjectId, ref: 'User' }],
-      assistants: [{ type: Schema.Types.ObjectId, ref: 'User' }]
+
+      // 🔄 Remplacement de 'coordinators' par 'coordinators'
+      coordinators: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+
+      // ✅ Ajout de 'pmJuniors'
+      pmJuniors: [{ type: Schema.Types.ObjectId, ref: 'User' }]
     },
 
     finalSubmission: { type: Object, required: false }

@@ -164,10 +164,10 @@ function ProjectPreviewPanel({ project }: { project: Project }) {
                             project.team.team3D.map((u) => <span key={u.id} className="font-medium">{u.name}</span>)
                         ) : <span className="font-medium text-muted-foreground">N/A</span>}
                     </div>
-                    <span className="text-muted-foreground">Assistants:</span>
+                    <span className="text-muted-foreground">coordinators:</span>
                     <div className="flex flex-col">
-                        {project.team.assistants.length > 0 ? (
-                            project.team.assistants.map((u) => <span key={u.id} className="font-medium">{u.name}</span>)
+                        {project.team.coordinators.length > 0 ? (
+                            project.team.coordinators.map((u) => <span key={u.id} className="font-medium">{u.name}</span>)
                         ) : <span className="font-medium text-muted-foreground">N/A</span>}
                     </div>
                 </div>
@@ -291,7 +291,7 @@ function ProjectTeamRow({ project }: { project: Project }) {
     const allMembers = [
         ...project.team.infographistes,
         ...project.team.team3D,
-        ...project.team.assistants,
+        ...project.team.coordinators,
     ];
     const isEmpty = allMembers.length === 0;
 

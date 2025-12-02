@@ -50,7 +50,7 @@ export interface Project {
     team: {
         infographistes: { id: string, name: string }[];
         team3D: { id: string, name: string }[];
-        assistants: { id: string, name: string }[];
+        coordinators: { id: string, name: string }[];
     };
     // Zid ay fields khrin kat-7tajhom
     stages: any;
