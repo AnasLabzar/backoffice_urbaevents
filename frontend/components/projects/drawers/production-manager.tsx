@@ -193,28 +193,32 @@ export function ProductionManager({ projectId, initialTeam, onSave }: Production
                                 icon={<IconDeviceDesktopAnalytics />}
                                 options={data?.infographistes}
                                 selected={teamData.infographisteIds}
-                                onChange={(id, c) => handleTeamChange('infographisteIds', id, c)}
+                                // ✅ FIX: Explicitly type 'id' and 'c' (checked)
+                                onChange={(id: string, c: boolean) => handleTeamChange('infographisteIds', id, c)}
                             />
                             <TeamCard
                                 title="Équipe 3D"
                                 icon={<IconLayoutKanban />}
                                 options={data?.team3D}
                                 selected={teamData.team3DIds}
-                                onChange={(id, c) => handleTeamChange('team3DIds', id, c)}
+                                // ✅ FIX
+                                onChange={(id: string, c: boolean) => handleTeamChange('team3DIds', id, c)}
                             />
                             <TeamCard
                                 title="Coordinateurs"
                                 icon={<IconUser />}
                                 options={data?.coordinators}
                                 selected={teamData.coordinatorIds}
-                                onChange={(id, c) => handleTeamChange('coordinatorIds', id, c)}
+                                // ✅ FIX
+                                onChange={(id: string, c: boolean) => handleTeamChange('coordinatorIds', id, c)}
                             />
                             <TeamCard
                                 title="PM Juniors"
                                 icon={<IconUser />}
                                 options={data?.pmJuniors}
                                 selected={teamData.pmJuniorIds}
-                                onChange={(id, c) => handleTeamChange('pmJuniorIds', id, c)}
+                                // ✅ FIX
+                                onChange={(id: string, c: boolean) => handleTeamChange('pmJuniorIds', id, c)}
                             />
                         </div>
 

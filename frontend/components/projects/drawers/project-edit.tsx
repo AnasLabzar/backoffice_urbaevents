@@ -36,6 +36,17 @@ import {
     GET_ALL_USERS
 } from "@/lib/graphql/projects";
 
+interface ProductionManagerProps {
+    projectId: string;
+    initialTeam?: {
+        infographisteIds: string[];
+        team3DIds: string[];
+        coordinatorIds: string[]; // Note: Vérifiez si c'est 'coordinatorIds' ou 'assistantIds' dans votre définition
+        pmJuniorIds: string[];
+    };
+    onSave?: () => void;
+}
+
 // --- HELPER UPLOAD ---
 const uploadFileWithProgress = (file: File, url: string, onProgress: (percent: number) => void): Promise<any> => {
     return new Promise((resolve, reject) => {
@@ -416,16 +427,16 @@ export function ProjectEditDrawer({ item }: { item: any }) {
         // ✅ INTEGRATION DU PRODUCTION MANAGER (PANIER)
         if ((userPermissions.includes('assign_creative_tasks') || userRole === 'ADMIN' || isAssignedPM) && isInProduction) {
             return (
+                // ✅ LA CORRECTION
                 <ProductionManager
                     projectId={item.id}
-                    // On récupère tous les IDs de l'équipe déjà assignée pour les afficher
-                    initialTeamIds={[
-                        ...(item.team?.infographistes?.map((u: any) => u.id) || []),
-                        ...(item.team?.team3D?.map((u: any) => u.id) || []),
-                        ...(item.team?.coordinators?.map((u: any) => u.id) || [])
-                    ]}
+                    initialTeam={{ // On passe un objet structuré
+                        infographisteIds: item.team?.infographistes?.map((u: any) => u.id) || [],
+                        team3DIds: item.team?.team3D?.map((u: any) => u.id) || [],
+                        coordinatorIds: item.team?.coordinators?.map((u: any) => u.id) || [],
+                        pmJuniorIds: item.team?.pmJuniors?.map((u: any) => u.id) || [] // Ajouté si présent dans votre modèle
+                    }}
                     onSave={() => {
-                        // Callback après action si nécessaire (ex: refetch data)
                         toast.success("Production mise à jour");
                     }}
                 />
@@ -461,15 +472,15 @@ export function ProjectEditDrawer({ item }: { item: any }) {
             return (
                 <div className="flex flex-col gap-3 w-full">
                     {/* Le Bouton Principal qui redirige vers la nouvelle page */}
-                    <Button 
-                        onClick={() => router.push(`/dashboard/projects/${item.id}/brief`)} 
+                    <Button
+                        onClick={() => router.push(`/dashboard/projects/${item.id}/brief`)}
                         className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-6 shadow-md"
                     >
                         <IconFileDescription className="w-5 h-5 mr-2" />
                         Accéder au Brief & Détails
                         <IconArrowRight className="w-4 h-4 ml-2 opacity-70" />
                     </Button>
-                    
+
                     <Button variant="outline" className="w-full">Fermer</Button>
                 </div>
             );
