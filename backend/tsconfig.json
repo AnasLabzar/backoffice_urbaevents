@@ -16,6 +16,7 @@
     "noImplicitAny": false, /* ✅ REDDINA HADI FALSE BACH MA Y-BLOKICH 3LA ANY */
     "strictNullChecks": false, /* ✅ REDDINA HADI FALSE */
     "strictFunctionTypes": true,
+    "strict": false,
     "noImplicitThis": true,
     "noUnusedLocals": false,
     "noUnusedParameters": false,

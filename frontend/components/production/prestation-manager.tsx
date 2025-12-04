@@ -49,7 +49,9 @@ const DELETE_PRESTATION = gql`
 `;
 
 // --- CONFIGURATION AVANCÉE DES CHAMPS ---
-const CATEGORY_FIELDS: Record<string, { label: string; key: string; type: 'text' | 'number' | 'select' | 'textarea'; options?: string[]; placeholder?: string }[]> = {
+const CATEGORY_FIELDS: Record<string, { label: string; key: string; type: 
+'text' | 'number' | 'select' | 'date' | 'textarea'; options?: string[]; 
+placeholder?: string, width?: string }[]> = {
     AUDIO_VISUELLE: [
         { label: "Sous-Catégorie", key: "sub_cat", type: "select", options: ["Sonorisation", "Éclairage", "Vidéo / LED", "Structure Scénique", "Traduction Simultanée", "Régie / Câblage"] },
         { label: "Marque / Réf", key: "brand", type: "text", placeholder: "Ex: Shure, L-Acoustics..." },
