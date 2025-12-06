@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useMutation, useQuery } from "@apollo/client";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation"; // ✅ 1. IMPORT ROUTER
+import { useRouter } from "next/navigation";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerFooter, DrawerClose, DrawerTrigger } from "@/components/ui/drawer";
@@ -20,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import {
     IconCheck, IconFileText, IconUpload, IconDownload, IconAlertCircle, IconLoader,
     IconChartPie, IconTrendingUp, IconTrendingDown, IconCalculator, IconBuildingBank,
-    IconUserShield, IconFileDescription, IconArrowRight // ✅ 2. NOUVELLES ICONES
+    IconUserShield, IconFileDescription, IconArrowRight
 } from "@tabler/icons-react";
 
 // Import du composant "Panier" Production qu'on a créé
@@ -41,7 +41,7 @@ interface ProductionManagerProps {
     initialTeam?: {
         infographisteIds: string[];
         team3DIds: string[];
-        coordinatorIds: string[]; // Note: Vérifiez si c'est 'coordinatorIds' ou 'assistantIds' dans votre définition
+        coordinatorIds: string[];
         pmJuniorIds: string[];
     };
     onSave?: () => void;
@@ -85,7 +85,7 @@ function DocumentRow({ label, type, existingDoc, file, setFile, progress, isOpti
                 <div className="flex flex-col min-w-0">
                     <div className="flex items-center gap-2"><span className="font-medium text-sm truncate text-foreground">{label}</span>{isOptional && <Badge variant="outline" className="text-[10px] h-5 px-1.5">Optionnel</Badge>}</div>
                     <div className="text-xs text-muted-foreground truncate max-w-[200px] mt-0.5">
-                        {isUploading ? <span className="text-blue-600 font-medium animate-pulse">Upload en cours...</span> : file ? <span className="text-blue-600 font-medium">Prêt: {file.name}</span> : isUploaded ? <a href={`https://backoffice.urbagroupe.ma/${existingDoc.fileUrl}`} target="_blank" className="hover:underline flex items-center gap-1 text-green-600">{existingDoc.originalFileName || existingDoc.fileName} <IconDownload size={12} /></a> : <span>Non uploadé</span>}
+                        {isUploading ? <span className="text-blue-600 font-medium animate-pulse">Upload en cours...</span> : file ? <span className="text-blue-600 font-medium">Prêt: {file.name}</span> : isUploaded ? <a href={`http://localhost:5002/${existingDoc.fileUrl}`} target="_blank" className="hover:underline flex items-center gap-1 text-green-600">{existingDoc.originalFileName || existingDoc.fileName} <IconDownload size={12} /></a> : <span>Non uploadé</span>}
                     </div>
                 </div>
             </div>
@@ -119,7 +119,7 @@ function MarginCalculator({ marketPrice, costPrice }: { marketPrice: number, cos
 // --- MAIN COMPONENT ---
 export function ProjectEditDrawer({ item }: { item: any }) {
     const isMobile = useIsMobile();
-    const router = useRouter(); // ✅ 3. INITIALISATION DU ROUTER
+    const router = useRouter();
     const { data: meData } = useQuery(ME_QUERY);
     const userRole = meData?.me.role.name;
     const userPermissions = meData?.me.role.permissions || [];
@@ -211,10 +211,10 @@ export function ProjectEditDrawer({ item }: { item: any }) {
         if (!file) return true;
         setUploadProgress(prev => ({ ...prev, [docType]: 1 }));
         try {
-            let uploadBaseUrl = 'https://backoffice.urbagroupe.ma/graphql';
+            let uploadBaseUrl = 'http://localhost:5002/graphql';
             if (typeof window !== 'undefined') {
                 const hostname = window.location.hostname;
-                if (hostname !== 'localhost' && hostname !== '127.0.0.1') { uploadBaseUrl = 'https://backoffice.urbagroupe.ma'; }
+                if (hostname !== 'localhost' && hostname !== '127.0.0.1') { uploadBaseUrl = 'http://localhost:5002'; }
             }
             const result = await uploadFileWithProgress(file, `${uploadBaseUrl}/api/upload/${item.id}`, (percent) => { setUploadProgress(prev => ({ ...prev, [docType]: percent })); });
             await mutation({ variables: { projectId: item.id, stageName, docType, originalFileName: file.name, fileUrl: result.fileUrl } });
@@ -361,29 +361,67 @@ export function ProjectEditDrawer({ item }: { item: any }) {
             );
         }
 
+        // ✅ MODIFICATION DEMANDEE: Suppression des inputs financiers, Ajout du bouton, Summary
         if ((userPermissions.includes('manage_assigned_projects') || isAssignedPM) && isToPrepare) {
             return (
                 <div className="flex flex-col gap-6 w-full">
                     <div className="bg-blue-50 border border-blue-200 text-blue-800 p-3 rounded-md text-sm flex items-center gap-2"><IconChartPie size={18} />Préparer l'estimation financière.</div>
+
+                    {/* ✅ 1. BOUTON VERS DETAIL TECHNIQUE & DEVIS */}
+                    <Button
+                        onClick={() => router.push(`/dashboard/projects/${item.id}/technical`)}
+                        className="w-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-md py-6"
+                    >
+                        <IconFileDescription className="w-5 h-5 mr-2" />
+                        Accéder au Détail Technique & Devis
+                        <IconArrowRight className="w-4 h-4 ml-2 opacity-70" />
+                    </Button>
+
+                    {/* ✅ 2. RESUME FINANCIER (READ ONLY) */}
                     <div className="space-y-3">
-                        <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Données Financières</h4>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-1.5"><Label>Montant Marché (DH)</Label><Input type="number" id="marketEstimate" value={formData.marketEstimate} onChange={handleChange} placeholder="ex: 100000" className="font-mono" /></div>
-                            <div className="space-y-1.5"><Label>Coût Estimé (DH)</Label><Input type="number" id="estimatedBudget" value={formData.estimatedBudget} onChange={handleChange} placeholder="ex: 80000" className="font-mono" /></div>
+                        <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Résumé Financier (Live)</h4>
+                        <MarginCalculator
+                            marketPrice={Number(item.marketEstimate) || 0}
+                            costPrice={Number(item.estimatedBudget) || 0}
+                        />
+                    </div>
+
+                    <Separator />
+
+                    {/* ✅ 3. UPLOAD OPTIONNEL */}
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                            <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Fichiers Techniques (Optionnel)</h4>
                         </div>
-                        <MarginCalculator marketPrice={Number(formData.marketEstimate) || 0} costPrice={Number(formData.estimatedBudget) || 0} />
+                        <DocumentRow
+                            label="Estimation Excel (CPS)"
+                            type="CP_ESTIMATE"
+                            existingDoc={getTechDoc('CP_ESTIMATE')}
+                            file={fileEstimate}
+                            setFile={setFileEstimate}
+                            progress={uploadProgress['CP_ESTIMATE'] || 0}
+                            isOptional={true}
+                        />
+                        {/* Instant Upload Button for this file if selected */}
+                        {fileEstimate && !uploadProgress['CP_ESTIMATE'] && (
+                            <Button
+                                size="sm"
+                                onClick={handleSubmitEstimate}
+                                disabled={loading}
+                                className="w-full mt-1 bg-blue-600 hover:bg-blue-700"
+                            >
+                                {isUploadingFiles ? "Upload..." : "Uploader le fichier maintenant"}
+                            </Button>
+                        )}
                     </div>
+
                     <Separator />
-                    <div className="space-y-3">
-                        <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Fichiers Techniques</h4>
-                        <DocumentRow label="Estimation Excel (CPS)" type="CP_ESTIMATE" existingDoc={getTechDoc('CP_ESTIMATE')} file={fileEstimate} setFile={setFileEstimate} progress={uploadProgress['CP_ESTIMATE'] || 0} />
-                    </div>
-                    <Separator />
+
                     <div className="space-y-3">
                         <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Décision</h4>
                         <Select value={avisData.status} onValueChange={(v) => handleAvisFormChange("status", v)}><SelectTrigger><SelectValue placeholder="Sélectionner une décision..." /></SelectTrigger><SelectContent><SelectItem value="ACCEPTED">✅ Valider (Prêt pour Faisabilité)</SelectItem><SelectItem value="NOT_ACCEPTED">❌ Refuser (Non Faisable)</SelectItem></SelectContent></Select>
                         {avisData.status === 'NOT_ACCEPTED' && <Textarea placeholder="Motif..." value={avisData.reason} onChange={(e) => handleAvisFormChange("reason", e.target.value)} />}
-                        <Button onClick={handleSubmitAvis} disabled={loadingAvis} className="w-full">{loadingAvis ? <IconLoader className="animate-spin" /> : "Confirmer la décision"}</Button>
+                        <Button onClick={handleSubmitAvis} disabled={loadingAvis || !avisData.status} className="w-full bg-green-600 hover:bg-green-700">{loadingAvis ? <IconLoader className="animate-spin" /> : "Confirmer la décision"}</Button>
                     </div>
                 </div>
             );
@@ -401,7 +439,7 @@ export function ProjectEditDrawer({ item }: { item: any }) {
                         {getTechDoc('CP_ESTIMATE') ? (
                             <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/20">
                                 <div className="flex items-center gap-3"><div className="h-8 w-8 rounded-full bg-green-100 text-green-600 flex items-center justify-center"><IconFileText size={16} /></div><div className="flex flex-col"><span className="text-sm font-medium">Estimation Détaillée (Excel)</span><span className="text-xs text-muted-foreground">Uploadé par le CP</span></div></div>
-                                <Button variant="outline" size="sm" asChild><a href={`https://backoffice.urbagroupe.ma/${getTechDoc('CP_ESTIMATE').fileUrl}`} target="_blank"><IconDownload size={14} className="mr-2" /> Télécharger</a></Button>
+                                <Button variant="outline" size="sm" asChild><a href={`http://localhost:5002/${getTechDoc('CP_ESTIMATE').fileUrl}`} target="_blank"><IconDownload size={14} className="mr-2" /> Télécharger</a></Button>
                             </div>
                         ) : <div className="p-3 border border-dashed rounded-lg text-center text-sm text-muted-foreground">⚠️ Aucune estimation Excel.</div>}
                     </div>
@@ -456,7 +494,8 @@ export function ProjectEditDrawer({ item }: { item: any }) {
         }
 
         if ((userPermissions.includes('manage_assigned_projects') || isAssignedPM) && isToPrepare) {
-            return <div className="flex gap-2 w-full"><Button onClick={(e) => { if (fileEstimate) handleSubmitEstimate(); handleSubmit(e); }} disabled={loading} className="flex-1 bg-blue-600 hover:bg-blue-700">{isUploadingFiles ? "Upload..." : "Sauvegarder Données"}</Button></div>;
+            // ✅ Clean footer since actions are inside
+            return <Button variant="outline" className="w-full">Fermer</Button>;
         }
 
         if (userRole === 'ADMIN' && isFeasibilityPending) {

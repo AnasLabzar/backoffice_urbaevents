@@ -1,7 +1,10 @@
-// src/graphql/typeDefs.ts
 import { gql } from 'apollo-server-express';
 
 export const typeDefs = gql`
+  scalar Upload
+
+  # --- ENTITY TYPES ---
+
   type User {
     id: ID!
     name: String!
@@ -31,7 +34,45 @@ export const typeDefs = gql`
     givenAt: String!
   }
 
-type Project {
+  # ✅ MODIFIED: Invoice Architecture
+  type InvoiceItem {
+    id: ID!
+    invoice: ID!
+    project: ID
+    
+    # Content Snapshot
+    category: String!
+    subCategory: String
+    designation: String!
+    description: String
+    unit: String
+    
+    # Financials
+    quantity: Float!
+    unitPrice: Float!
+    totalPrice: Float!
+    
+    createdAt: String
+    updatedAt: String
+  }
+
+  type Invoice {
+    id: ID!
+    project: ID!
+    type: String!        
+    reference: String!   
+    status: String!      
+    
+    # ✅ Items are now explicit objects
+    items: [InvoiceItem]
+    
+    totalAmount: Float
+    createdBy: User
+    createdAt: String
+    updatedAt: String
+  }
+
+  type Project {
     id: ID!
     projectCode: String!
     projectType: String!
@@ -53,7 +94,12 @@ type Project {
     feasibilityChecks: FeasibilityChecks!
     proposalAvis: ProposalAvis
     caution: Caution!
-    prestations: [Prestation] # ✅ Ajout de ce champ virtuel
+    
+    # Computed / Linked fields
+    prestations: [Prestation] 
+    invoices: [Invoice]
+    brief: ProjectBrief
+    
     marketEstimate: Float
     estimatedBudget: Float
     
@@ -61,21 +107,21 @@ type Project {
     finalSubmission: String
 
     aiSummary: AiSummary
-
-    brief: ProjectBrief
   }
 
+  # ✅ MODIFIED: Prestation is now just a Catalog Item
   type Prestation {
     id: ID!
-    project: ID!
-    name: String!
-    description: String
+    project: ID
     category: String!
-    quantity: Int!
-    unitPrice: Float!
-    totalPrice: Float!
-    status: String!
-    createdAt: String!
+    subCategory: String
+    designation: String! # Name in DB
+    name: String         # Alias for frontend compatibility
+    description: String
+    unit: String
+    unitPrice: Float     # Default Price
+    supplier: String
+    createdAt: String
   }
 
   type Stages {
@@ -108,24 +154,6 @@ type Project {
     createdAt: String!
   }
 
-  input CreateSupplierInput {
-    name: String!
-    category: String!
-    contactName: String!
-    email: String!
-    phone: String!
-    address: String
-  }
-
-  input UpdateSupplierInput {
-    name: String
-    category: String
-    contactName: String
-    email: String
-    phone: String
-    address: String
-  }
-
   type FeasibilityChecks {
     administrative: String!
     technical: String!
@@ -142,25 +170,7 @@ type Project {
     infographistes: [User!]!
     team3D: [User!]!
     coordinators: [User!]! 
-    pmJuniors: [User!]!   
-  }
-
-  input AddPrestationInput {
-    projectId: ID!
-    name: String!
-    category: String! # RH, AUDIO_VISUELLE, HEBERGEMENT, etc.
-    description: String
-    quantity: Int
-    unitPrice: Float
-  }
-
-  input UpdatePrestationInput {
-    name: String
-    category: String
-    description: String
-    quantity: Int
-    unitPrice: Float
-    status: String
+    pmJuniors: [User!]!    
   }
 
   type ProjectBriefRequirements {
@@ -177,10 +187,8 @@ type Project {
   type ProjectBrief {
     id: ID!
     project: ID!
-    
     clientName: String
     clientNature: String
-    
     projectName: String
     eventFormat: String
     toneStyle: String
@@ -191,7 +199,6 @@ type Project {
     endDate: String
     durationDays: Int
     estimatedBudget: Float
-    
     eventGoal: String
     targetAudience: [String]
     mainObjective: String
@@ -200,10 +207,8 @@ type Project {
     themeConcept: String
     themeDeclination: String
     constraints: String
-    
     requirements: ProjectBriefRequirements
     spaces: [String]
-    
     updatedAt: String
   }
 
@@ -240,7 +245,79 @@ type Project {
     user: User!
   }
 
+  type AiSummary {
+    summary: String
+    thematic: String
+    risks: [String]
+    generatedAt: String
+  }
+
+  type Notification {
+    id: ID!
+    level: NotificationLevel!
+    message: String!
+    link: String
+    createdAt: String!
+    isRead: Boolean 
+  }
+
+  enum NotificationLevel {
+    INFO
+    STANDARD
+    IMPORTANT
+    URGENT
+    DEADLINE
+  }
+
   # --- INPUTS ---
+
+  # ✅ NEW: Input for creating an Invoice Item
+  input AddInvoiceItemInput {
+    invoiceId: ID!
+    projectId: ID
+    category: String!
+    subCategory: String
+    name: String!       # Maps to designation
+    description: String
+    quantity: Float!
+    unitPrice: Float!
+  }
+
+  input CreateSupplierInput {
+    name: String!
+    category: String!
+    contactName: String!
+    email: String!
+    phone: String!
+    address: String
+  }
+
+  input UpdateSupplierInput {
+    name: String
+    category: String
+    contactName: String
+    email: String
+    phone: String
+    address: String
+  }
+
+  input AddPrestationInput {
+    projectId: ID!
+    name: String!
+    category: String!
+    description: String
+    unit: String
+    unitPrice: Float
+  }
+
+  input UpdatePrestationInput {
+    name: String
+    category: String
+    description: String
+    unit: String
+    unitPrice: Float
+  }
+
   input ProjectBriefRequirementsInput {
     logistics: String
     accommodation: String
@@ -295,8 +372,6 @@ type Project {
     title: String
     object: String
     status: String
-    
-    # ✅ AJOUTEZ CES DEUX LIGNES :
     marketEstimate: Float
     estimatedBudget: Float
   }
@@ -328,13 +403,11 @@ type Project {
     department: String!
     dueDate: String
   }
-  
-  # --- NEW INPUT FOR DYNAMIC PM ASSIGNMENT ---
+   
   input DynamicPMAssignmentInput {
     projectId: ID!
     newPmId: ID!
   }
-  # -------------------------------------------
 
   input CreateUserInput {
     name: String!
@@ -348,45 +421,54 @@ type Project {
     permissions: [String!]!
   }
 
-  # Zid had l-input jdid (foq l-Query)
   input ProjectFilterInput {
     preparationStatus: String
   }
 
-  type AiSummary {
-    summary: String
-    thematic: String
-    risks: [String]
-    generatedAt: String
-  }
+  # --- QUERY ---
 
   type Query {
     me: User
     users(role: String, roles: [String!]): [User!] 
     projects_proposals: [Project!]
-    
     projects(filter: ProjectFilterInput): [Project!]
+    
     suppliers: [Supplier!]
     supplier(id: ID!): Supplier
+    
     projects_feed: [ProjectFeedItem!]
     project(id: ID!): Project
+    
     tasksByProject(projectId: ID!): [Task!]
-    logs(projectId: ID): [ActivityLog!]
     myTasks: [Task!]
     allTasks: [Task!]
+    
+    logs(projectId: ID): [ActivityLog!]
     myNotifications: [Notification!]
+    
     getProjectBrief(projectId: ID!): ProjectBrief
+    getProjectEstimation(projectId: ID!): Invoice
+    
+    getInvoiceItems(invoiceId: ID!): [InvoiceItem]
+    getPrestationCatalog: [String]
+    searchPrestation(category: String, subCategory: String, search: String): [Prestation]
+
+    # Legacy / Catalog Queries
     prestationsByProject(projectId: ID!): [Prestation!]!
   }
 
+  # --- MUTATION ---
+
   type Mutation {
+    # Auth
     register(name: String!, email: String!, password: String!): AuthPayload!
     login(email: String!, password: String!): AuthPayload!
-    updateProject(id: ID!, input: UpdateProjectInput!): Project!
 
+    # Projects
+    updateProject(id: ID!, input: UpdateProjectInput!): Project!
     generateCPSSummary(projectId: ID!): Project
     
-    # Proposal Manager
+    # Proposal
     proposal_createProject(input: CreateProjectInput!): Project!
     proposal_uploadDocument(
       projectId: ID!
@@ -396,11 +478,25 @@ type Project {
       originalFileName: String!
     ): Project!
     proposal_submitForReview(projectId: ID!): Project!
-
+    
+    # Suppliers
     createSupplier(input: CreateSupplierInput!): Supplier!
     updateSupplier(id: ID!, input: UpdateSupplierInput!): Supplier!
     deleteSupplier(id: ID!): Boolean
     
+    # Prestations (Catalog)
+    addPrestation(input: AddPrestationInput!): Prestation!
+    updatePrestation(id: ID!, input: UpdatePrestationInput!): Prestation!
+    deletePrestation(id: ID!): Boolean
+    
+    # ✅ NEW: Invoicing Mutations
+    addInvoiceItem(input: AddInvoiceItemInput!): InvoiceItem!
+    deleteInvoiceItem(id: ID!): Boolean
+    importPrestationsFromExcel(projectId: ID!, invoiceId: ID!, fileUrl: String!): [InvoiceItem] # Updated return type
+
+    # Brief
+    saveProjectBrief(input: ProjectBriefInput!): ProjectBrief!
+
     # Admin
     admin_createUser(input: CreateUserInput!): User!
     admin_createRole(input: CreateRoleInput!): Role!
@@ -409,18 +505,15 @@ type Project {
     admin_updateProjectStage(projectId: ID!, stage: String!, status: String!): Project!
     admin_runFeasibility(input: AdminFeasibilityInput!): Project!
     admin_launchProject(projectId: ID!): Project!
-    
-    # --- NEW MUTATION: DYNAMIC PM ASSIGNMENT ---
     assignDynamicProjectManager(input: DynamicPMAssignmentInput!): Project!
-    # -------------------------------------------
-
-    # Project Manager
+    
+    # Tasks & Project Management
     pm_createTask(input: PMCreateTaskInput!): Task!
     pm_updateTaskStatus(taskId: ID!, status: String!): Task!
     pm_validateStage(projectId: ID!, stage: String!): Project!
     giveProposalAvis(projectId: ID!, status: String!, reason: String): Project!
     
-    # CP
+    # CP & Uploads
     cp_uploadEstimate(projectId: ID!, fileUrl: String!, originalFileName: String!): Project!
     cp_assignTeam(input: CPAssignTeamInput!): Project!
     cp_uploadFinalOffer(projectId: ID!, fileUrl: String!, originalFileName: String!): Project!
@@ -432,46 +525,20 @@ type Project {
     # Assistant
     assistant_uploadMethodology(projectId: ID!, fileUrl: String!, originalFileName: String!): Project!
     
-    # Team
+    # Team Uploads
     team_uploadTaskV1(taskId: ID!, fileUrl: String!, originalFileName: String!): Task!
     team_uploadTaskFinal(taskId: ID!, fileUrl: String!, originalFileName: String!): Task!
 
     # Notifications
     markNotificationAsRead(notificationId: ID!): Notification
     markAllNotificationsAsRead: Boolean
-
-    addPrestation(input: AddPrestationInput!): Prestation!
-    updatePrestation(id: ID!, input: UpdatePrestationInput!): Prestation!
-    deletePrestation(id: ID!): Boolean
-
-    saveProjectBrief(input: ProjectBriefInput!): ProjectBrief!
   }
 
-  # Zid f Subscription
+  # --- SUBSCRIPTION ---
+
   type Subscription {
     taskCreated(userId: ID!): Task
     taskUpdated: Task
-    # HADI L-JDIDA L-MOHIMMA
     newNotification(userId: ID!): Notification
-  }
-
-  # Zid had l-Type l-jdid
-  type Notification {
-    id: ID!
-    level: NotificationLevel!
-    message: String!
-    link: String
-    createdAt: String!
-    # Check wach l-user l-current qraha wla mazal
-    isRead: Boolean 
-  }
-
-  # Zid had l-Enum l-jdid
-  enum NotificationLevel {
-    INFO
-    STANDARD
-    IMPORTANT
-    URGENT
-    DEADLINE
   }
 `;

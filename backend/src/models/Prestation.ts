@@ -1,68 +1,49 @@
 import mongoose, { Document, Schema } from 'mongoose';
-import { IProject } from './Project';
 
 export interface IPrestation extends Document {
-    project: IProject['_id'];
-    name: string; // Ex: "Location Écran LED"
-    description?: string; // Ex: "5m x 3m P3.9"
-    category:
-    | 'RESSOURCES_HUMAINES'
-    | 'AUDIO_VISUELLE'
-    | 'HEBERGEMENT'
-    | 'RESTAURATION'
-    | 'TRANSPORT'
-    | 'LOGISTIQUE'
-    | 'COMMUNICATION_DIGITAL'
-    | 'ANIMATION'
-    | 'AUTRE';
-
-    quantity: number;
-    unitPrice: number;
-    totalPrice: number; // Calculated
-    status: 'PENDING' | 'VALIDATED' | 'COMPLETED' | 'CANCELLED';
-
-    createdAt: Date;
-    updatedAt: Date;
+  project?: mongoose.Types.ObjectId; // Optional: Si lié à un projet spécifique
+  
+  // Catalog Data
+  category: string; 
+  subCategory: string; 
+  designation: string; 
+  description?: string;
+  unit: string;
+  unitPrice: number; // Prix Standard (Reference)
+  supplier?: string;
+  
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 const PrestationSchema: Schema = new Schema(
-    {
-        project: { type: Schema.Types.ObjectId, ref: 'Project', required: true },
-        name: { type: String, required: true },
-        description: { type: String },
-        category: {
-            type: String,
-            enum: [
-                'RESSOURCES_HUMAINES',
-                'AUDIO_VISUELLE',
-                'HEBERGEMENT',
-                'RESTAURATION',
-                'TRANSPORT',
-                'LOGISTIQUE',
-                'COMMUNICATION_DIGITAL',
-                'ANIMATION',
-                'AUTRE'
-            ],
-            default: 'AUTRE',
-            required: true
-        },
-        quantity: { type: Number, default: 1 },
-        unitPrice: { type: Number, default: 0 },
-        // On peut stocker le total ou le calculer à la volée. Stockons-le pour faciliter les requêtes.
-        totalPrice: { type: Number, default: 0 },
-        status: {
-            type: String,
-            enum: ['PENDING', 'VALIDATED', 'COMPLETED', 'CANCELLED'],
-            default: 'PENDING'
-        }
+  {
+    project: { type: Schema.Types.ObjectId, ref: 'Project', required: false },
+    // Invoice link REMOVED (Catalog shouldn't know about Invoices)
+    
+    category: { 
+      type: String, 
+      required: true,
+      enum: [
+        'RESSOURCES_HUMAINES', 'AUDIO_VISUELLE', 'HEBERGEMENT', 'RESTAURATION', 
+        'TRANSPORT', 'LOGISTIQUE', 'COMMUNICATION_DIGITAL', 'ANIMATION', 
+        'AUTRE', 'AMENAGEMENT_ESPACE', 'STRUCTURE'
+      ] 
     },
-    { timestamps: true }
+    subCategory: { type: String, default: 'Divers' }, 
+    
+    designation: { type: String, required: true },
+    description: { type: String },
+    
+    unit: { type: String, default: 'U' },
+    unitPrice: { type: Number, required: true, default: 0 }, // Prix catalogue
+    
+    supplier: { type: String }
+  },
+  { timestamps: true }
 );
 
-// Petit Hook pour calculer le total avant de sauvegarder
-PrestationSchema.pre<IPrestation>('save', function (next) {
-    this.totalPrice = this.quantity * this.unitPrice;
-    next();
-});
+// ✅ FIX: Explicit Type Casting
+const PrestationModel: mongoose.Model<IPrestation> = mongoose.models.Prestation || mongoose.model<IPrestation>('Prestation', PrestationSchema);
 
-export default mongoose.model<IPrestation>('Prestation', PrestationSchema);
+export default PrestationModel;

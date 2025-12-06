@@ -80,7 +80,7 @@ export function TaskChecklistPanel({ project }: { project: any }) {
             const formDataRest = new FormData();
             formDataRest.append('file', file);
             toast.loading(`Upload en cours...`);
-            const response = await fetch(`https://backoffice.urbagroupe.ma/api/upload/${project.id}`, { method: 'POST', body: formDataRest });
+            const response = await fetch(`http://localhost:5002/api/upload/${project.id}`, { method: 'POST', body: formDataRest });
             if (!response.ok) throw new Error('Upload failed.');
             const result = await response.json();
             toast.dismiss();
@@ -195,7 +195,7 @@ export function TaskChecklistPanel({ project }: { project: any }) {
                                                     )}
                                                     <div className="space-y-2">
                                                         {task.v1Uploads.map((upload: any) => (
-                                                            <a key={upload.id} href={`https://backoffice.urbagroupe.ma/${upload.fileUrl}`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-2 rounded border hover:bg-muted/50 transition-colors group">
+                                                            <a key={upload.id} href={`http://localhost:5002/${upload.fileUrl}`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-2 rounded border hover:bg-muted/50 transition-colors group">
                                                                 <div className="flex items-center gap-2 overflow-hidden">
                                                                     <IconUpload className="h-4 w-4 text-blue-500 flex-shrink-0" />
                                                                     <span className="text-sm truncate">{upload.originalFileName}</span>
@@ -205,7 +205,7 @@ export function TaskChecklistPanel({ project }: { project: any }) {
                                                             </a>
                                                         ))}
                                                         {task.finalUpload && (
-                                                            <a href={`https://backoffice.urbagroupe.ma/${task.finalUpload.fileUrl}`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-2 rounded border border-green-200 bg-green-50/50 dark:bg-green-900/10 hover:bg-green-100/50 transition-colors group">
+                                                            <a href={`http://localhost:5002/${task.finalUpload.fileUrl}`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-2 rounded border border-green-200 bg-green-50/50 dark:bg-green-900/10 hover:bg-green-100/50 transition-colors group">
                                                                 <div className="flex items-center gap-2 overflow-hidden">
                                                                     <IconCircleCheck className="h-4 w-4 text-green-600 flex-shrink-0" />
                                                                     <span className="text-sm truncate font-medium">{task.finalUpload.originalFileName}</span>

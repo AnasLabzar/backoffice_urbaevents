@@ -2,19 +2,14 @@ import mongoose, { Document, Schema } from 'mongoose';
 import { IUser } from './User';
 import DocumentModel, { IDocument } from './Document';
 
-// --- L-SCHEMA DYAL L-AVIS ---
+// --- SUB-SCHEMAS ---
 const ProposalAvisSchema: Schema = new Schema({
-  status: {
-    type: String,
-    enum: ['ACCEPTED', 'NOT_ACCEPTED'],
-    required: true
-  },
+  status: { type: String, enum: ['ACCEPTED', 'NOT_ACCEPTED'], required: true },
   reason: { type: String },
   givenBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   givenAt: { type: Date, default: Date.now }
 });
 
-// --- L-INTERFACE DYAL L-AVIS ---
 export interface IProposalAvis extends Document {
   status: 'ACCEPTED' | 'NOT_ACCEPTED';
   reason?: string;
@@ -23,7 +18,6 @@ export interface IProposalAvis extends Document {
 }
 
 type StageStatus = 'TODO' | 'IN_PROGRESS' | 'DONE' | 'SKIPPED';
-
 const StageSchema = new Schema({
   status: { type: String, enum: ['TODO', 'IN_PROGRESS', 'DONE', 'SKIPPED'], default: 'TODO' },
   deadline: { type: Date, required: false },
@@ -31,38 +25,19 @@ const StageSchema = new Schema({
   documents: [{ type: Schema.Types.ObjectId, ref: 'Document' }]
 });
 
-// --- L-Status dyal l-Workflow ---
-type PreparationStatus =
-  | 'DRAFT'
-  | 'TO_CONFIRM'
-  | 'TO_PREPARE'
-  | 'FEASIBILITY_PENDING'
-  | 'CAUTION_PENDING'
-  | 'IN_PRODUCTION'
-  | 'FINAL_REVIEW'
-  | 'DONE'
-  | 'NO';
-
-// --- INTERFACE AI SUMMARY ---
-interface IAiSummary {
-  summary: string;
-  thematic: string;
-  risks: string[];
-  generatedAt: Date;
-}
-
+// --- MAIN PROJECT INTERFACE ---
 export interface IProject extends Document {
-  // 1. Type & ID
   projectCode: string;
   projectType: 'PUBLIC_TENDER' | 'CONFIRMED' | 'INTERNAL';
   createdBy: IUser['_id'];
-  endDate?: Date;
-
-  // 2. Proposal Details
   title: string;
 
-  // ✅ AJOUT DANS L'INTERFACE (TypeScript)
-  aiSummary?: IAiSummary;
+  aiSummary?: {
+    summary: string;
+    thematic: string;
+    risks: string[];
+    generatedAt: Date;
+  };
 
   object: string;
   referenceAO: string;
@@ -74,59 +49,35 @@ export interface IProject extends Document {
   marketEstimate: Number;
   cautionAmount: Number;
 
-  // 3. Management Details
-  preparationStatus: PreparationStatus;
+  preparationStatus: string;
   projectManagers: IUser['_id'][];
   assignedTeam: IUser['_id'][];
-
-  // 4. Workflow & Status
   generalStatus: 'IN_PROGRESS' | 'DONE' | 'CANCELED';
   currentStage: string;
 
-  stages: {
-    administrative: { status: StageStatus, responsible: string[], documents: IDocument[] };
-    technical: { status: StageStatus, responsible: string[], documents: IDocument[] };
-    technicalOffer: { status: StageStatus, responsible: string[], documents: IDocument[] };
-    financialOffer: { status: StageStatus, responsible: string[], documents: IDocument[] };
-    printing: { status: StageStatus };
-    workshop: { status: StageStatus };
-    field: { status: StageStatus };
-    logistics: { status: StageStatus };
-  };
-
-  // L-Checks dyal l-Admin
-  feasibilityChecks: {
-    administrative: 'PENDING' | 'PASS' | 'FAIL';
-    technical: 'PENDING' | 'PASS' | 'FAIL';
-    financial: 'PENDING' | 'PASS' | 'FAIL';
-  };
-
-  // --- L-AVIS L-JDID ---
+  stages: any; // Simplified for brevity, kept structure in Schema
+  feasibilityChecks: any;
   proposalAvis?: IProposalAvis;
 
-  // L-Khdma dyal Safia (Finance)
   caution: {
     status: 'PENDING' | 'REQUESTED';
     requestedBy?: IUser['_id'];
     requestedAt?: Date;
   };
 
-  // L-Équipe li 3zl l-CP
   team: {
     infographistes: IUser['_id'][];
     team3D: IUser['_id'][];
-    coordinators: IUser['_id'][]; // 🔄 Renommé (ex-coordinators)
-    pmJuniors: IUser['_id'][];    // ✅ Ajouté
+    coordinators: IUser['_id'][];
+    pmJuniors: IUser['_id'][];
   };
 
-  // Fichiers l-finaliyin
   finalSubmission?: { type: Object, required: false };
-
-  // --- FIX: Explicitly add Timestamps to Interface ---
   createdAt: Date;
   updatedAt: Date;
 }
 
+// --- MAIN PROJECT SCHEMA ---
 const ProjectSchema: Schema = new Schema(
   {
     projectCode: { type: String, required: true, unique: true },
@@ -134,7 +85,6 @@ const ProjectSchema: Schema = new Schema(
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     title: { type: String, required: true },
 
-    // ✅ AJOUT DANS LE SCHEMA (MongoDB)
     aiSummary: {
       summary: String,
       thematic: String,
@@ -154,11 +104,7 @@ const ProjectSchema: Schema = new Schema(
 
     preparationStatus: {
       type: String,
-      enum: [
-        'DRAFT', 'TO_CONFIRM', 'TO_PREPARE',
-        'FEASIBILITY_PENDING', 'CAUTION_PENDING', 'IN_PRODUCTION',
-        'FINAL_REVIEW', 'DONE', 'NO'
-      ],
+      enum: ['DRAFT', 'TO_CONFIRM', 'TO_PREPARE', 'FEASIBILITY_PENDING', 'CAUTION_PENDING', 'IN_PRODUCTION', 'FINAL_REVIEW', 'DONE', 'NO'],
       default: 'DRAFT'
     },
 
@@ -169,13 +115,7 @@ const ProjectSchema: Schema = new Schema(
 
     stages: {
       administrative: { ...StageSchema.obj, responsible: { type: [String], default: ['PROPOSAL_MANAGER'] } },
-      technical: {
-        // Zidna l-possible PM l-jddad ila kan 3ndhom chi rôle f technical stage
-        ...StageSchema.obj,
-        responsible: {
-          type: [String], default: ['PROPOSAL_MANAGER', 'PROJECT_MANAGER', 'ASSISTANT_PM', 'COORDINATOR', 'DIRECTOR_EVENT', 'IT_MANAGER']
-        }
-      },
+      technical: { ...StageSchema.obj, responsible: { type: [String], default: ['PROPOSAL_MANAGER', 'PROJECT_MANAGER', 'ASSISTANT_PM', 'COORDINATOR', 'DIRECTOR_EVENT', 'IT_MANAGER'] } },
       technicalOffer: { ...StageSchema.obj, responsible: { type: [String], default: ['PROJECT_MANAGER', 'COORDINATOR', 'DIRECTOR_EVENT', 'IT_MANAGER'] } },
       financialOffer: { ...StageSchema.obj, responsible: { type: [String], default: ['PROPOSAL_MANAGER', 'PROJECT_MANAGER', 'COORDINATOR'] } },
       printing: StageSchema,
@@ -190,7 +130,6 @@ const ProjectSchema: Schema = new Schema(
       financial: { type: String, enum: ['PENDING', 'PASS', 'FAIL'], default: 'PENDING' }
     },
 
-    // --- L-AVIS L-JDID ---
     proposalAvis: ProposalAvisSchema,
 
     caution: {
@@ -202,11 +141,7 @@ const ProjectSchema: Schema = new Schema(
     team: {
       infographistes: [{ type: Schema.Types.ObjectId, ref: 'User' }],
       team3D: [{ type: Schema.Types.ObjectId, ref: 'User' }],
-
-      // 🔄 Remplacement de 'coordinators' par 'coordinators'
       coordinators: [{ type: Schema.Types.ObjectId, ref: 'User' }],
-
-      // ✅ Ajout de 'pmJuniors'
       pmJuniors: [{ type: Schema.Types.ObjectId, ref: 'User' }]
     },
 
@@ -215,4 +150,7 @@ const ProjectSchema: Schema = new Schema(
   { timestamps: true }
 );
 
-export default mongoose.model<IProject>('Project', ProjectSchema);
+// ✅ FIX: Explicit Type Casting
+const ProjectModel: mongoose.Model<IProject> = mongoose.models.Project || mongoose.model<IProject>('Project', ProjectSchema);
+
+export default ProjectModel;

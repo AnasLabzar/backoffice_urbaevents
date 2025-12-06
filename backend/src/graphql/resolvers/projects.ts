@@ -8,9 +8,9 @@ import { logActivity } from '../../utils/logger';
 import { createNotification } from '../../utils/notifications';
 import { NotificationLevel } from '../../models/Notification';
 import { pubsub, NEW_TASK_EVENT } from '../../utils/pubsub';
-import path from 'path'; // <--- ZID HADI L-FOUQ
+import path from 'path';
 import {
-    checkPermission, defaultUser, handleUpload, stagePopulates,
+    checkPermission, handleUpload, stagePopulates,
     teamPopulates, userSelect, buildProjectFilter, isDynamicPmCandidate,
     getRoleUserIds, patchProjectUsers
 } from './helpers';
@@ -56,7 +56,6 @@ export const projectResolvers = {
                 .populate({ path: 'assignedTeam', select: userSelect })
                 .populate({ path: 'proposalAvis.givenBy', select: userSelect });
 
-            // ✅ FIX COMPLEXITY: On cast 'projectQuery' as any pour éviter l'erreur TS2590
             for (const p of stagePopulates) projectQuery = (projectQuery as any).populate(p);
             for (const p of teamPopulates) projectQuery = (projectQuery as any).populate(p);
 
@@ -86,7 +85,6 @@ export const projectResolvers = {
                 .populate({ path: 'assignedTeam', select: userSelect })
                 .populate({ path: 'proposalAvis.givenBy', select: userSelect });
 
-            // ✅ FIX COMPLEXITY
             for (const p of stagePopulates) projectQuery = (projectQuery as any).populate(p);
             for (const p of teamPopulates) projectQuery = (projectQuery as any).populate(p);
 
@@ -168,7 +166,6 @@ export const projectResolvers = {
                 .populate({ path: 'assignedTeam', select: userSelect })
                 .populate({ path: 'proposalAvis.givenBy', select: userSelect });
 
-            // ✅ FIX COMPLEXITY
             for (const p of stagePopulates) q = (q as any).populate(p);
             for (const p of teamPopulates) q = (q as any).populate(p);
 
@@ -198,8 +195,6 @@ export const projectResolvers = {
 
             const newPm = updatedProject.projectManagers.find(pm => (pm as any)._id.toString() === newPmId);
 
-            // ✅ FIX: logActivity prend un objet, pas 4 arguments
-            // ✅ FIX: newPm?.name avec 'as any' pour éviter l'erreur TS
             await logActivity({
                 userId: context.user!.id as any,
                 details: `Assigned new dynamic PM: ${(newPm as any)?.name || newPmId}`,
@@ -207,10 +202,9 @@ export const projectResolvers = {
                 project: projectId
             });
 
-            // ✅ FIX: Structure standardisée (message, userIds)
             await createNotification({
-                userIds: [newPmId], // 'users' -> 'userIds'
-                message: `You have been assigned as Project Manager for project ${updatedProject.title}.`, // 'title' + 'body' -> 'message'
+                userIds: [newPmId],
+                message: `You have been assigned as Project Manager for project ${updatedProject.title}.`,
                 level: NotificationLevel.IMPORTANT,
                 project: projectId,
                 link: `/dashboard/projects/${projectId}`
@@ -272,19 +266,13 @@ export const projectResolvers = {
             const newDocument = await handleUpload(fileUrl, originalFileName, docType, context.user!.id);
             ((project.stages as any)[stageName].documents as any).push(newDocument._id);
 
-            // =========================================================
-            // ✅ START: ANALYSE PDF CONTENU
-            // =========================================================
             const isCPS = docType.includes('CPS') || originalFileName.toLowerCase().includes('cps');
 
             if (isCPS) {
                 console.log("🤖 CPS détecté, analyse contextuelle IA...");
-
                 const absoluteFilePath = path.join(process.cwd(), newDocument.fileUrl);
 
                 try {
-                    // 👇 C'EST ICI QUE TU AVAIS L'ERREUR
-                    // On ajoute 'project.title' et 'project.object'
                     const analysis = await aiService.analyzeCPSPDF(
                         absoluteFilePath,
                         project.title,
@@ -302,9 +290,8 @@ export const projectResolvers = {
                     console.error("⚠️ Echec analyse IA:", err);
                 }
             }
-            // =========================================================
 
-            await project.save(); // Hna fin kay-tsjel kolchi (Doc + AI Summary)
+            await project.save();
 
             await logActivity({
                 userId: context.user!.id as any,
@@ -389,9 +376,10 @@ export const projectResolvers = {
                 });
             }
 
-            // Logic de création de tâches (simplifié pour TS)
             if (projectManagerIds && projectManagerIds.length > 0) {
-                const projectEndDate = project.endDate ? new Date(project.endDate) : null;
+                // ✅ FIX: Casting 'project' as 'any' to avoid TS2339 error on 'endDate'
+                // This ensures compilation works even if IProject interface isn't fully updated in all contexts
+                const projectEndDate = (project as any).endDate ? new Date((project as any).endDate) : null;
                 const generalTaskDescription = `Suivi et gestion générale du projet "${project.title}"`;
                 const tasksToPublish = [];
 
@@ -568,7 +556,7 @@ export const projectResolvers = {
                 reason: status === 'NOT_ACCEPTED' ? reason : undefined,
                 givenBy: context.user.id as any,
                 givenAt: new Date(),
-            } as any; // ✅ ZID HADI (as any)
+            } as any;
 
             if (status === 'ACCEPTED') {
                 project.preparationStatus = 'FEASIBILITY_PENDING';
@@ -606,7 +594,6 @@ export const projectResolvers = {
             }
 
             const newDocument = await handleUpload(fileUrl, originalFileName, 'CP_ESTIMATE', context.user!.id);
-            // ✅ FIX: Cast pour push
             (project.stages.technical.documents as any).push(newDocument._id);
 
             await logActivity({ userId: context.user!.id as any, action: 'CP_UPLOAD_ESTIMATE', project: project._id, details: `Estimation uploadée` });
@@ -627,7 +614,6 @@ export const projectResolvers = {
         },
 
         cp_assignTeam: async (_: unknown, { input }: any, context: IContext) => {
-            // On déstructure les nouveaux champs
             const { projectId, infographisteIds, team3DIds, coordinatorIds, pmJuniorIds } = input;
 
             const project = await Project.findById(projectId);
@@ -636,14 +622,11 @@ export const projectResolvers = {
             const canAccess = await checkPMAccess(context, project, 'assign_creative_tasks');
             if (!canAccess) throw new ApolloError('Forbidden', 'FORBIDDEN');
 
-            // Mise à jour de l'objet Team
             project.team.infographistes = infographisteIds || [];
             project.team.team3D = team3DIds || [];
-            project.team.coordinators = coordinatorIds || []; // 🔄 Updated
-            project.team.pmJuniors = pmJuniorIds || [];       // ✅ Added
+            project.team.coordinators = coordinatorIds || [];
+            project.team.pmJuniors = pmJuniorIds || [];
 
-            // Mise à jour de la liste globale (pour les permissions/visibilité)
-            // On combine tous les tableaux et on enlève les doublons
             const allIds = [...new Set([
                 ...infographisteIds,
                 ...team3DIds,
@@ -662,7 +645,6 @@ export const projectResolvers = {
 
             await project.save();
 
-            // Notification (Optionnelle)
             if (allIds.length > 0) {
                 await createNotification({
                     userIds: allIds,
@@ -681,7 +663,6 @@ export const projectResolvers = {
             if (!project) throw new ApolloError('Project not found');
 
             const newDocument = await handleUpload(fileUrl, originalFileName, 'FINAL_OFFER_TECH', context.user!.id);
-            // ✅ FIX: Cast pour push
             (project.stages.technicalOffer.documents as any).push(newDocument._id);
 
             await logActivity({
@@ -700,7 +681,6 @@ export const projectResolvers = {
             if (!project) throw new ApolloError('Project not found');
 
             const newDocument = await handleUpload(fileUrl, originalFileName, 'ASSET', context.user!.id);
-            // ✅ FIX: Cast pour push
             (project.stages.technical.documents as any).push(newDocument._id);
 
             await logActivity({
@@ -737,7 +717,6 @@ export const projectResolvers = {
             const project = await Project.findById(projectId);
             if (!project) throw new ApolloError('Project not found');
             project.caution.status = 'REQUESTED';
-            // ✅ FIX: Cast to any
             project.caution.requestedBy = context.user!.id as any;
             project.caution.requestedAt = new Date();
             project.preparationStatus = 'IN_PRODUCTION';
@@ -774,7 +753,6 @@ export const projectResolvers = {
             if (!project) throw new ApolloError('Project not found');
 
             const newDocument = await handleUpload(fileUrl, originalFileName, 'METHODOLOGY', context.user!.id);
-            // ✅ FIX: Cast pour push
             (project.stages.technical.documents as any).push(newDocument._id);
 
             await logActivity({
@@ -787,16 +765,20 @@ export const projectResolvers = {
             return project;
         },
     },
-    // ✅ AJOUTE CECI POUR LIER LES DEUX
+
+    // ✅ Field Resolvers
     Project: {
         prestations: async (parent: any) => {
-            // Import Prestation ici ou en haut
             const PrestationModel = require('../../models/Prestation').default;
             return await PrestationModel.find({ project: parent._id || parent.id });
         },
         brief: async (parent: any) => {
             const BriefModel = require('../../models/ProjectBrief').default;
             return await BriefModel.findOne({ project: parent._id || parent.id });
+        },
+        invoices: async (parent: any) => {
+            const InvoiceModel = require('../../models/Invoice').default;
+            return await InvoiceModel.find({ project: parent._id || parent.id }).sort({ createdAt: -1 });
         }
     }
 };

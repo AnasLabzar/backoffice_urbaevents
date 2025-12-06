@@ -269,7 +269,7 @@ function FileDownloads({ task }: { task: Task }) {
       {task.v1Uploads.map((file) => (
         <a
           key={file.id}
-          href={`https://backoffice.urbagroupe.ma/${file.fileUrl}`}
+          href={`http://localhost:5002/${file.fileUrl}`}
           target="_blank"
           rel="noopener noreferrer"
           title={`Télécharger ${file.originalFileName}`}
@@ -282,7 +282,7 @@ function FileDownloads({ task }: { task: Task }) {
       ))}
       {task.finalUpload && (
         <a
-          href={`https://backoffice.urbagroupe.ma/${task.finalUpload.fileUrl}`}
+          href={`http://localhost:5002/${task.finalUpload.fileUrl}`}
           target="_blank"
           rel="noopener noreferrer"
           title={`Télécharger ${task.finalUpload.originalFileName}`}
