@@ -125,12 +125,11 @@ export function TechnicalDetails({ projectId, projectTitle, initialBudget, initi
     // 6. CALCULS POUR IMPRESSION (TVA, TTC)
     const groupedItems = useMemo(() => {
         if (!itemsData?.getInvoiceItems) return {};
-        return itemsData.getInvoiceItems.reduce((acc: any, item: any) => {
-            const cat = item.category || 'AUTRE';
-            if (!acc[cat]) acc[cat] = [];
-            acc[cat].push(item);
-            return acc;
-        }, {});
+        // Flatten list for this specific invoice template which is a simple list
+        // If grouping is needed later, logic can be adjusted.
+        // For now, let's keep it as a flat list sorted by category or creation if needed, 
+        // but the PDF example shows a numbered list.
+        return itemsData.getInvoiceItems;
     }, [itemsData]);
 
     const TVA_RATE = 0.20;
@@ -275,139 +274,160 @@ export function TechnicalDetails({ projectId, projectTitle, initialBudget, initi
                 </div>
             </div>
 
-
             {/* =====================================================================================
                 SECTION IMPRESSION (Visible SEULEMENT à l'impression / PDF)
                ===================================================================================== */}
 
-            <div className="hidden print:block fixed inset-0 bg-white z-[9999] p-0 m-0 w-full h-full text-black overflow-visible">
-                {/* Conteneur A4 Style */}
-                <div className="w-full max-w-[210mm] mx-auto p-10 min-h-screen flex flex-col">
+            <div className="hidden print:block fixed inset-0 bg-white z-[9999] p-0 m-0 w-full h-full text-black font-sans leading-normal">
+                {/* Conteneur A4 Style (Padding ajusté pour impression) */}
+                <div className="w-full h-full p-8 flex flex-col justify-between relative">
 
-                    {/* Header Facture */}
-                    <div className="flex justify-between items-start border-b-2 border-black pb-6 mb-8">
-                        <div className="flex items-center gap-5">
+                    {/* --- HEADER --- */}
+                    <div className="mb-8">
+                        {/* Top Row: Logo & Facture Title */}
+                        <div className="flex justify-between items-start mb-6">
                             {/* Logo */}
-                            <div className="bg-black text-white flex items-center justify-center">
-                                <img
-                                    src="/logo/logo-black-urba-events.png"
-                                    alt="URBA EVENTS BackOffice"
-                                    className="h-12" // Kbrt l-logo chwiya
-                                />
-                            </div>
-                            {/* <div>
-                                <h1 className="text-2xl font-black text-black tracking-tight leading-none mb-1">URBA EVENTS</h1>
-                                <p className="text-[10px] uppercase tracking-[0.2em] text-gray-500 font-bold">Agence Événementielle</p>
-                                <div className="mt-3 text-[9px] text-gray-500 font-medium space-y-0.5">
-                                    <p className="flex items-center gap-1.5"><IconMapPin size={10} /> 123, Boulevard Zerktouni, Casablanca</p>
-                                    <p className="flex items-center gap-1.5"><IconMail size={10} /> contact@urbaevents.ma</p>
-                                    <p className="flex items-center gap-1.5"><IconPhone size={10} /> +212 5 22 00 00 00</p>
+                            <div className="w-1/3">
+                                {/* Using the updated logo image file if available, or fallback to text/icon */}
+                                <img src="/logo/logo-dark-urba-events.png" alt="URBA EVENTS INTERNATIONAL" className="h-16 object-contain" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                                {/* Fallback text if image fails or for SEO */}
+                                <div className="mt-2">
+                                    <img
+                                        src="/logo/logo-dark-urba-events.png"
+                                        alt="URBA EVENTS BackOffice"
+                                        className="h-16" // Kbrt l-logo chwiya
+                                    />
                                 </div>
-                            </div> */}
+                            </div>
+
+                            {/* Facture Box */}
+                            <div className="w-1/3 text-right">
+                                <div className="border-2 border-gray-800 p-2 inline-block min-w-[200px] text-center">
+                                    <h2 className="text-xl font-bold uppercase">DEVIS Estimer</h2>
+                                </div>
+                            </div>
                         </div>
-                        <div className="text-right">
-                            <h2 className="text-3xl font-light text-gray-400 uppercase tracking-wide">ESTIMATION</h2>
-                            <div className="mt-3">
-                                <div className="inline-block bg-gray-100 rounded px-3 py-1 mb-1">
-                                    <span className="text-[10px] uppercase text-gray-500 font-bold mr-2">Référence</span>
-                                    <span className="text-sm font-bold font-mono">{estimationRef}</span>
+
+                        {/* Middle Row: Details & Client */}
+                        <div className="flex justify-between items-start text-xs">
+                            {/* Left: Invoice Details */}
+                            <div className="w-[45%] border border-gray-300 p-3 rounded-sm space-y-1">
+                                <div className="flex justify-between">
+                                    <span className="font-bold">N° Facture:</span>
+                                    <span>{estimationRef}</span>
                                 </div>
-                                <p className="text-[10px] text-gray-400 font-medium">
-                                    Date: {estimationDate ? new Date(parseInt(estimationDate)).toLocaleDateString('fr-FR') : new Date().toLocaleDateString('fr-FR')}
-                                </p>
+                                <div className="flex justify-between">
+                                    <span className="font-bold">Date:</span>
+                                    <span>{estimationDate ? new Date(parseInt(estimationDate)).toLocaleDateString('fr-FR') : new Date().toLocaleDateString('fr-FR')}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="font-bold">Référence:</span>
+                                    <span className="text-align: right; justify-content: end;">{projectTitle}</span> {/* Using project title as reference context */}
+                                </div>
                             </div>
+
+                            {/* Right: Client Details */}
+                            <div className="w-[45%] border border-gray-300 p-3 rounded-sm space-y-1">
+                                <div className="flex justify-between">
+                                    <span className="font-bold">Client:</span>
+                                    <span>Casablanca Events et Animation</span> {/* Placeholder or Dynamic */}
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="font-bold">ICE:</span>
+                                    <span>001630800000095</span> {/* Placeholder or Dynamic */}
+                                </div>
+                                <div className="flex justify-between items-start">
+                                    <span className="font-bold">Adresse:</span>
+                                    <span className="text-right max-w-[150px]">105 Boulevard Anfa, 1 ère étage Casablanca-Maroc</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Object */}
+                        <div className="mt-6 border border-gray-300 p-3 rounded-sm text-xs">
+                            <span className="font-bold underline mb-1 block">Objet:</span>
+                            <p>Supplément de l'Aménagement Et équipements des espaces relatifs à l'organisation de la course du 10 KM International By Wecasablanca</p>
                         </div>
                     </div>
 
-                    {/* Info Projet */}
-                    <div className="mb-8 bg-gray-50/50 p-6 rounded-lg border border-gray-200">
-                        <div className="flex justify-between items-center">
-                            <div>
-                                <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Projet</span>
-                                <p className="text-lg font-bold text-gray-900 mt-1">{projectTitle}</p>
-                            </div>
-                            {/* Placeholder Client */}
-                            <div className="text-right">
-                                <span className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Client</span>
-                                <p className="text-sm font-medium text-gray-900 mt-1">Client Confidentiel</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Tableau des Prestations */}
+                    {/* --- TABLE --- */}
                     <div className="flex-1">
-                        <table className="w-full text-sm">
-                            <thead className="border-b-2 border-black">
-                                <tr className="text-left text-[10px] uppercase tracking-wider font-bold text-gray-500">
-                                    <th className="pb-3 pl-2 w-[45%]">Désignation</th>
-                                    <th className="pb-3 text-center w-[10%]">Unité</th>
-                                    <th className="pb-3 text-center w-[10%]">Qté</th>
-                                    <th className="pb-3 text-right w-[15%]">P.U (HT)</th>
-                                    <th className="pb-3 pr-2 text-right w-[20%]">Total (HT)</th>
+                        <table className="w-full text-xs border-collapse border border-gray-800">
+                            <thead>
+                                <tr className="bg-gray-100 text-center font-bold">
+                                    <th className="border border-gray-600 p-2 w-[5%]">N°</th>
+                                    <th className="border border-gray-600 p-2 w-[50%] text-left">DÉSIGNATION</th>
+                                    <th className="border border-gray-600 p-2 w-[10%]">U</th>
+                                    <th className="border border-gray-600 p-2 w-[10%]">QTE</th>
+                                    <th className="border border-gray-600 p-2 w-[12%]">P.U DH. HT</th>
+                                    <th className="border border-gray-600 p-2 w-[13%]">P.T DH HT</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {Object.entries(groupedItems).map(([cat, items]: [string, any]) => (
-                                    <>
-                                        {/* En-tête de Catégorie */}
-                                        <tr key={cat} className="bg-gray-50/80 break-inside-avoid">
-                                            <td colSpan={5} className="py-2 px-3 font-bold text-[11px] uppercase tracking-wide text-gray-800 mt-4 border-l-2 border-black">
-                                                {cat.replace('_', ' ')}
-                                            </td>
-                                        </tr>
-                                        {/* Items */}
-                                        {items.map((item: any) => (
-                                            <tr key={item.id} className="group break-inside-avoid">
-                                                <td className="py-2.5 pl-2 pr-4 align-top">
-                                                    <div className="font-semibold text-gray-900 text-xs">{item.designation}</div>
-                                                    {item.description && (
-                                                        <div className="text-[9px] text-gray-500 mt-0.5 whitespace-pre-wrap leading-tight">
-                                                            {item.description.startsWith('{') ? "Spécifications techniques incluses" : item.description}
-                                                        </div>
-                                                    )}
-                                                </td>
-                                                <td className="py-2.5 text-center align-top text-gray-500 text-[10px] uppercase">{item.unit || 'U'}</td>
-                                                <td className="py-2.5 text-center align-top font-mono text-xs">{item.quantity}</td>
-                                                <td className="py-2.5 text-right align-top font-mono text-xs text-gray-600">{item.unitPrice.toLocaleString('fr-FR')}</td>
-                                                <td className="py-2.5 pr-2 text-right align-top font-bold font-mono text-xs">{item.totalPrice.toLocaleString('fr-FR')}</td>
-                                            </tr>
-                                        ))}
-                                    </>
+                            <tbody>
+                                {Array.isArray(groupedItems) && groupedItems.map((item: any, index: number) => (
+                                    <tr key={item.id} className="text-center">
+                                        <td className="border border-gray-600 p-2">{index + 1}</td>
+                                        <td className="border border-gray-600 p-2 text-left font-medium">
+                                            {item.designation}
+                                            {item.description && <div className="text-[9px] text-gray-500 font-normal mt-0.5">{item.description}</div>}
+                                        </td>
+                                        <td className="border border-gray-600 p-2">{item.unit || 'U'}</td>
+                                        <td className="border border-gray-600 p-2 font-bold">{item.quantity}</td>
+                                        <td className="border border-gray-600 p-2 text-right">{item.unitPrice.toLocaleString('fr-FR', { minimumFractionDigits: 2 })}</td>
+                                        <td className="border border-gray-600 p-2 text-right font-bold">{item.totalPrice.toLocaleString('fr-FR', { minimumFractionDigits: 2 })}</td>
+                                    </tr>
                                 ))}
+                                {/* Empty rows filler if needed for styling consistency */}
                             </tbody>
                         </table>
                     </div>
 
-                    {/* Totaux & Footer */}
-                    <div className="mt-8 break-inside-avoid">
-                        <div className="flex justify-end">
-                            <div className="w-1/3 bg-gray-50 p-4 rounded-lg space-y-2 border border-gray-100">
-                                <div className="flex justify-between text-xs">
-                                    <span className="text-gray-500 font-medium">Total HT</span>
-                                    <span className="font-bold font-mono">{totalHT.toLocaleString('fr-FR')} MAD</span>
-                                </div>
-                                <div className="flex justify-between text-xs">
-                                    <span className="text-gray-500 font-medium">TVA (20%)</span>
-                                    <span className="font-mono text-gray-600">{totalTVA.toLocaleString('fr-FR')} MAD</span>
-                                </div>
-                                <Separator className="bg-gray-300 my-2" />
-                                <div className="flex justify-between text-base pt-1">
-                                    <span className="font-bold text-gray-900">NET À PAYER</span>
-                                    <span className="font-black font-mono">{totalTTC.toLocaleString('fr-FR')} MAD</span>
-                                </div>
+                    {/* --- TOTALS & SIGNATURE --- */}
+                    <div className="mt-4 flex justify-between items-start text-xs">
+
+                        {/* Signature Box */}
+                        <div className="w-[40%]">
+                            <div className="mb-2 font-bold underline">URBA EVENTS INTERNATIONAL</div>
+                            <div className="h-24 border border-gray-300 rounded-sm p-2 text-gray-400 text-[10px] italic">
+                                Signature et cachet du concurrent
                             </div>
                         </div>
 
-                        {/* Footer Legal */}
-                        <div className="mt-12 pt-6 border-t border-gray-200 text-center">
-                            <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold mb-1">
-                                URBA EVENTS S.A.R.L - Au capital de 100.000 DHS
-                            </p>
-                            <p className="text-[8px] text-gray-400 font-mono">
-                                RC: 123456 • IF: 12345678 • ICE: 000123456789000 • Patente: 12345678 • CNSS: 1234567
-                            </p>
-                            <p className="text-[8px] text-gray-300 mt-2">Document généré automatiquement via Urba Manager le {new Date().toLocaleString()}</p>
+                        {/* Totals Table */}
+                        <div className="w-[40%]">
+                            <table className="w-full border-collapse border border-gray-800 font-bold">
+                                <tbody>
+                                    <tr>
+                                        <td className="border border-gray-600 p-2 bg-gray-50">Total HT</td>
+                                        <td className="border border-gray-600 p-2 text-right">{totalHT.toLocaleString('fr-FR', { minimumFractionDigits: 2 })}</td>
+                                    </tr>
+                                    <tr>
+                                        <td className="border border-gray-600 p-2 bg-gray-50">Tva 20%</td>
+                                        <td className="border border-gray-600 p-2 text-right">{totalTVA.toLocaleString('fr-FR', { minimumFractionDigits: 2 })}</td>
+                                    </tr>
+                                    <tr className="text-sm bg-gray-100">
+                                        <td className="border border-gray-600 p-2">Total TTC</td>
+                                        <td className="border border-gray-600 p-2 text-right">{totalTTC.toLocaleString('fr-FR', { minimumFractionDigits: 2 })}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
                         </div>
+                    </div>
+
+                    {/* --- FOOTER --- */}
+                    <div className="mt-auto pt-6 text-center text-[9px] text-gray-500 font-medium">
+                        <div className="mb-1 font-bold text-[#c2185b] uppercase tracking-wider text-[10px]">
+                            URBA EVENTS INTERNATIONAL • COMMUNICATION • EVENEMENTIEL
+                        </div>
+                        <p>
+                            Adresse: Boulevard Allal El Fassi, Complexe Professionnel du Habous, Tranche 2, Imm B. 2eme étage, Appt N° 11 - MARRAKECH
+                        </p>
+                        <p className="mt-0.5">
+                            GSM: 06 61 24 25 91 • FIXE: 05 24 44 91 15 • Email: contact@urbaevents.com • Site web: www.urbaevents.com
+                        </p>
+                        <p className="mt-0.5 font-mono">
+                            RC: 80897 • IF: 20764643 • CNSS: 5442489 • TP: 45301437 • ICE: 001892739000012 • C.B: N° 007 450 0002043000000501 61
+                        </p>
                     </div>
 
                 </div>
