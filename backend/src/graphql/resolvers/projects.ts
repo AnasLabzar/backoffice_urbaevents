@@ -8,6 +8,8 @@ import { logActivity } from '../../utils/logger';
 import { createNotification } from '../../utils/notifications';
 import { NotificationLevel } from '../../models/Notification';
 import { pubsub, NEW_TASK_EVENT } from '../../utils/pubsub';
+import Document from '../../models/Document';
+import Notification from '../../models/Notification';
 import path from 'path';
 import {
     checkPermission, handleUpload, stagePopulates,
@@ -15,6 +17,7 @@ import {
     getRoleUserIds, patchProjectUsers
 } from './helpers';
 import { aiService } from '../../../services/aiService';
+import Role from '../../models/Role';
 
 // --- HELPER: CHECK PM ACCESS ---
 const checkPMAccess = async (context: IContext, project: any, requiredPermission: string) => {
@@ -230,18 +233,31 @@ export const projectResolvers = {
             return updatedProject;
         },
 
+        // ... imports
+
         proposal_createProject: async (_: unknown, { input }: any, context: IContext) => {
             await checkPermission(context, 'create_project_proposal');
+
             const projectCount = await Project.countDocuments();
+            // Génération automatique du code
             const projectCode = `${input.projectType.slice(0, 2)}-${(projectCount + 1).toString().padStart(4, '0')}`;
+
+            // --- LOGIC JDIDA DYAL STATUS ---
+            // Ila kan CONFIRMED ola INTERNAL -> Direct Production (TO_PREPARE)
+            // Ila kan PUBLIC_TENDER (Appel d'offre) -> DRAFT
+            const isDirectProduction = input.projectType === 'CONFIRMED' || input.projectType === 'INTERNAL';
+
+            const initialStatus = isDirectProduction ? 'TO_PREPARE' : 'DRAFT';
+            const initialStage = isDirectProduction ? 'ADMINISTRATIVE' : 'PROPOSAL';
+            // -------------------------------
 
             const project = await Project.create({
                 ...input,
                 projectCode,
                 createdBy: context.user!.id,
-                preparationStatus: 'DRAFT',
+                preparationStatus: initialStatus, // <--- Hna fin tbedlat
                 generalStatus: 'IN_PROGRESS',
-                currentStage: 'PROPOSAL',
+                currentStage: initialStage,      // <--- Hna tbedlat bach tbda direct
                 stages: {
                     administrative: { responsible: ['PROPOSAL_MANAGER', 'ADMIN'], documents: [] },
                     technical: { responsible: ['PROPOSAL_MANAGER', 'PROJECT_MANAGER', 'ASSISTANT_PM', 'COORDINATOR'], documents: [] },
@@ -254,7 +270,13 @@ export const projectResolvers = {
                 },
             });
 
-            await logActivity({ userId: context.user!.id as any, action: 'PROPOSAL_CREATE', project: project._id, details: `Draft created: "${project.title}"` });
+            await logActivity({
+                userId: context.user!.id as any,
+                action: 'PROPOSAL_CREATE',
+                project: project._id,
+                details: `Projet créé: "${project.title}" (Status: ${initialStatus})`
+            });
+
             return project;
         },
 
@@ -763,6 +785,42 @@ export const projectResolvers = {
             });
             await project.save();
             return project;
+        },
+
+        admin_deleteProject: async (_: unknown, { projectId }: { projectId: string }, context: IContext) => {
+            // --- FIX HNA ---
+            // 1. Ila kan Admin 3tih l-passe, sinon chouf permission
+            // Hada kay-eviter l-mochkil dyal permission missing f DB
+            const userRole = await Role.findById(context.user!.role);
+            const isAdmin = userRole?.name === 'ADMIN';
+
+            if (!isAdmin) {
+                // Ila machi admin, 3ad n-verifier permission
+                await checkPermission(context, 'delete_project'); 
+            }
+            // ----------------
+
+            const project = await Project.findById(projectId);
+            if (!project) throw new ApolloError('Project not found');
+
+            const projectTitle = project.title;
+
+            console.log(`🗑️ Deleting project ${projectId} ...`);
+            
+            // Cascade Delete
+            await Task.deleteMany({ project: projectId });
+            await Notification.deleteMany({ project: projectId });
+
+            await Project.findByIdAndDelete(projectId);
+
+            await logActivity({
+                userId: context.user!.id as any,
+                action: 'PROJECT_DELETE',
+                project: null,
+                details: `Deleted project: "${projectTitle}"`
+            });
+
+            return true;
         },
     },
 

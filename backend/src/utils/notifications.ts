@@ -50,8 +50,8 @@ export const createNotification = async (input: NotificationInput) => {
             sendEmail({
               to: user.email,
               subject: `[${level}] Notification: ${message.substring(0, 20)}...`,
-              text: `Notification: ${message}\n\nLien: https://backoffice.urbagroupe.ma${link || ''}`,
-              html: `<p>${message}</p><a href="https://backoffice.urbagroupe.ma${link || ''}">Voir les détails</a>`,
+              text: `Notification: ${message}\n\nLien: http://localhost:5002${link || ''}`,
+              html: `<p>${message}</p><a href="http://localhost:5002${link || ''}">Voir les détails</a>`,
             });
           }
         }

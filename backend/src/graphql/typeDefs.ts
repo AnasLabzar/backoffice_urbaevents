@@ -532,6 +532,7 @@ export const typeDefs = gql`
     # Notifications
     markNotificationAsRead(notificationId: ID!): Notification
     markAllNotificationsAsRead: Boolean
+    admin_deleteProject(projectId: ID!): Boolean
   }
 
   # --- SUBSCRIPTION ---

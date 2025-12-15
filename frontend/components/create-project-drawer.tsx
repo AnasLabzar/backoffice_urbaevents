@@ -2,22 +2,25 @@
 
 import * as React from "react";
 import { gql } from "@apollo/client";
-import { useMutation, useQuery } from "@apollo/client/react"; // Zidna useQuery
+import { useMutation, useQuery } from "@apollo/client/react";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { IconCalendar as CalendarIcon, IconPlus } from "@tabler/icons-react";
+import { fr } from "date-fns/locale";
+import {
+  Calendar as CalendarIcon,
+  Plus,
+  Info,
+  AlertCircle,
+  User,
+  Hash,
+  CheckCircle2,
+  Pencil
+} from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 
-import { PriceInput } from "@/components/ui/price-input"; // Import dyal l-PriceInput
-
-
-// Imports dyal l-UI
+import { PriceInput } from "@/components/ui/price-input";
 import { Button } from "@/components/ui/button";
-import {
-  Drawer, DrawerClose, DrawerContent, DrawerDescription,
-  DrawerFooter, DrawerHeader, DrawerTitle, DrawerTrigger,
-} from "@/components/ui/drawer";
 import {
   Sheet, SheetClose, SheetContent, SheetDescription,
   SheetFooter, SheetHeader, SheetTitle, SheetTrigger,
@@ -31,56 +34,28 @@ import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Checkbox } from "@/components/ui/checkbox"; // Zid hadi
+import { Checkbox } from "@/components/ui/checkbox";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Separator } from "@/components/ui/separator";
+import { DatePickerInput } from "@/components/ui/date-picker-input";
 
-// --- L-API ---
-
-// 1. L-Mutation dyal "Create"
+// --- GRAPHQL ---
 const CREATE_PROJECT_MUTATION = gql`
   mutation CreateProject($input: CreateProjectInput!) {
     proposal_createProject(input: $input) { 
-      id 
-      projectCode 
-      title 
-      technicalOfferRequired 
+      id projectCode title technicalOfferRequired 
     }
   }
 `;
 
-// 2. L-Mutation dyal "Upload" (BDILNAHA: Db katkhod ghir l-URL)
-const UPLOAD_DOCUMENT_MUTATION = gql`
-  mutation UploadDocument(
-    $projectId: ID!
-    $stageName: String!
-    $fileName: String!
-    $fileUrl: String!
-  ) {
-    proposal_uploadDocument(
-      projectId: $projectId
-      stageName: $stageName
-      fileName: $fileName
-      fileUrl: $fileUrl
-    ) {
-      id
-      stages {
-        administrative { documents { id fileName } }
-        technical { documents { id fileName } }
-      }
+const UPDATE_PROJECT_MUTATION = gql`
+  mutation UpdateProject($id: ID!, $input: UpdateProjectInput!) {
+    proposal_updateProject(id: $id, input: $input) {
+      id title object status
     }
   }
 `;
 
-// 3. L-Mutation dyal "Submit"
-const SUBMIT_REVIEW_MUTATION = gql`
-  mutation SubmitForReview($projectId: ID!) {
-    proposal_submitForReview(projectId: $projectId) {
-      id
-      preparationStatus
-    }
-  }
-`;
-
-// 4. L-Query dyal "Refetch"
 const GET_PROJECTS_FEED = gql`
   query GetProjectsFeed {
     projects_feed {
@@ -94,287 +69,292 @@ const GET_PROJECTS_FEED = gql`
   }
 `;
 
-// 5. L-Query dyal "Me" (Bach n3rfo l-role)
 const ME_QUERY = gql` query Me { me { id role { name } } }`;
 
-// --- L-COMPONENT DYAL L-FORM (Bo7do) ---
+// --- HELPER: SAFE DATE ---
+const safeDate = (dateInput: any): Date | undefined => {
+  if (!dateInput) return undefined;
+  if (dateInput instanceof Date) return dateInput;
+  // Handle timestamp strings
+  const isNumberString = !isNaN(Number(dateInput));
+  if (isNumberString) return new Date(Number(dateInput));
+  // Handle ISO strings
+  const parsed = new Date(dateInput);
+  return isNaN(parsed.getTime()) ? undefined : parsed;
+};
+
+// --- FORM CONTENT ---
 function ProjectFormContent({
   formData,
   handleChange,
   handleSelectChange,
   handleDateChange,
-  handleCheckboxChange, // Zid had l-function
+  handleCheckboxChange,
   handleSubmit,
   loading,
   userRole,
-}: {
-  formData: any;
-  handleChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  handleSelectChange: (id: string, value: string) => void;
-  handleDateChange: (date: Date | undefined) => void;
-  handleCheckboxChange: (id: string, checked: boolean) => void; // Zid had l-parameter
-  handleSubmit: (e: React.FormEvent) => void;
-  loading: boolean;
-  userRole: string;
-}) {
+  isEditMode
+}: any) {
 
-  // N-affichiw l-form ghir l-PROPOSAL_MANAGER
-  if (userRole === 'PROPOSAL_MANAGER' || userRole === 'ADMIN') {
+  const canCreate = userRole === 'PROPOSAL_MANAGER' || userRole === 'ADMIN';
+  const isDirectProd = formData.projectType === 'CONFIRMED' || formData.projectType === 'INTERNAL';
+
+  if (!canCreate) {
     return (
-      <form
-        id="create-project-form"
-        className="flex flex-col gap-4 overflow-y-auto px-4 text-sm"
-        onSubmit={handleSubmit}
-      >
-        {/* L-Form 3adia (Title, Object, Type, Date...) */}
-        <div className="flex flex-col gap-3">
-          <Label htmlFor="title">Nom du Client (Titre)</Label>
-          <Input id="title" value={formData.title} onChange={handleChange} required />
+      <Alert variant="destructive">
+        <AlertCircle className="h-4 w-4" />
+        <AlertTitle>Accès Refusé</AlertTitle>
+        <AlertDescription>Permission manquante.</AlertDescription>
+      </Alert>
+    );
+  }
+
+  return (
+    <form id="project-form" className="flex flex-col gap-6 px-1" onSubmit={handleSubmit}>
+      <Alert className={cn(
+        "border",
+        isDirectProd ? "bg-green-50 border-green-200 text-green-800" : "bg-blue-50 border-blue-200 text-blue-800"
+      )}>
+        {isDirectProd ? <CheckCircle2 className="h-4 w-4 text-green-600" /> : <Info className="h-4 w-4 text-blue-600" />}
+        <AlertTitle className="font-semibold">
+          {isEditMode ? "Mode Modification" : (isDirectProd ? "Mode Production Directe" : "Mode Brouillon (Draft)")}
+        </AlertTitle>
+        <AlertDescription className="text-xs opacity-90">
+          {isEditMode
+            ? "Vous modifiez les informations de ce projet."
+            : "Ce projet sera créé en attente de validation."
+          }
+        </AlertDescription>
+      </Alert>
+
+      <div className="space-y-4">
+        <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+          <User className="h-4 w-4 text-muted-foreground" /> Informations Client
+        </h3>
+        <div className="grid gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="title" className="text-xs font-bold text-muted-foreground uppercase">Nom du Client *</Label>
+            <Input id="title" placeholder="Ex: Ministère de la Culture..." value={formData.title} onChange={handleChange} required className="bg-background" />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="object" className="text-xs font-bold text-muted-foreground uppercase">Objet du Projet *</Label>
+            <Input id="object" placeholder="Ex: Organisation de l'événement..." value={formData.object} onChange={handleChange} required className="bg-background" />
+          </div>
         </div>
-        <div className="flex flex-col gap-3">
-          <Label htmlFor="object">Objet du Projet</Label>
-          <Input id="object" value={formData.object} onChange={handleChange} required />
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="flex flex-col gap-3">
-            <Label htmlFor="projectType">Type</Label>
+      </div>
+
+      <Separator />
+
+      <div className="space-y-4">
+        <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+          <Hash className="h-4 w-4 text-muted-foreground" /> Détails Techniques
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="projectType">Type de Projet</Label>
             <Select value={formData.projectType} onValueChange={(value) => handleSelectChange("projectType", value)}>
-              <SelectTrigger id="projectType"><SelectValue /></SelectTrigger>
+              <SelectTrigger id="projectType" className="bg-background"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="PUBLIC_TENDER">Appel d'Offre</SelectItem>
-                <SelectItem value="CONFIRMED">Projet Confirmé</SelectItem>
-                <SelectItem value="INTERNAL">Projet Interne</SelectItem>
+                <SelectItem value="PUBLIC_TENDER">🏛️ Appel d'Offre</SelectItem>
+                <SelectItem value="CONFIRMED">✅ Projet Confirmé</SelectItem>
+                <SelectItem value="INTERNAL">🏢 Projet Interne</SelectItem>
               </SelectContent>
             </Select>
           </div>
-          <div className="flex flex-col gap-3">
-            <Label htmlFor="submissionDeadline">Date de Dépôt</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant={"outline"} className={cn("justify-start text-left font-normal", !formData.submissionDeadline && "text-muted-foreground")}>
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {formData.submissionDeadline ? format(formData.submissionDeadline, "PPP") : <span>Pick a date</span>}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar mode="single" selected={formData.submissionDeadline} onSelect={handleDateChange} initialFocus />
-              </PopoverContent>
-            </Popover>
-          </div>
-        </div>
-        <div className="grid grid-cols-3 gap-4">
-          <div className="flex flex-col gap-3">
+          <div className="space-y-2">
             <Label htmlFor="referenceAO">Référence AO</Label>
-            <Input id="referenceAO" value={formData.referenceAO} onChange={handleChange} />
+            <Input id="referenceAO" placeholder="N° 12/2026/..." value={formData.referenceAO} onChange={handleChange} className="bg-background" />
           </div>
-          <div className="flex flex-col gap-2 mt-2">
-            <Label htmlFor="estimate-price">Montant Estimatif</Label>
-            <PriceInput
-              id="estimate-price"
-              value={formData.estimatedBudget || ""} // Assurer que formData 3ndha had l-field
-              onChange={(val) => handleSelectChange("estimatedBudget", val)} // Stocki l-value string b commas
-              placeholder="ex:  1,000,000.00"
-            />
-          </div>
-
-          <div className="flex flex-col gap-2 mt-2">
-            <Label htmlFor="caution-amount">Montant Caution</Label>
-            <PriceInput
-              id="caution-amount"
-              value={formData.cautionAmount || ""}
-              onChange={(val) => handleSelectChange("cautionAmount", val)}
-              placeholder="ex:   20,000.00"
+          <div className="space-y-2 md:col-span-2">
+            <Label htmlFor="submissionDeadline">Date Deadline</Label>
+            <DatePickerInput
+              date={formData.submissionDeadline}
+              setDate={handleDateChange}
+              placeholder="Sélectionner la date limite"
             />
           </div>
         </div>
+      </div>
 
-        {/* ZID HAD L-CHECKBOX DYAL technicalOfferRequired */}
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            id="technicalOfferRequired"
-            checked={formData.technicalOfferRequired}
-            onCheckedChange={(checked) => handleCheckboxChange("technicalOfferRequired", checked as boolean)}
-          />
-          <Label htmlFor="technicalOfferRequired" className="text-sm font-normal cursor-pointer">
-            Offre technique requise
-          </Label>
+      <Separator />
+
+      <div className="space-y-4">
+        <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+          <span className="font-bold text-green-600 text-xs border border-green-200 px-1 rounded">DH</span> Financier
+        </h3>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="estimatedBudget">Budget Est. (DH)</Label>
+            <PriceInput id="estimatedBudget" value={formData.estimatedBudget || ""} onChange={(val) => handleSelectChange("estimatedBudget", val)} placeholder="0.00" className="bg-background" />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="cautionAmount">Caution (DH)</Label>
+            <PriceInput id="cautionAmount" value={formData.cautionAmount || ""} onChange={(val) => handleSelectChange("cautionAmount", val)} placeholder="0.00" className="bg-background" />
+          </div>
         </div>
+      </div>
 
-      </form>
-    );
-  }
-
-  // Ila kan ay role khor (Admin, CP...), ma 3ndouch l-7aq y-crea
-  return (
-    <div className="px-4 text-sm text-red-500">
-      Vous n'avez pas la permission de créer un projet.
-    </div>
+      <div className="flex items-center space-x-3 bg-muted/30 p-4 rounded-lg border">
+        <Checkbox id="technicalOfferRequired" checked={formData.technicalOfferRequired} onCheckedChange={(checked) => handleCheckboxChange("technicalOfferRequired", checked as boolean)} />
+        <div className="grid gap-1">
+          <Label htmlFor="technicalOfferRequired" className="text-sm font-medium cursor-pointer">Besoin d'équipe technique ?</Label>
+          <p className="text-xs text-muted-foreground">Cochez si le projet nécessite des Infographistes ou 3D.</p>
+        </div>
+      </div>
+    </form>
   );
 }
 
-// --- L-COMPONENT L-RA2ISSI (Drawer/Sheet) ---
-export function CreateProjectDrawer() {
-  const [isOpen, setIsOpen] = React.useState(false);
-  const isMobile = useIsMobile();
+// --- MAIN SHEET ---
+interface ProjectSheetProps {
+  projectToEdit?: any;
+  trigger?: React.ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}
+
+export function ProjectSheet({ projectToEdit, trigger, open: controlledOpen, onOpenChange: setControlledOpen }: ProjectSheetProps) {
+  const [internalOpen, setInternalOpen] = React.useState(false);
+  const isOpen = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const setIsOpen = setControlledOpen || setInternalOpen;
 
   const { data: meData } = useQuery(ME_QUERY);
   const userRole = meData?.me.role.name;
+  const isEditMode = !!projectToEdit;
 
-  // State w Logic dyal l-Form - ZID technicalOfferRequired
-  const [formData, setFormData] = React.useState({
-    title: "",
-    object: "",
-    projectType: "PUBLIC_TENDER",
-    submissionDeadline: new Date(),
+  const defaultState = {
+    title: "", object: "", projectType: "PUBLIC_TENDER",
+    submissionDeadline: undefined as Date | undefined,
     referenceAO: "",
-    estimatedBudget: 0,
-    cautionAmount: 0,
-    technicalOfferRequired: true, // ZID HAD L-CHAMP
-  });
+    estimatedBudget: 0, cautionAmount: 0, technicalOfferRequired: true,
+  };
 
-  const [createProject, { loading }] = useMutation(CREATE_PROJECT_MUTATION, {
-    onCompleted: (data) => {
-      toast.success(`Projet créé (Draft): ${data.proposal_createProject.projectCode}`);
-      setIsOpen(false);
-      // N-reset l-form
+  const [formData, setFormData] = React.useState(defaultState);
+
+  // --- STATE HYDRATION (FIXED) ---
+  React.useEffect(() => {
+    if (isOpen && projectToEdit) {
       setFormData({
-        title: "", object: "", projectType: "PUBLIC_TENDER",
-        submissionDeadline: new Date(), referenceAO: "",
-        estimatedBudget: 0, cautionAmount: 0,
-        technicalOfferRequired: true, // ZID HNA KAMAL
+        title: projectToEdit.title || "",
+        object: projectToEdit.object || "",
+        projectType: projectToEdit.projectType || "PUBLIC_TENDER",
+        submissionDeadline: safeDate(projectToEdit.submissionDeadline),
+        referenceAO: projectToEdit.referenceAO || "",
+        estimatedBudget: projectToEdit.estimatedBudget ? Number(projectToEdit.estimatedBudget) : 0,
+        cautionAmount: projectToEdit.cautionAmount ? Number(projectToEdit.cautionAmount) : 0,
+        technicalOfferRequired: projectToEdit.technicalOfferRequired ?? true,
       });
+    } else if (isOpen && !projectToEdit) {
+      setFormData(defaultState);
+    }
+  }, [isOpen, projectToEdit]);
+
+  const [createProject, { loading: creating }] = useMutation(CREATE_PROJECT_MUTATION, {
+    onCompleted: () => {
+      toast.success("Projet créé avec succès !");
+      setIsOpen(false);
+      setFormData(defaultState);
     },
-    onError: (error) => { toast.error(`Error: ${error.message}`); },
+    onError: (e) => toast.error(e.message),
     refetchQueries: [{ query: GET_PROJECTS_FEED }]
   });
 
-  // Functions dyal l-Form
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { id, value, type } = e.target;
-    setFormData({
-      ...formData,
-      [id]: type === 'number' ? parseFloat(value) : value,
-    });
-  };
+  const [updateProject, { loading: updating }] = useMutation(UPDATE_PROJECT_MUTATION, {
+    onCompleted: () => {
+      toast.success("Projet modifié avec succès !");
+      setIsOpen(false);
+    },
+    onError: (e) => toast.error(e.message),
+    refetchQueries: [{ query: GET_PROJECTS_FEED }]
+  });
 
-  const handleSelectChange = (id: string, value: string) => {
-    setFormData({ ...formData, [id]: value });
-  };
+  const loading = creating || updating;
 
-  const handleDateChange = (date: Date | undefined) => {
-    if (date) { setFormData({ ...formData, submissionDeadline: date }); }
-  };
-
-  // ZID HAD L-FUNCTION DYAL L-CHECKBOX
-  const handleCheckboxChange = (id: string, checked: boolean) => {
-    setFormData({ ...formData, [id]: checked });
-  };
+  const handleChange = (e: any) => setFormData({ ...formData, [e.target.id]: e.target.value });
+  const handleSelectChange = (id: string, val: any) => setFormData({ ...formData, [id]: val });
+  const handleDateChange = (date: any) => date && setFormData({ ...formData, submissionDeadline: date });
+  const handleCheckboxChange = (id: string, val: boolean) => setFormData({ ...formData, [id]: val });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (userRole !== 'PROPOSAL_MANAGER' && userRole !== 'ADMIN') {
-      toast.error("Action non autorisée.");
-      return;
-    }
+    const inputData = {
+      ...formData,
+      estimatedBudget: Number(formData.estimatedBudget),
+      cautionAmount: Number(formData.cautionAmount),
+    };
 
-    createProject({
-      variables: {
-        input: {
-          ...formData,
-          submissionDeadline: formData.submissionDeadline.toISOString(),
-          estimatedBudget: parseFloat(formData.estimatedBudget.toString()) || 0,
-          cautionAmount: parseFloat(formData.cautionAmount.toString()) || 0,
-          technicalOfferRequired: formData.technicalOfferRequired, // ZID HNA
-        },
-      },
-    });
+    if (isEditMode) {
+      updateProject({
+        variables: { id: projectToEdit.id, input: inputData }
+      });
+    } else {
+      createProject({
+        variables: { input: inputData }
+      });
+    }
   };
 
-  const triggerButton = (
-    <Button variant="outline" size="sm">
-      <IconPlus className="mr-2 h-4 w-4" />
-      <span className="hidden lg:inline">Add Project</span>
-      <span className="lg:hidden">Add</span>
-    </Button>
+  const Header = (
+    <SheetHeader className="px-6 pt-6 pb-2">
+      <SheetTitle>{isEditMode ? "Modifier le Projet" : "Nouveau Projet"}</SheetTitle>
+      <SheetDescription>
+        {isEditMode ? "Mettre à jour les informations du dossier." : "Initialiser un nouveau dossier."}
+      </SheetDescription>
+    </SheetHeader>
   );
 
-  // L-Check dyal l-Mobile/Desktop
-  if (isMobile) {
-    return (
-      <Drawer open={isOpen} onOpenChange={setIsOpen}>
-        <DrawerTrigger asChild>{triggerButton}</DrawerTrigger>
-        <DrawerContent>
-          <DrawerHeader className="gap-1">
-            <DrawerTitle>Créer un Nouveau Projet</DrawerTitle>
-            <DrawerDescription>
-              Étape 1: Entrer les informations de base.
-            </DrawerDescription>
-          </DrawerHeader>
+  const Footer = (
+    <SheetFooter className="px-6 pb-6 pt-4 border-t mt-auto">
+      <SheetClose asChild><Button variant="ghost">Annuler</Button></SheetClose>
+      <Button onClick={handleSubmit} disabled={loading} className="w-full md:w-auto">
+        {loading ? (isEditMode ? "Modification..." : "Création...") : (isEditMode ? "Enregistrer" : "Confirmer")}
+      </Button>
+    </SheetFooter>
+  );
 
-          <ProjectFormContent
-            formData={formData}
-            handleChange={handleChange}
-            handleSelectChange={handleSelectChange}
-            handleDateChange={handleDateChange}
-            handleCheckboxChange={handleCheckboxChange} // ZID HNA
-            handleSubmit={handleSubmit}
-            loading={loading}
-            userRole={userRole}
-          />
-
-          <DrawerFooter>
-            <Button
-              form="create-project-form"
-              type="submit"
-              disabled={loading || (userRole !== 'PROPOSAL_MANAGER' && userRole !== 'ADMIN')} // CORRECTION: && au lieu de ||
-            >
-              {loading ? "Création..." : "Créer le Projet (Draft)"}
-            </Button>
-            <DrawerClose asChild>
-              <Button variant="outline">Annuler</Button>
-            </DrawerClose>
-          </DrawerFooter>
-        </DrawerContent>
-      </Drawer>
-    );
-  }
-
-  // L-Code dyal l-PC (Sheet)
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
-      <SheetTrigger asChild>{triggerButton}</SheetTrigger>
-      <SheetContent className="sm:max-w-xl">
-        <SheetHeader className="gap-1">
-          <SheetTitle>Créer un Nouveau Projet</SheetTitle>
-          <SheetDescription>
-            Étape 1: Entrer les informations de base.
-          </SheetDescription>
-        </SheetHeader>
-
-        <ProjectFormContent
-          formData={formData}
-          handleChange={handleChange}
-          handleSelectChange={handleSelectChange}
-          handleDateChange={handleDateChange}
-          handleCheckboxChange={handleCheckboxChange} // ZID HNA
-          handleSubmit={handleSubmit}
-          loading={loading}
-          userRole={userRole}
-        />
-
-        <SheetFooter>
-          <SheetClose asChild>
-            <Button variant="outline">Annuler</Button>
-          </SheetClose>
-          <Button
-            form="create-project-form"
-            type="submit"
-            disabled={loading || (userRole !== 'PROPOSAL_MANAGER' && userRole !== 'ADMIN')} // CORRECTION: && au lieu de ||
-          >
-            {loading ? "Création..." : "Créer le Projet (Draft)"}
-          </Button>
-        </SheetFooter>
+      {trigger && <SheetTrigger asChild>{trigger}</SheetTrigger>}
+      <SheetContent className="sm:max-w-2xl w-full flex flex-col p-0 gap-0">
+        {Header}
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          <ProjectFormContent
+            formData={formData} handleChange={handleChange}
+            handleSelectChange={handleSelectChange} handleDateChange={handleDateChange}
+            handleCheckboxChange={handleCheckboxChange} handleSubmit={handleSubmit}
+            loading={loading} userRole={userRole}
+            isEditMode={isEditMode}
+          />
+        </div>
+        {Footer}
       </SheetContent>
     </Sheet>
+  );
+}
+
+
+export function CreateProjectDrawer() {
+  return (
+    <ProjectSheet
+      trigger={
+        <Button size="sm" className="bg-primary text-white hover:bg-primary/90">
+          <Plus className="mr-2 h-4 w-4" /> Nouveau Projet
+        </Button>
+      }
+    />
+  );
+}
+
+// O tqdr tzid hta hadi ila bghiti tsta3mlha f blayss khrin
+export function EditProjectButton({ project }: { project: any }) {
+  return (
+    <ProjectSheet
+      projectToEdit={project}
+      trigger={
+        <Button variant="ghost" size="icon">
+          <Pencil className="h-4 w-4 text-muted-foreground" />
+        </Button>
+      }
+    />
   );
 }

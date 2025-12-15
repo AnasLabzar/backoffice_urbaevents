@@ -27,11 +27,11 @@ export const teamPopulates = [
 export const defaultUser = { _id: 'DELETED_USER_ID', id: 'DELETED_USER_ID', name: 'Utilisateur Supprimé', email: '', role: null };
 
 const DYNAMIC_PM_CANDIDATE_ROLES = [
-    'PROJECT_MANAGER', 
-    'DIRECTOR_EVENT', 
-    'IT_MANAGER', 
-    'CREATIVE', 
-    'TEAM_MEMBER', 
+    'PROJECT_MANAGER',
+    'DIRECTOR_EVENT',
+    'IT_MANAGER',
+    'CREATIVE',
+    'TEAM_MEMBER',
     'ASSISTANT_PM'
 ] as const;
 
@@ -81,12 +81,12 @@ export const getRoleUserIds = async (roleName: string): Promise<string[]> => {
 };
 
 export function buildProjectFilter(permissions: string[], userId: string) {
-    // 1. Admin ou Super-User (Voit tout sauf les brouillons)
+    // 1. Admin ou Super-User (DB ghadi ywelli ychouf kolchi: DRAFT, COMPLETED, etc.)
     if (permissions.includes('view_all_analytics')) {
-        return { preparationStatus: { $ne: 'DRAFT' } };
+        return {}; // <--- Khellina hada khawi bach mayfiltrich Drafts
     }
 
-    // 2. Proposal Manager (Voit ce qu'il a créé OU ce qu'il gère explicitement)
+    // 2. Proposal Manager (Voit ce qu'il a créé OU ce qu'il gère explicitement - Y compris ses propres brouillons)
     if (permissions.includes('create_project_proposal')) {
         return {
             $or: [
@@ -107,7 +107,7 @@ export function buildProjectFilter(permissions: string[], userId: string) {
         $and: [
             // Condition 1 : Ne pas montrer les brouillons (sauf si on est le créateur, mais géré plus haut)
             { preparationStatus: { $ne: 'DRAFT' } },
-            
+
             // Condition 2 : Être impliqué dans le projet
             {
                 $or: [
@@ -115,7 +115,7 @@ export function buildProjectFilter(permissions: string[], userId: string) {
                     { assignedTeam: userId },          // <-- Assigné dans l'équipe globale
                     { 'team.infographistes': userId }, // <-- Assigné comme Infographiste
                     { 'team.team3D': userId },         // <-- Assigné comme 3D
-                    { 'team.coordinators': userId }      // <-- Assigné comme Assistant
+                    { 'team.coordinators': userId }    // <-- Assigné comme Assistant
                 ]
             }
         ]
