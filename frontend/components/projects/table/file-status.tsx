@@ -16,11 +16,11 @@ export const FileStatusCell = ({ row, docType }: { row: any, docType: string }) 
     }
 
     if (file && file.fileUrl) {
-        let baseUrl = 'http://localhost:5002/graphql';
+        let baseUrl = 'https://backoffice.urbagroupe.ma/graphql';
         if (typeof window !== 'undefined') {
             const hostname = window.location.hostname;
             if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
-                baseUrl = 'http://localhost:5002';
+                baseUrl = 'https://backoffice.urbagroupe.ma';
             }
         }
         const cleanPath = file.fileUrl.startsWith('/') ? file.fileUrl.slice(1) : file.fileUrl;

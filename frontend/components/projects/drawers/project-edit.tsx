@@ -85,7 +85,7 @@ function DocumentRow({ label, type, existingDoc, file, setFile, progress, isOpti
                 <div className="flex flex-col min-w-0">
                     <div className="flex items-center gap-2"><span className="font-medium text-sm truncate text-foreground">{label}</span>{isOptional && <Badge variant="outline" className="text-[10px] h-5 px-1.5">Optionnel</Badge>}</div>
                     <div className="text-xs text-muted-foreground truncate max-w-[200px] mt-0.5">
-                        {isUploading ? <span className="text-blue-600 font-medium animate-pulse">Upload en cours...</span> : file ? <span className="text-blue-600 font-medium">Prêt: {file.name}</span> : isUploaded ? <a href={`http://localhost:5002/${existingDoc.fileUrl}`} target="_blank" className="hover:underline flex items-center gap-1 text-green-600">{existingDoc.originalFileName || existingDoc.fileName} <IconDownload size={12} /></a> : <span>Non uploadé</span>}
+                        {isUploading ? <span className="text-blue-600 font-medium animate-pulse">Upload en cours...</span> : file ? <span className="text-blue-600 font-medium">Prêt: {file.name}</span> : isUploaded ? <a href={`https://backoffice.urbagroupe.ma/${existingDoc.fileUrl}`} target="_blank" className="hover:underline flex items-center gap-1 text-green-600">{existingDoc.originalFileName || existingDoc.fileName} <IconDownload size={12} /></a> : <span>Non uploadé</span>}
                     </div>
                 </div>
             </div>
@@ -211,10 +211,10 @@ export function ProjectEditDrawer({ item }: { item: any }) {
         if (!file) return true;
         setUploadProgress(prev => ({ ...prev, [docType]: 1 }));
         try {
-            let uploadBaseUrl = 'http://localhost:5002/graphql';
+            let uploadBaseUrl = 'https://backoffice.urbagroupe.ma/graphql';
             if (typeof window !== 'undefined') {
                 const hostname = window.location.hostname;
-                if (hostname !== 'localhost' && hostname !== '127.0.0.1') { uploadBaseUrl = 'http://localhost:5002'; }
+                if (hostname !== 'localhost' && hostname !== '127.0.0.1') { uploadBaseUrl = 'https://backoffice.urbagroupe.ma'; }
             }
             const result = await uploadFileWithProgress(file, `${uploadBaseUrl}/api/upload/${item.id}`, (percent) => { setUploadProgress(prev => ({ ...prev, [docType]: percent })); });
             await mutation({ variables: { projectId: item.id, stageName, docType, originalFileName: file.name, fileUrl: result.fileUrl } });
@@ -439,7 +439,7 @@ export function ProjectEditDrawer({ item }: { item: any }) {
                         {getTechDoc('CP_ESTIMATE') ? (
                             <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/20">
                                 <div className="flex items-center gap-3"><div className="h-8 w-8 rounded-full bg-green-100 text-green-600 flex items-center justify-center"><IconFileText size={16} /></div><div className="flex flex-col"><span className="text-sm font-medium">Estimation Détaillée (Excel)</span><span className="text-xs text-muted-foreground">Uploadé par le CP</span></div></div>
-                                <Button variant="outline" size="sm" asChild><a href={`http://localhost:5002/${getTechDoc('CP_ESTIMATE').fileUrl}`} target="_blank"><IconDownload size={14} className="mr-2" /> Télécharger</a></Button>
+                                <Button variant="outline" size="sm" asChild><a href={`https://backoffice.urbagroupe.ma/${getTechDoc('CP_ESTIMATE').fileUrl}`} target="_blank"><IconDownload size={14} className="mr-2" /> Télécharger</a></Button>
                             </div>
                         ) : <div className="p-3 border border-dashed rounded-lg text-center text-sm text-muted-foreground">⚠️ Aucune estimation Excel.</div>}
                     </div>

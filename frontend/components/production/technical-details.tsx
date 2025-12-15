@@ -192,79 +192,91 @@ export function TechnicalDetails({ projectId, projectTitle, initialBudget, initi
 
                 {/* DROITE: DASHBOARD FINANCIER */}
                 <div className="xl:col-span-4 space-y-6">
-                    <Card className={cn("border-2 shadow-lg sticky top-6 transition-colors", isProfit ? "border-green-100 dark:border-green-900 bg-green-50/30" : "border-red-100 bg-red-50/30")}>
-                        <CardHeader className="pb-4 border-b bg-background/50 backdrop-blur-sm">
+                    <Card className={cn(
+                        "shadow-lg sticky top-6 transition-all duration-300 border-2",
+                        isProfit 
+                            ? "border-green-100 dark:border-green-900/50 bg-gradient-to-b from-green-50/50 to-transparent dark:from-green-950/10" 
+                            : "border-red-100 dark:border-red-900/50 bg-gradient-to-b from-red-50/50 to-transparent dark:from-red-950/10"
+                    )}>
+                        <CardHeader className="pb-4 border-b bg-background/40 backdrop-blur-md">
                             <CardTitle className="text-base font-bold uppercase flex items-center gap-2">
-                                <IconCurrencyDirham className="w-5 h-5" /> Rentabilité Projet
+                                <div className={cn("p-1.5 rounded-md", isProfit ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400")}>
+                                    <IconCurrencyDirham className="w-5 h-5" />
+                                </div>
+                                Rentabilité Projet
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="p-6 space-y-8">
 
                             {/* Inputs Financiers */}
-                            <div className="space-y-4">
-                                <div className="space-y-1.5">
-                                    <Label className="text-xs uppercase text-muted-foreground font-bold">Prix de Vente (Marché)</Label>
-                                    <div className="relative">
+                            <div className="space-y-5">
+                                <div className="space-y-2">
+                                    <Label className="text-xs uppercase text-muted-foreground font-bold tracking-wider">Prix de Vente (Marché)</Label>
+                                    <div className="relative group">
                                         <Input
                                             type="number"
-                                            className="pl-3 pr-12 text-lg font-bold font-mono bg-background border-primary/20 focus:border-primary shadow-sm"
+                                            className="pl-4 pr-12 h-12 text-xl font-bold font-mono bg-background border-input hover:border-primary/50 focus:border-primary transition-colors shadow-sm"
                                             value={budgetClient}
                                             onChange={e => setBudgetClient(parseFloat(e.target.value) || 0)}
                                         />
-                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground">MAD</span>
+                                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground group-hover:text-foreground transition-colors">MAD</span>
                                     </div>
                                 </div>
 
-                                <div className="space-y-1.5 opacity-80 hover:opacity-100 transition-opacity">
-                                    <Label className="text-xs uppercase text-muted-foreground font-bold">Budget Cible (Interne)</Label>
-                                    <div className="relative">
+                                <div className="space-y-2">
+                                    <Label className="text-xs uppercase text-muted-foreground font-bold tracking-wider">Budget Cible (Interne)</Label>
+                                    <div className="relative group">
                                         <Input
                                             type="number"
-                                            className="pl-3 pr-12 text-sm font-mono bg-background/50"
+                                            className="pl-4 pr-12 h-10 text-sm font-mono bg-background/50 border-input hover:border-primary/30 focus:border-primary/50 transition-colors"
                                             value={estimatedBudget}
                                             onChange={e => setEstimatedBudget(parseFloat(e.target.value) || 0)}
                                         />
-                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">MAD</span>
+                                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-muted-foreground group-hover:text-foreground transition-colors">MAD</span>
                                     </div>
                                 </div>
                             </div>
 
-                            <Separator />
+                            <Separator className="bg-border/50" />
 
                             {/* KPI Display */}
                             <div className="space-y-6">
-                                <div className="flex justify-between items-center">
+                                <div className="flex justify-between items-center p-3 rounded-lg bg-background/50 border border-border/50">
                                     <span className="text-sm font-medium text-muted-foreground">Coût Technique (Live)</span>
                                     <span className="text-lg font-bold font-mono">{technicalCost.toLocaleString()} MAD</span>
                                 </div>
 
-                                <div className="space-y-2">
+                                <div className="space-y-3">
                                     <div className="flex justify-between items-end">
-                                        <span className="text-xs font-bold uppercase">Marge Nette</span>
+                                        <span className="text-xs font-bold uppercase text-muted-foreground">Marge Nette</span>
                                         <div className="text-right">
-                                            <span className={cn("text-2xl font-black block font-mono", isProfit ? "text-green-600" : "text-red-600")}>
-                                                {margeReelle.toLocaleString()} <span className="text-sm font-normal text-muted-foreground">MAD</span>
+                                            <span className={cn("text-3xl font-black block font-mono tracking-tight", isProfit ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400")}>
+                                                {margeReelle.toLocaleString()} <span className="text-sm font-medium text-muted-foreground">MAD</span>
                                             </span>
                                         </div>
                                     </div>
+                                    
+                                    <div className="relative pt-1">
                                     <Progress
                                         value={Math.min(Math.max(margePercent, 0), 100)}
-                                        className={cn("h-3", isProfit ? "bg-green-200" : "bg-red-200")}
-                                        indicatorClassName={isProfit ? "bg-green-600" : "bg-red-600"}
+                                        className={cn("h-2.5", isProfit ? "bg-green-100 dark:bg-green-950/30" : "bg-red-100 dark:bg-red-950/30")}
+                                        indicatorClassName={isProfit ? "bg-green-500 dark:bg-green-400" : "bg-red-500 dark:bg-red-400"}
                                     />
+                                    </div>
+
                                     <div className="flex justify-end">
-                                        <span className={cn("text-xs font-bold px-2 py-0.5 rounded", isProfit ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700")}>
-                                            {margePercent.toFixed(1)}%
-                                        </span>
+                                        <Badge variant="outline" className={cn("font-mono text-xs border-0", isProfit ? "bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300" : "bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300")}>
+                                            {margePercent.toFixed(1)}% de marge
+                                        </Badge>
                                     </div>
                                 </div>
 
                                 {technicalCost > estimatedBudget && (
-                                    <div className="p-3 bg-red-100 border border-red-200 rounded-md flex items-start gap-2 text-red-800 text-xs animate-pulse">
-                                        <IconFileSpreadsheet className="w-4 h-4 shrink-0 mt-0.5" />
-                                        <div>
-                                            <strong>Alerte Dépassement !</strong>
-                                            <p>Le coût technique dépasse le budget interne alloué.</p>
+                                    <div className="p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800/30 rounded-lg flex items-start gap-3 text-red-800 dark:text-red-300 text-sm animate-in fade-in slide-in-from-bottom-2">
+                                        <IconFileSpreadsheet className="w-5 h-5 shrink-0 mt-0.5" />
+                                        <div className="space-y-1">
+                                            <strong className="block font-semibold">Alerte Dépassement !</strong>
+                                            <p className="opacity-90">Le coût technique dépasse le budget interne alloué.</p>
                                         </div>
                                     </div>
                                 )}
