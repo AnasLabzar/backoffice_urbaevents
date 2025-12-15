@@ -1,13 +1,17 @@
-import { Input } from "./input";
+import * as React from "react"
+import { Input } from "@/components/ui/input"
+import { cn } from "@/lib/utils"
 
-// --- COMPONENT SPECIAL PRICE INPUT (CINEMATIC) ---
 interface PriceInputProps {
-    value?: string | number;
-    onChange: (val: string) => void;
-    placeholder?: string;
-    label?: string; // Optional label inside
-    id?: string;
+  value: string | number
+  onChange: (val: string) => void
+  placeholder?: string
+  id?: string
+  // 👇 ZID HADI
+  className?: string 
 }
+
+
 
 export function PriceInput({ value, onChange, placeholder, id }: PriceInputProps) {
     // Fonction bach n-formatiw l-arqam b l-commas

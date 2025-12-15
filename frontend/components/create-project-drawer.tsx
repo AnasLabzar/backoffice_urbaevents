@@ -185,11 +185,11 @@ function ProjectFormContent({
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="estimatedBudget">Budget Est. (DH)</Label>
-            <PriceInput id="estimatedBudget" value={formData.estimatedBudget || ""} onChange={(val) => handleSelectChange("estimatedBudget", val)} placeholder="0.00" className="bg-background" />
+            <PriceInput id="estimatedBudget" value={formData.estimatedBudget || ""} onChange={(val) => handleSelectChange("estimatedBudget", val)} placeholder="0.00" />
           </div>
           <div className="space-y-2">
             <Label htmlFor="cautionAmount">Caution (DH)</Label>
-            <PriceInput id="cautionAmount" value={formData.cautionAmount || ""} onChange={(val) => handleSelectChange("cautionAmount", val)} placeholder="0.00" className="bg-background" />
+            <PriceInput id="cautionAmount" value={formData.cautionAmount || ""} onChange={(val) => handleSelectChange("cautionAmount", val)} placeholder="0.00" />
           </div>
         </div>
       </div>
