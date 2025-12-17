@@ -6,7 +6,10 @@ import { setContext } from "@apollo/client/link/context";
 // --- HNA L-CHANGE ---
 // Kan-golo lih: Ila kayn variable f .env st3mlha, sinu st3ml localhost par défaut
 const httpLink = createHttpLink({
-  uri: process.env.NEXT_PUBLIC_GRAPHQL_URI || "https://backoffice.urbagroupe.ma/graphql",
+  uri: process.env.NEXT_PUBLIC_GRAPHQL_URI ||
+    ((typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
+      ? "http://localhost:5002/graphql"
+      : "https://backoffice.urbagroupe.ma/graphql"),
 });
 // --------------------
 

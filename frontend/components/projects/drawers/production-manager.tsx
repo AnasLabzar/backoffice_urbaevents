@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation"; // 👈 IMPORT JDID
 import { gql, useQuery, useMutation } from "@apollo/client";
 import {
     IconUpload, IconUsers, IconChecklist, IconPlus,
     IconFile, IconX, IconBriefcase, IconDeviceDesktopAnalytics,
-    IconUser, IconLayoutKanban, IconLoader
+    IconUser, IconLayoutKanban, IconLoader, IconExternalLink // 👈 IMPORT ICON
 } from "@tabler/icons-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -16,7 +17,6 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Skeleton } from "@/components/ui/skeleton";
 import { MultiSelectPopover } from "@/components/ui/multi-select-popover";
 
 // --- 1. GRAPHQL DEFINITIONS ---
@@ -28,8 +28,6 @@ const GET_DATA_QUERY = gql`
     coordinators: users(role: "COORDINATOR") { id name }
     pmJuniors: users(role: "PROJECT_MANAGER") { id name } 
     
-    # Removed project brief fetching as it's now on a separate page
-
     tasksByProject(projectId: $projectId) {
       id
       description
@@ -59,13 +57,12 @@ interface ProductionManagerProps {
     onSave?: () => void;
 }
 
-// Updated TabType: Removed "brief"
 type TabType = "team" | "assets" | "tasks";
 
 // --- 3. MAIN COMPONENT ---
 
 export function ProductionManager({ projectId, initialTeam, onSave }: ProductionManagerProps) {
-    // Default tab is now "team"
+    const router = useRouter(); // 👈 ROUTER HOOK
     const [activeTab, setActiveTab] = useState<TabType>("team");
 
     // Form States
@@ -131,7 +128,6 @@ export function ProductionManager({ projectId, initialTeam, onSave }: Production
 
         try {
             toast.loading("Upload en cours...");
-            // Remplace par ton URL prod
             const baseUrl = typeof window !== 'undefined' && window.location.hostname !== 'localhost'
                 ? 'https://backoffice.urbagroupe.ma'
                 : 'http://localhost:5002';
@@ -158,18 +154,32 @@ export function ProductionManager({ projectId, initialTeam, onSave }: Production
                             <IconBriefcase className="w-5 h-5" />
                         </div>
                         <div>
-                            <h2 className="text-lg font-bold tracking-tight text-foreground">Production Manager</h2>
-                            <p className="text-sm text-muted-foreground">Espace de travail collaboratif</p>
+                            <h2 className="text-lg font-bold tracking-tight text-foreground">Production</h2>
+                            <p className="text-sm text-muted-foreground">Quick Edit Panel</p>
                         </div>
                     </div>
-                    {/* Status Badge */}
+
+                    {/* Status Badge & FULL SPACE BUTTON */}
                     <div className="flex items-center gap-2">
+                        {/* 👇 ZIDT HAD LE BOUTTON HNA */}
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs gap-1.5 text-muted-foreground hover:text-primary"
+                            onClick={() => router.push(`/dashboard/projects/${projectId}/production`)}
+                        >
+                            <IconExternalLink className="w-3.5 h-3.5" />
+                            Espace Complet
+                        </Button>
+
+                        <Separator orientation="vertical" className="h-4" />
+
                         <Badge variant="outline" className="gap-2 px-3 py-1 bg-green-500/10 text-green-600 border-green-500/20">
                             <span className="relative flex h-2 w-2">
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                                 <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
                             </span>
-                            Live Sync
+                            Live
                         </Badge>
                     </div>
                 </div>
@@ -193,7 +203,6 @@ export function ProductionManager({ projectId, initialTeam, onSave }: Production
                                 icon={<IconDeviceDesktopAnalytics />}
                                 options={data?.infographistes}
                                 selected={teamData.infographisteIds}
-                                // ✅ FIX: Explicitly type 'id' and 'c' (checked)
                                 onChange={(id: string, c: boolean) => handleTeamChange('infographisteIds', id, c)}
                             />
                             <TeamCard
@@ -201,7 +210,6 @@ export function ProductionManager({ projectId, initialTeam, onSave }: Production
                                 icon={<IconLayoutKanban />}
                                 options={data?.team3D}
                                 selected={teamData.team3DIds}
-                                // ✅ FIX
                                 onChange={(id: string, c: boolean) => handleTeamChange('team3DIds', id, c)}
                             />
                             <TeamCard
@@ -209,7 +217,6 @@ export function ProductionManager({ projectId, initialTeam, onSave }: Production
                                 icon={<IconUser />}
                                 options={data?.coordinators}
                                 selected={teamData.coordinatorIds}
-                                // ✅ FIX
                                 onChange={(id: string, c: boolean) => handleTeamChange('coordinatorIds', id, c)}
                             />
                             <TeamCard
@@ -217,7 +224,6 @@ export function ProductionManager({ projectId, initialTeam, onSave }: Production
                                 icon={<IconUser />}
                                 options={data?.pmJuniors}
                                 selected={teamData.pmJuniorIds}
-                                // ✅ FIX
                                 onChange={(id: string, c: boolean) => handleTeamChange('pmJuniorIds', id, c)}
                             />
                         </div>
@@ -322,7 +328,6 @@ export function ProductionManager({ projectId, initialTeam, onSave }: Production
 
 function TabNavigation({ active, onChange, counts }: { active: TabType, onChange: (t: TabType) => void, counts: any }) {
     const tabs = [
-        // Removed "Brief" tab
         { id: "team", label: "Équipe", icon: <IconUsers className="w-4 h-4" /> },
         { id: "assets", label: "Fichiers", icon: <IconUpload className="w-4 h-4" /> },
         { id: "tasks", label: "Tâches", icon: <IconChecklist className="w-4 h-4" />, count: counts.tasks },

@@ -222,6 +222,19 @@ function TaskStatusBadge({ status }: { status: Task["status"] }) {
   );
 }
 
+const getFileUrl = (filePath: string) => {
+  if (!filePath) return "#";
+
+  // Check if we are on the client side (window exists)
+  const baseUrl = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+    ? 'http://localhost:5002'            // Dev Mode
+    : 'https://backoffice.urbagroupe.ma'; // Production Mode
+
+  // Combine base URL with file path
+  // Note: Ensure filePath doesn't start with a slash if you add one here, or vice versa
+  return `${baseUrl}/${filePath.startsWith('/') ? filePath.slice(1) : filePath}`;
+};
+
 // --- Department Badge Component ---
 function DepartmentBadge({ department }: { department: Task["department"] }) {
   const deptConfig = {
@@ -269,7 +282,7 @@ function FileDownloads({ task }: { task: Task }) {
       {task.v1Uploads.map((file) => (
         <a
           key={file.id}
-          href={`https://backoffice.urbagroupe.ma/${file.fileUrl}`}
+          href={getFileUrl(file.fileUrl)}
           target="_blank"
           rel="noopener noreferrer"
           title={`Télécharger ${file.originalFileName}`}
@@ -282,7 +295,7 @@ function FileDownloads({ task }: { task: Task }) {
       ))}
       {task.finalUpload && (
         <a
-          href={`https://backoffice.urbagroupe.ma/${task.finalUpload.fileUrl}`}
+          href={getFileUrl(task.finalUpload.fileUrl)}
           target="_blank"
           rel="noopener noreferrer"
           title={`Télécharger ${task.finalUpload.originalFileName}`}

@@ -27,6 +27,20 @@ const TASK_STATUS_BADGE_MAP: { [key: string]: { label: string; className: string
     DONE: { label: "Terminé", className: "bg-green-100 text-green-800 dark:bg-green-800/30 dark:text-green-300", icon: IconCircleCheck },
 };
 
+const getFileUrl = (filePath: string) => {
+    if (!filePath) return "#";
+
+    // Logic: Use localhost:5002 if we are developing locally, otherwise use the production domain
+    const baseUrl = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+        ? 'http://localhost:5002'
+        : 'https://backoffice.urbagroupe.ma';
+
+    // Prevent double slashes if filePath already starts with /
+    const cleanPath = filePath.startsWith('/') ? filePath.slice(1) : filePath;
+
+    return `${baseUrl}/${cleanPath}`;
+};
+
 function TaskStatusBadge({ status }: { status: string }) {
     const statusInfo = TASK_STATUS_BADGE_MAP[status] || TASK_STATUS_BADGE_MAP["TODO"];
     const Icon = statusInfo.icon;
@@ -80,7 +94,18 @@ export function TaskChecklistPanel({ project }: { project: any }) {
             const formDataRest = new FormData();
             formDataRest.append('file', file);
             toast.loading(`Upload en cours...`);
-            const response = await fetch(`https://backoffice.urbagroupe.ma/api/upload/${project.id}`, { method: 'POST', body: formDataRest });
+            // 1. Determine the Base URL
+            let baseUrl = 'https://backoffice.urbagroupe.ma'; // Default Prod
+
+            if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+                baseUrl = 'http://localhost:5002'; // Dev
+            }
+
+            // 2. Use it in fetch
+            const response = await fetch(`${baseUrl}/api/upload/${project.id}`, {
+                method: 'POST',
+                body: formDataRest
+            });
             if (!response.ok) throw new Error('Upload failed.');
             const result = await response.json();
             toast.dismiss();
@@ -195,7 +220,7 @@ export function TaskChecklistPanel({ project }: { project: any }) {
                                                     )}
                                                     <div className="space-y-2">
                                                         {task.v1Uploads.map((upload: any) => (
-                                                            <a key={upload.id} href={`https://backoffice.urbagroupe.mabagroupe.ma/${upload.fileUrl}`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-2 rounded border hover:bg-muted/50 transition-colors group">
+                                                        <a key={upload.id} href={getFileUrl(upload.fileUrl)} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-2 rounded border hover:bg-muted/50 transition-colors group">
                                                                 <div className="flex items-center gap-2 overflow-hidden">
                                                                     <IconUpload className="h-4 w-4 text-blue-500 flex-shrink-0" />
                                                                     <span className="text-sm truncate">{upload.originalFileName}</span>
@@ -205,7 +230,7 @@ export function TaskChecklistPanel({ project }: { project: any }) {
                                                             </a>
                                                         ))}
                                                         {task.finalUpload && (
-                                                            <a href={`https://backoffice.urbagroupe.ma/${task.finalUpload.fileUrl}`} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-2 rounded border border-green-200 bg-green-50/50 dark:bg-green-900/10 hover:bg-green-100/50 transition-colors group">
+                                                            <a href={getFileUrl(task.finalUpload.fileUrl)} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-2 rounded border border-green-200 bg-green-50/50 dark:bg-green-900/10 hover:bg-green-100/50 transition-colors group">
                                                                 <div className="flex items-center gap-2 overflow-hidden">
                                                                     <IconCircleCheck className="h-4 w-4 text-green-600 flex-shrink-0" />
                                                                     <span className="text-sm truncate font-medium">{task.finalUpload.originalFileName}</span>

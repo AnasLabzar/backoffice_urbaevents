@@ -74,18 +74,49 @@ export function ProjectTasksSheet({ project }: { project: any }) {
         getTasks({ variables: { projectId: project.id } });
     };
 
+    const getFileUrl = (filePath: string) => {
+        if (!filePath) return "#";
+
+        // Logic: Use localhost:5002 if we are developing locally, otherwise use the production domain
+        const baseUrl = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+            ? 'http://localhost:5002'
+            : 'https://backoffice.urbagroupe.ma';
+
+        // Prevent double slashes if filePath already starts with /
+        const cleanPath = filePath.startsWith('/') ? filePath.slice(1) : filePath;
+
+        return `${baseUrl}/${cleanPath}`;
+    };
+
     const handleFileUploadAndMutate = async (file: File | null, mutation: Function, docType: string, taskId: string) => {
         if (!file) { toast.error(`Aucun fichier.`); return false; }
+
         try {
             const formDataRest = new FormData();
             formDataRest.append('file', file);
             toast.loading(`Upload en cours...`);
-            const response = await fetch(`https://backoffice.urbagroupe.ma/api/upload/${project.id}`, { method: 'POST', body: formDataRest });
+
+            // 1. Définir l'URL de base (Local vs Prod)
+            let baseUrl = 'https://backoffice.urbagroupe.ma'; // Prod par défaut
+
+            if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+                baseUrl = 'http://localhost:5002'; // Dev
+            }
+
+            // 2. Utiliser la variable baseUrl dans le fetch
+            const response = await fetch(`${baseUrl}/api/upload/${project.id}`, {
+                method: 'POST',
+                body: formDataRest
+            });
+
             if (!response.ok) throw new Error('Upload failed.');
+
             const result = await response.json();
             toast.dismiss();
+
             await mutation({ variables: { taskId: taskId, originalFileName: file.name, fileUrl: result.fileUrl } });
             return true;
+
         } catch (error: any) {
             toast.dismiss();
             toast.error(`Erreur: ${error.message}`);
@@ -198,7 +229,7 @@ export function ProjectTasksSheet({ project }: { project: any }) {
 
                                                     <div className="space-y-2">
                                                         {task.v1Uploads.map((upload: any) => (
-                                                            <a key={upload.id} href={`https://backoffice.urbagroupe.ma/${upload.fileUrl}`} target="_blank" rel="noopener noreferrer"
+                                                            <a key={upload.id} href={getFileUrl(upload.fileUrl)} target="_blank" rel="noopener noreferrer"
                                                                 className="flex items-center justify-between p-2 rounded border hover:bg-muted/50 transition-colors group">
                                                                 <div className="flex items-center gap-2 overflow-hidden">
                                                                     <IconUpload className="h-4 w-4 text-blue-500 flex-shrink-0" />
@@ -210,7 +241,7 @@ export function ProjectTasksSheet({ project }: { project: any }) {
                                                         ))}
 
                                                         {task.finalUpload && (
-                                                            <a href={`https://backoffice.urbagroupe.ma/${task.finalUpload.fileUrl}`} target="_blank" rel="noopener noreferrer"
+                                                            <a href={getFileUrl(task.finalUpload.fileUrl)} target="_blank" rel="noopener noreferrer"
                                                                 className="flex items-center justify-between p-2 rounded border border-green-200 bg-green-50/50 dark:bg-green-900/10 dark:border-green-800 hover:bg-green-100/50 transition-colors group">
                                                                 <div className="flex items-center gap-2 overflow-hidden">
                                                                     <IconCircleCheck className="h-4 w-4 text-green-600 flex-shrink-0" />

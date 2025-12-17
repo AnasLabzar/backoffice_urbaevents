@@ -69,6 +69,20 @@ const uploadFileWithProgress = (file: File, url: string, onProgress: (percent: n
     });
 };
 
+const getFileUrl = (filePath: string) => {
+    if (!filePath) return "#";
+
+    // Logic: Use localhost:5002 if we are developing locally, otherwise use the production domain
+    const baseUrl = typeof window !== 'undefined' && window.location.hostname === 'localhost'
+        ? 'http://localhost:5002'
+        : 'https://backoffice.urbagroupe.ma';
+
+    // Prevent double slashes if filePath already starts with /
+    const cleanPath = filePath.startsWith('/') ? filePath.slice(1) : filePath;
+
+    return `${baseUrl}/${cleanPath}`;
+};
+
 // --- DOCUMENT ROW ---
 function DocumentRow({ label, type, existingDoc, file, setFile, progress, isOptional = false }: any) {
     const isUploaded = !!existingDoc;
@@ -85,7 +99,7 @@ function DocumentRow({ label, type, existingDoc, file, setFile, progress, isOpti
                 <div className="flex flex-col min-w-0">
                     <div className="flex items-center gap-2"><span className="font-medium text-sm truncate text-foreground">{label}</span>{isOptional && <Badge variant="outline" className="text-[10px] h-5 px-1.5">Optionnel</Badge>}</div>
                     <div className="text-xs text-muted-foreground truncate max-w-[200px] mt-0.5">
-                        {isUploading ? <span className="text-blue-600 font-medium animate-pulse">Upload en cours...</span> : file ? <span className="text-blue-600 font-medium">Prêt: {file.name}</span> : isUploaded ? <a href={`https://backoffice.urbagroupe.ma/${existingDoc.fileUrl}`} target="_blank" className="hover:underline flex items-center gap-1 text-green-600">{existingDoc.originalFileName || existingDoc.fileName} <IconDownload size={12} /></a> : <span>Non uploadé</span>}
+                        {isUploading ? <span className="text-blue-600 font-medium animate-pulse">Upload en cours...</span> : file ? <span className="text-blue-600 font-medium">Prêt: {file.name}</span> : isUploaded ? <a href={getFileUrl(existingDoc.fileUrl)} target="_blank" className="hover:underline flex items-center gap-1 text-green-600">{existingDoc.originalFileName || existingDoc.fileName} <IconDownload size={12} /></a> : <span>Non uploadé</span>}
                     </div>
                 </div>
             </div>
@@ -210,16 +224,39 @@ export function ProjectEditDrawer({ item }: { item: any }) {
     const handleFileUploadAndMutate = async (file: File | null, mutation: Function, docType: string, stageName?: string) => {
         if (!file) return true;
         setUploadProgress(prev => ({ ...prev, [docType]: 1 }));
+
         try {
-            let uploadBaseUrl = 'https://backoffice.urbagroupe.ma/graphql';
-            if (typeof window !== 'undefined') {
-                const hostname = window.location.hostname;
-                if (hostname !== 'localhost' && hostname !== '127.0.0.1') { uploadBaseUrl = 'https://backoffice.urbagroupe.ma'; }
+            // 1. Determine the Base URL (Local vs Prod)
+            let apiBaseUrl = 'https://backoffice.urbagroupe.ma'; // Default to production
+
+            if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+                apiBaseUrl = 'http://localhost:5002'; // Use local backend port
             }
-            const result = await uploadFileWithProgress(file, `${uploadBaseUrl}/api/upload/${item.id}`, (percent) => { setUploadProgress(prev => ({ ...prev, [docType]: percent })); });
-            await mutation({ variables: { projectId: item.id, stageName, docType, originalFileName: file.name, fileUrl: result.fileUrl } });
+
+            // 2. Construct the full upload endpoint
+            const uploadUrl = `${apiBaseUrl}/api/upload/${item.id}`;
+
+            // 3. Perform Upload
+            const result = await uploadFileWithProgress(
+                file,
+                uploadUrl,
+                (percent) => { setUploadProgress(prev => ({ ...prev, [docType]: percent })); }
+            );
+
+            // 4. Run Mutation
+            await mutation({
+                variables: {
+                    projectId: item.id,
+                    stageName,
+                    docType,
+                    originalFileName: file.name,
+                    fileUrl: result.fileUrl
+                }
+            });
+
             setUploadProgress(prev => ({ ...prev, [docType]: 0 }));
             return true;
+
         } catch (err: any) {
             setUploadProgress(prev => ({ ...prev, [docType]: 0 }));
             toast.error(`Erreur upload ${docType}: ${err.message}`);
