@@ -99,7 +99,7 @@ const formatDate = (dateString: string | null) => {
     return format(date, "d MMM", { locale: fr });
 };
 
-const files = project.stages?.technical?.documents || [];
+// const files = project.stages?.technical?.documents || [];
 
 // --- MAIN PAGE COMPONENT ---
 export default function ProductionPage({ params }: { params: Promise<{ id: string }> }) {
