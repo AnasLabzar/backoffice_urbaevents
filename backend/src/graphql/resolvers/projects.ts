@@ -68,7 +68,7 @@ export const projectResolvers = {
             return projects;
         },
 
-                                                                                                                                                                                                                                                                                            projects_feed: async (_: unknown, __: unknown, context: IContext) => {
+        projects_feed: async (_: unknown, __: unknown, context: IContext) => {
             if (!context.user) throw new ApolloError('Not authenticated', 'UNAUTHENTICATED');
 
             const user = await User.findById(context.user.id).populate('role');
@@ -287,7 +287,7 @@ export const projectResolvers = {
 
             const newDocument = await handleUpload(fileUrl, originalFileName, docType, context.user!.id);
             ((project.stages as any)[stageName].documents as any).push(newDocument._id);
-
+            
             const isCPS = docType.includes('CPS') || originalFileName.toLowerCase().includes('cps');
 
             if (isCPS) {
@@ -796,7 +796,7 @@ export const projectResolvers = {
 
             if (!isAdmin) {
                 // Ila machi admin, 3ad n-verifier permission
-                await checkPermission(context, 'delete_project'); 
+                await checkPermission(context, 'delete_project');
             }
             // ----------------
 
@@ -806,7 +806,7 @@ export const projectResolvers = {
             const projectTitle = project.title;
 
             console.log(`🗑️ Deleting project ${projectId} ...`);
-            
+
             // Cascade Delete
             await Task.deleteMany({ project: projectId });
             await Notification.deleteMany({ project: projectId });
