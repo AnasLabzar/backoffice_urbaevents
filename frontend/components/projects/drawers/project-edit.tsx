@@ -20,7 +20,8 @@ import { Badge } from "@/components/ui/badge";
 import {
     IconCheck, IconFileText, IconUpload, IconDownload, IconAlertCircle, IconLoader,
     IconChartPie, IconTrendingUp, IconTrendingDown, IconCalculator, IconBuildingBank,
-    IconUserShield, IconFileDescription, IconArrowRight
+    IconUserShield, IconFileDescription, IconArrowRight,
+    IconX
 } from "@tabler/icons-react";
 
 // Import du composant "Panier" Production qu'on a créé
@@ -84,33 +85,72 @@ const getFileUrl = (filePath: string) => {
 };
 
 // --- DOCUMENT ROW ---
-function DocumentRow({ label, type, existingDoc, file, setFile, progress, isOptional = false }: any) {
-    const isUploaded = !!existingDoc;
+// --- MULTI-DOCUMENT ROW ---
+function DocumentRow({ label, type, existingDocs, file, setFile, progress, isOptional = false }: any) {
     const isSelected = !!file;
     const isUploading = progress > 0 && progress < 100;
 
+    // Filter documents matching this type (e.g., "CPS", "RC")
+    // This allows multiple files to be listed under one category
+    const relevantDocs = Array.isArray(existingDocs)
+        ? existingDocs.filter((d: any) => d.fileName === type || d.originalFileName?.includes(type))
+        : [];
+
     return (
-        <div className="flex items-center justify-between p-3 border rounded-lg bg-card hover:bg-accent/5 transition-colors group relative overflow-hidden">
+        <div className="flex flex-col gap-2 p-3 border rounded-lg bg-card hover:bg-accent/5 transition-colors group relative overflow-hidden">
             {isUploading && <div className="absolute bottom-0 left-0 h-1 bg-blue-500 transition-all duration-300 ease-out" style={{ width: `${progress}%` }} />}
-            <div className="flex items-center gap-3 overflow-hidden z-10">
-                <div className={cn("h-10 w-10 rounded-full flex items-center justify-center flex-shrink-0 transition-colors border", isUploaded ? "bg-green-50 text-green-600 border-green-200" : isUploading ? "bg-blue-50 text-blue-600 border-blue-200" : isSelected ? "bg-blue-50 text-blue-600 border-blue-200" : "bg-muted text-muted-foreground border-transparent")}>
-                    {isUploading ? <span className="text-[10px] font-bold">{Math.round(progress)}%</span> : isUploaded ? <IconCheck size={20} /> : isSelected ? <IconUpload size={20} /> : <IconFileText size={20} />}
+
+            {/* Header: Label & Upload Button */}
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <span className="font-medium text-sm text-foreground">{label}</span>
+                    {isOptional && <Badge variant="outline" className="text-[10px] h-5 px-1.5">Optionnel</Badge>}
+                    <Badge variant="secondary" className="text-[10px] h-5 px-1.5">{relevantDocs.length} fichier(s)</Badge>
                 </div>
-                <div className="flex flex-col min-w-0">
-                    <div className="flex items-center gap-2"><span className="font-medium text-sm truncate text-foreground">{label}</span>{isOptional && <Badge variant="outline" className="text-[10px] h-5 px-1.5">Optionnel</Badge>}</div>
-                    <div className="text-xs text-muted-foreground truncate max-w-[200px] mt-0.5">
-                        {isUploading ? <span className="text-blue-600 font-medium animate-pulse">Upload en cours...</span> : file ? <span className="text-blue-600 font-medium">Prêt: {file.name}</span> : isUploaded ? <a href={getFileUrl(existingDoc.fileUrl)} target="_blank" className="hover:underline flex items-center gap-1 text-green-600">{existingDoc.originalFileName || existingDoc.fileName} <IconDownload size={12} /></a> : <span>Non uploadé</span>}
-                    </div>
-                </div>
-            </div>
-            <div className="flex-shrink-0 ml-2 z-10">
+
                 <div className="relative">
-                    <input type="file" id={`upload-${type}`} disabled={isUploading} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed" onChange={(e) => { if (e.target.files && e.target.files[0]) setFile(e.target.files[0]); }} />
-                    <Button variant={isUploaded || isSelected ? "outline" : "secondary"} size="sm" disabled={isUploading} className={cn("pointer-events-none h-8 text-xs", isUploaded && "border-green-200 text-green-700 hover:bg-green-50")}>
-                        {isUploading ? <IconLoader className="animate-spin h-3 w-3" /> : isUploaded ? "Remplacer" : isSelected ? "Changer" : "Choisir"}
+                    <input
+                        type="file"
+                        id={`upload-${type}`}
+                        disabled={isUploading}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed"
+                        onChange={(e) => { if (e.target.files && e.target.files[0]) setFile(e.target.files[0]); }}
+                    />
+                    <Button variant={isSelected ? "default" : "secondary"} size="sm" disabled={isUploading} className="h-7 text-xs">
+                        {isUploading ? <IconLoader className="animate-spin h-3 w-3" /> : isSelected ? "Fichier sélectionné" : <><IconUpload size={12} className="mr-1" /> Ajouter</>}
                     </Button>
                 </div>
             </div>
+
+            {/* Selected File Preview (Pending Upload) */}
+            {isSelected && (
+                <div className="text-xs bg-blue-50 text-blue-700 p-2 rounded flex justify-between items-center mt-1">
+                    <span>Prêt à envoyer: <strong>{file.name}</strong></span>
+                    <Button variant="ghost" size="sm" className="h-5 w-5 p-0 hover:bg-blue-100 rounded-full" onClick={(e) => { e.preventDefault(); setFile(null); }}>
+                        <IconX size={14} />
+                    </Button>
+                </div>
+            )}
+
+            {/* List of Existing Files */}
+            {relevantDocs.length > 0 ? (
+                <div className="mt-2 space-y-1">
+                    {relevantDocs.map((doc: any, index: number) => (
+                        <div key={doc.id || index} className="flex items-center justify-between text-xs bg-muted/50 p-2 rounded border border-transparent hover:border-border transition-colors">
+                            <div className="flex items-center gap-2 overflow-hidden">
+                                <IconFileText size={14} className="text-muted-foreground flex-shrink-0" />
+                                <span className="truncate max-w-[200px]" title={doc.originalFileName}>{doc.originalFileName || "Document sans nom"}</span>
+                                <span className="text-[10px] text-muted-foreground">{new Date(doc.createdAt).toLocaleDateString()}</span>
+                            </div>
+                            <a href={getFileUrl(doc.fileUrl)} target="_blank" className="text-green-600 hover:text-green-700 hover:bg-green-50 p-1 rounded transition-colors" title="Télécharger">
+                                <IconDownload size={14} />
+                            </a>
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <div className="mt-1 text-xs text-muted-foreground italic pl-1">Aucun document disponible.</div>
+            )}
         </div>
     );
 }
@@ -130,6 +170,8 @@ function MarginCalculator({ marketPrice, costPrice }: { marketPrice: number, cos
     );
 }
 
+
+
 // --- MAIN COMPONENT ---
 export function ProjectEditDrawer({ item }: { item: any }) {
     const isMobile = useIsMobile();
@@ -137,6 +179,10 @@ export function ProjectEditDrawer({ item }: { item: any }) {
     const { data: meData } = useQuery(ME_QUERY);
     const userRole = meData?.me.role.name;
     const userPermissions = meData?.me.role.permissions || [];
+
+    // Get ALL documents for specific stages
+    const administrativeDocs = item.stages?.administrative?.documents || [];
+    const technicalDocs = item.stages?.technical?.documents || [];
 
     // ✅ Check PM Assignment
     const isAssignedPM = item.projectManagers?.some((pm: any) => pm.id === meData?.me?.id);
@@ -264,13 +310,24 @@ export function ProjectEditDrawer({ item }: { item: any }) {
         }
     };
 
+    // Helper to check if AT LEAST ONE document exists
+    const hasDocType = (docs: any[], type: string) => {
+        return docs.some((d: any) => d.fileName === type || d.originalFileName?.includes(type));
+    };
+
+    // Update handleSubmitForReview
     const handleSubmitForReview = async () => {
         const isDraft = item.preparationStatus === 'DRAFT';
-        const hasCPS = fileCPS || getDoc('CPS');
-        const hasRC = fileRC || getDoc('RC');
-        const hasAvis = fileAvis || getDoc('Avis');
 
-        if (isDraft && (!hasCPS || !hasRC || !hasAvis)) { toast.error("Documents requis manquants."); return; }
+        // Check if file is selected OR if it exists in the list
+        const hasCPS = fileCPS || hasDocType(existingDocs, 'CPS');
+        const hasRC = fileRC || hasDocType(existingDocs, 'RC');
+        const hasAvis = fileAvis || hasDocType(existingDocs, 'Avis');
+
+        if (isDraft && (!hasCPS || !hasRC || !hasAvis)) {
+            toast.error("Documents requis manquants (CPS, RC, ou Avis).");
+            return;
+        }
         if (fileCPS) await handleFileUploadAndMutate(fileCPS, uploadDocument, 'CPS', 'administrative');
         if (fileRC) await handleFileUploadAndMutate(fileRC, uploadDocument, 'RC', 'administrative');
         if (fileAvis) await handleFileUploadAndMutate(fileAvis, uploadDocument, 'Avis', 'administrative');
@@ -316,15 +373,53 @@ export function ProjectEditDrawer({ item }: { item: any }) {
                     </div>
                     <div className="space-y-3">
                         <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Documents Requis</h4>
-                        <DocumentRow label="Cahier des Charges (CPS)" type="CPS" existingDoc={getDoc('CPS')} file={fileCPS} setFile={setFileCPS} progress={uploadProgress['CPS'] || 0} />
-                        <DocumentRow label="Règlement Consultation (RC)" type="RC" existingDoc={getDoc('RC')} file={fileRC} setFile={setFileRC} progress={uploadProgress['RC'] || 0} />
-                        <DocumentRow label="Avis de Marché" type="Avis" existingDoc={getDoc('Avis')} file={fileAvis} setFile={setFileAvis} progress={uploadProgress['Avis'] || 0} />
+                        {/* 👇 CHANGE HERE: Pass existingDocs array instead of single getDoc() */}
+                        <DocumentRow
+                            label="Cahier des Charges (CPS)"
+                            type="CPS"
+                            existingDocs={administrativeDocs} // Pass full array
+                            file={fileCPS}
+                            setFile={setFileCPS}
+                            progress={uploadProgress['CPS'] || 0}
+                        />
+                        <DocumentRow
+                            label="Règlement Consultation (RC)"
+                            type="RC"
+                            existingDocs={administrativeDocs}
+                            file={fileRC}
+                            setFile={setFileRC}
+                            progress={uploadProgress['RC'] || 0}
+                        />
+                        <DocumentRow
+                            label="Avis de Marché"
+                            type="Avis"
+                            existingDocs={administrativeDocs}
+                            file={fileAvis}
+                            setFile={setFileAvis}
+                            progress={uploadProgress['Avis'] || 0}
+                        />
                     </div>
                     <Separator />
                     <div className="space-y-3">
                         <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Documents Optionnels</h4>
-                        <DocumentRow label="Bordereau Prix (BPE)" type="BPE" existingDoc={getDoc('BPE')} file={fileBPE} setFile={setFileBPE} progress={uploadProgress['BPE'] || 0} isOptional />
-                        <DocumentRow label="Dossier Technique" type="Tech" existingDoc={getDoc('Fichier Technique')} file={fileTech} setFile={setFileTech} progress={uploadProgress['Fichier Technique'] || 0} isOptional />
+                        <DocumentRow
+                            label="Bordereau Prix (BPE)"
+                            type="BPE"
+                            existingDocs={administrativeDocs}
+                            file={fileBPE}
+                            setFile={setFileBPE}
+                            progress={uploadProgress['BPE'] || 0}
+                            isOptional
+                        />
+                        <DocumentRow
+                            label="Dossier Technique"
+                            type="Fichier Technique" // Ensure this matches your docType string
+                            existingDocs={technicalDocs} // Note: Technical docs come from technical stage
+                            file={fileTech}
+                            setFile={setFileTech}
+                            progress={uploadProgress['Fichier Technique'] || 0}
+                            isOptional
+                        />
                     </div>
                 </div>
             );
