@@ -37,24 +37,31 @@ export const GET_PROJECTS_FEED = gql`
         status: generalStatus
         preparationStatus
         
+        # ✅ AJOUTÉ : Champs indispensables pour le mode Edit
+        projectType
+        referenceAO
+        technicalOfferRequired
+        submissionDeadline
+        # -------------------------------------------------
+
         # Les champs financiers
         marketEstimate
         estimatedBudget
+        cautionAmount
 
-        # --- AJOUTER CE BLOC POUR L'IA ---
+        # Bloc IA
         aiSummary {
-            summary      # Le résumé du CPS
-            thematic     # La thématique (ex: BTP, Informatique...)
-            generatedAt  # Date de génération
+            summary
+            thematic
+            generatedAt
         }
-        # ---------------------------------
         
         projectManagers { id name }
         stages { 
           administrative { documents { id fileName fileUrl } }
           technical { documents { id fileName fileUrl originalFileName } }
         }
-        submissionDeadline
+        
         cautionRequestDate
         feasibilityChecks {
           administrative
@@ -148,7 +155,22 @@ export const TASK_UPDATED_SUBSCRIPTION = gql`
 
 export const UPDATE_PROJECT_MUTATION = gql`
   mutation UpdateProject($id: ID!, $input: UpdateProjectInput!) {
-    updateProject(id: $id, input: $input) { id title object status: generalStatus }
+    updateProject(id: $id, input: $input) {
+      id 
+      title 
+      object 
+      status: generalStatus
+      
+      # ✅ AJOUTÉ : Retourner ces champs permet de mettre à jour le cache Apollo instantanément
+      preparationStatus
+      estimatedBudget
+      cautionAmount
+      marketEstimate
+      referenceAO
+      submissionDeadline
+      technicalOfferRequired
+      projectType
+    }
   }
 `;
 

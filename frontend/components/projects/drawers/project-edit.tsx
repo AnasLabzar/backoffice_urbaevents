@@ -21,10 +21,9 @@ import {
     IconCheck, IconFileText, IconUpload, IconDownload, IconAlertCircle, IconLoader,
     IconChartPie, IconTrendingUp, IconTrendingDown, IconCalculator, IconBuildingBank,
     IconUserShield, IconFileDescription, IconArrowRight,
-    IconX
+    IconX, IconPlus, IconTrash
 } from "@tabler/icons-react";
 
-// Import du composant "Panier" Production qu'on a créé
 import { ProductionManager } from "./production-manager";
 
 import {
@@ -37,18 +36,7 @@ import {
     GET_ALL_USERS
 } from "@/lib/graphql/projects";
 
-interface ProductionManagerProps {
-    projectId: string;
-    initialTeam?: {
-        infographisteIds: string[];
-        team3DIds: string[];
-        coordinatorIds: string[];
-        pmJuniorIds: string[];
-    };
-    onSave?: () => void;
-}
-
-// --- HELPER UPLOAD ---
+// ... (Garder les interfaces et les helpers uploadFileWithProgress / getFileUrl identiques) ...
 const uploadFileWithProgress = (file: File, url: string, onProgress: (percent: number) => void): Promise<any> => {
     return new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
@@ -72,40 +60,54 @@ const uploadFileWithProgress = (file: File, url: string, onProgress: (percent: n
 
 const getFileUrl = (filePath: string) => {
     if (!filePath) return "#";
-
-    // Logic: Use localhost:5002 if we are developing locally, otherwise use the production domain
     const baseUrl = typeof window !== 'undefined' && window.location.hostname === 'localhost'
         ? 'http://localhost:5002'
         : 'https://backoffice.urbagroupe.ma';
-
-    // Prevent double slashes if filePath already starts with /
     const cleanPath = filePath.startsWith('/') ? filePath.slice(1) : filePath;
-
     return `${baseUrl}/${cleanPath}`;
 };
 
-// --- DOCUMENT ROW ---
-// --- MULTI-DOCUMENT ROW ---
-function DocumentRow({ label, type, existingDocs, file, setFile, progress, isOptional = false }: any) {
-    const isSelected = !!file;
+// --- MULTI-DOCUMENT ROW (UPDATED) ---
+// ✅ Accepte maintenant un tableau de fichiers (files) et permet l'upload multiple
+function DocumentRow({ label, type, existingDocs, files, setFiles, progress, isOptional = false, maxFiles = 10 }: any) {
     const isUploading = progress > 0 && progress < 100;
 
-    // Filter documents matching this type (e.g., "CPS", "RC")
-    // This allows multiple files to be listed under one category
+    // Documents existants (Backend)
     const relevantDocs = Array.isArray(existingDocs)
         ? existingDocs.filter((d: any) => d.fileName === type || d.originalFileName?.includes(type))
         : [];
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files.length > 0) {
+            const newFiles = Array.from(e.target.files);
+            // Vérification limite max
+            if (files.length + newFiles.length > maxFiles) {
+                toast.error(`Maximum ${maxFiles} fichiers autorisés.`);
+                return;
+            }
+            // Ajout aux fichiers existants en attente
+            setFiles((prev: File[]) => [...prev, ...newFiles]);
+        }
+        // Reset input value to allow re-selecting same file if needed
+        e.target.value = '';
+    };
+
+    const removePendingFile = (indexToRemove: number) => {
+        setFiles((prev: File[]) => prev.filter((_, i) => i !== indexToRemove));
+    };
 
     return (
         <div className="flex flex-col gap-2 p-3 border rounded-lg bg-card hover:bg-accent/5 transition-colors group relative overflow-hidden">
             {isUploading && <div className="absolute bottom-0 left-0 h-1 bg-blue-500 transition-all duration-300 ease-out" style={{ width: `${progress}%` }} />}
 
-            {/* Header: Label & Upload Button */}
+            {/* Header */}
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                     <span className="font-medium text-sm text-foreground">{label}</span>
                     {isOptional && <Badge variant="outline" className="text-[10px] h-5 px-1.5">Optionnel</Badge>}
-                    <Badge variant="secondary" className="text-[10px] h-5 px-1.5">{relevantDocs.length} fichier(s)</Badge>
+                    <Badge variant="secondary" className="text-[10px] h-5 px-1.5">
+                        {relevantDocs.length} en ligne
+                    </Badge>
                 </div>
 
                 <div className="relative">
@@ -113,26 +115,35 @@ function DocumentRow({ label, type, existingDocs, file, setFile, progress, isOpt
                         type="file"
                         id={`upload-${type}`}
                         disabled={isUploading}
+                        multiple // ✅ ACTIVATION MULTIPLE
                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed"
-                        onChange={(e) => { if (e.target.files && e.target.files[0]) setFile(e.target.files[0]); }}
+                        onChange={handleFileChange}
                     />
-                    <Button variant={isSelected ? "default" : "secondary"} size="sm" disabled={isUploading} className="h-7 text-xs">
-                        {isUploading ? <IconLoader className="animate-spin h-3 w-3" /> : isSelected ? "Fichier sélectionné" : <><IconUpload size={12} className="mr-1" /> Ajouter</>}
+                    <Button variant={files.length > 0 ? "default" : "secondary"} size="sm" disabled={isUploading} className="h-7 text-xs">
+                        {isUploading ? <IconLoader className="animate-spin h-3 w-3" /> : <><IconPlus size={12} className="mr-1" /> Ajouter</>}
                     </Button>
                 </div>
             </div>
 
-            {/* Selected File Preview (Pending Upload) */}
-            {isSelected && (
-                <div className="text-xs bg-blue-50 text-blue-700 p-2 rounded flex justify-between items-center mt-1">
-                    <span>Prêt à envoyer: <strong>{file.name}</strong></span>
-                    <Button variant="ghost" size="sm" className="h-5 w-5 p-0 hover:bg-blue-100 rounded-full" onClick={(e) => { e.preventDefault(); setFile(null); }}>
-                        <IconX size={14} />
-                    </Button>
+            {/* --- LISTE DES FICHIERS EN ATTENTE (PENDING) --- */}
+            {files.length > 0 && (
+                <div className="mt-2 space-y-1 bg-blue-50/50 p-2 rounded border border-blue-100">
+                    <p className="text-[10px] font-semibold text-blue-700 mb-1">En attente d'envoi ({files.length}) :</p>
+                    {files.map((file: File, idx: number) => (
+                        <div key={idx} className="flex justify-between items-center text-xs text-blue-800 bg-white/60 p-1.5 rounded">
+                            <span className="truncate max-w-[200px]">{file.name}</span>
+                            <button
+                                onClick={() => removePendingFile(idx)}
+                                className="text-red-500 hover:bg-red-100 p-0.5 rounded transition-colors"
+                            >
+                                <IconX size={14} />
+                            </button>
+                        </div>
+                    ))}
                 </div>
             )}
 
-            {/* List of Existing Files */}
+            {/* --- LISTE DES FICHIERS EXISTANTS (BACKEND) --- */}
             {relevantDocs.length > 0 ? (
                 <div className="mt-2 space-y-1">
                     {relevantDocs.map((doc: any, index: number) => (
@@ -149,13 +160,13 @@ function DocumentRow({ label, type, existingDocs, file, setFile, progress, isOpt
                     ))}
                 </div>
             ) : (
-                <div className="mt-1 text-xs text-muted-foreground italic pl-1">Aucun document disponible.</div>
+                files.length === 0 && <div className="mt-1 text-xs text-muted-foreground italic pl-1">Aucun document.</div>
             )}
         </div>
     );
 }
 
-// --- MARGIN CALCULATOR ---
+// ... (Garder MarginCalculator identique) ...
 function MarginCalculator({ marketPrice, costPrice }: { marketPrice: number, costPrice: number }) {
     const market = Number(marketPrice) || 0; const cost = Number(costPrice) || 0; const margin = market - cost;
     const marginPercent = market > 0 ? (margin / market) * 100 : 0;
@@ -170,8 +181,6 @@ function MarginCalculator({ marketPrice, costPrice }: { marketPrice: number, cos
     );
 }
 
-
-
 // --- MAIN COMPONENT ---
 export function ProjectEditDrawer({ item }: { item: any }) {
     const isMobile = useIsMobile();
@@ -180,23 +189,22 @@ export function ProjectEditDrawer({ item }: { item: any }) {
     const userRole = meData?.me.role.name;
     const userPermissions = meData?.me.role.permissions || [];
 
-    // Get ALL documents for specific stages
     const administrativeDocs = item.stages?.administrative?.documents || [];
     const technicalDocs = item.stages?.technical?.documents || [];
-
-    // ✅ Check PM Assignment
     const isAssignedPM = item.projectManagers?.some((pm: any) => pm.id === meData?.me?.id);
 
-    // State
-    const [fileCPS, setFileCPS] = React.useState<File | null>(null);
-    const [fileRC, setFileRC] = React.useState<File | null>(null);
-    const [fileAvis, setFileAvis] = React.useState<File | null>(null);
-    const [fileBPE, setFileBPE] = React.useState<File | null>(null);
-    const [fileTech, setFileTech] = React.useState<File | null>(null);
-    const [uploadProgress, setUploadProgress] = React.useState<Record<string, number>>({});
+    // ✅ STATES MODIFIÉS POUR GERER LES TABLEAUX DE FICHIERS (Files[])
+    const [filesCPS, setFilesCPS] = React.useState<File[]>([]);
+    const [filesRC, setFilesRC] = React.useState<File[]>([]);
+    const [filesAvis, setFilesAvis] = React.useState<File[]>([]);
+    const [filesBPE, setFilesBPE] = React.useState<File[]>([]);
+    const [filesTech, setFilesTech] = React.useState<File[]>([]);
 
+    // Uploads uniques pour l'estimation / asset (on garde single file pour eux si besoin, ou on passe en array aussi)
     const [fileEstimate, setFileEstimate] = React.useState<File | null>(null);
     const [fileAsset, setFileAsset] = React.useState<File | null>(null);
+
+    const [uploadProgress, setUploadProgress] = React.useState<Record<string, number>>({});
 
     const [adminFormData, setAdminFormData] = React.useState({ status: item.preparationStatus, projectManagerId: item.projectManagers[0]?.id || '' });
     const [feasibilityData, setFeasibilityData] = React.useState({ administrative: item.feasibilityChecks.administrative, technical: item.feasibilityChecks.technical, financial: item.feasibilityChecks.financial });
@@ -213,7 +221,7 @@ export function ProjectEditDrawer({ item }: { item: any }) {
     const [newTaskDept, setNewTaskDept] = React.useState("");
     const [avisData, setAvisData] = React.useState({ status: '', reason: '' });
 
-    // Mutations
+    // Mutations (Identiques)
     const [updateProject, { loading: loadingUpdate }] = useMutation(UPDATE_PROJECT_MUTATION, { onCompleted: () => toast.success("Projet mis à jour!"), onError: (err) => toast.error(err.message), refetchQueries: [GET_PROJECTS_FEED] });
     const [uploadDocument, { loading: loadingUpload }] = useMutation(UPLOAD_DOCUMENT_MUTATION);
     const [submitForReview, { loading: loadingSubmit }] = useMutation(SUBMIT_REVIEW_MUTATION, { onCompleted: () => toast.success("Projet soumis avec succès!"), refetchQueries: [GET_PROJECTS_FEED] });
@@ -228,7 +236,6 @@ export function ProjectEditDrawer({ item }: { item: any }) {
     const [updateTaskStatus] = useMutation(PM_UPDATE_TASK_STATUS_MUTATION, { onCompleted: () => toast.success("Status MAJ!"), refetchQueries: [GET_PROJECTS_FEED] });
     const [cpUploadAsset, { loading: loadingAsset }] = useMutation(CP_UPLOAD_ASSET_MUTATION, { onCompleted: () => { toast.success("Asset uploadé!"); setFileAsset(null); }, refetchQueries: [{ query: GET_PROJECTS_FEED }] });
 
-    // Queries
     const { data: allUsersData, loading: loadingUsers } = useQuery(GET_ALL_USERS, { skip: userRole !== 'ADMIN' });
     const { data: pmData, loading: loadingPMs } = useQuery(GET_PROJECT_MANAGERS, { skip: userRole !== 'ADMIN' });
     const { data: teamMembers, loading: loadingTeamMembers } = useQuery(GET_TEAM_MEMBERS, { skip: !(userRole === 'ADMIN' || userPermissions.includes('assign_creative_tasks')) });
@@ -264,6 +271,8 @@ export function ProjectEditDrawer({ item }: { item: any }) {
     const handleLaunchProject = () => { adminLaunchProject({ variables: { projectId: item.id } }); };
     const handleRequestCaution = () => { financeRequestCaution({ variables: { projectId: item.id } }); };
     const handleAssignTeam = () => { cpAssignTeam({ variables: { input: { projectId: item.id, ...teamData } } }); };
+
+    // Single File Handlers
     const handleSubmitAsset = () => { handleFileUploadAndMutate(fileAsset, cpUploadAsset, 'ASSET', 'technical'); };
     const handleSubmitEstimate = () => { handleFileUploadAndMutate(fileEstimate, cpUploadEstimate, 'CP_ESTIMATE', 'technical'); };
 
@@ -272,24 +281,18 @@ export function ProjectEditDrawer({ item }: { item: any }) {
         setUploadProgress(prev => ({ ...prev, [docType]: 1 }));
 
         try {
-            // 1. Determine the Base URL (Local vs Prod)
-            let apiBaseUrl = 'https://backoffice.urbagroupe.ma'; // Default to production
-
+            let apiBaseUrl = 'https://backoffice.urbagroupe.ma';
             if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
-                apiBaseUrl = 'http://localhost:5002'; // Use local backend port
+                apiBaseUrl = 'http://localhost:5002';
             }
-
-            // 2. Construct the full upload endpoint
             const uploadUrl = `${apiBaseUrl}/api/upload/${item.id}`;
 
-            // 3. Perform Upload
             const result = await uploadFileWithProgress(
                 file,
                 uploadUrl,
                 (percent) => { setUploadProgress(prev => ({ ...prev, [docType]: percent })); }
             );
 
-            // 4. Run Mutation
             await mutation({
                 variables: {
                     projectId: item.id,
@@ -315,40 +318,44 @@ export function ProjectEditDrawer({ item }: { item: any }) {
         return docs.some((d: any) => d.fileName === type || d.originalFileName?.includes(type));
     };
 
-    // Update handleSubmitForReview
+    // ✅ NOUVEAU: Helper pour upload de masse (boucle sur le tableau)
+    const handleBulkUpload = async (files: File[], docType: string, stageName: string) => {
+        if (files.length === 0) return true;
+
+        let successCount = 0;
+        for (const file of files) {
+            const success = await handleFileUploadAndMutate(file, uploadDocument, docType, stageName);
+            if (success) successCount++;
+        }
+        return successCount === files.length;
+    };
+
+    // ✅ MODIFICATION LOGIQUE SUBMIT
     const handleSubmitForReview = async () => {
         const isDraft = item.preparationStatus === 'DRAFT';
 
-        // Check if file is selected OR if it exists in the list
-        const hasCPS = fileCPS || hasDocType(existingDocs, 'CPS');
-        const hasRC = fileRC || hasDocType(existingDocs, 'RC');
-        const hasAvis = fileAvis || hasDocType(existingDocs, 'Avis');
+        // Check validation
+        const hasCPS = filesCPS.length > 0 || hasDocType(existingDocs, 'CPS');
+        const hasRC = filesRC.length > 0 || hasDocType(existingDocs, 'RC');
+        const hasAvis = filesAvis.length > 0 || hasDocType(existingDocs, 'Avis');
 
         if (isDraft && (!hasCPS || !hasRC || !hasAvis)) {
             toast.error("Documents requis manquants (CPS, RC, ou Avis).");
             return;
         }
-        if (fileCPS) await handleFileUploadAndMutate(fileCPS, uploadDocument, 'CPS', 'administrative');
-        if (fileRC) await handleFileUploadAndMutate(fileRC, uploadDocument, 'RC', 'administrative');
-        if (fileAvis) await handleFileUploadAndMutate(fileAvis, uploadDocument, 'Avis', 'administrative');
-        if (fileBPE) await handleFileUploadAndMutate(fileBPE, uploadDocument, 'BPE', 'administrative');
-        if (fileTech) await handleFileUploadAndMutate(fileTech, uploadDocument, 'Fichier Technique', 'technical');
-        setFileCPS(null); setFileRC(null); setFileAvis(null); setFileBPE(null); setFileTech(null);
+
+        // Upload Sequentiel des fichiers
+        await handleBulkUpload(filesCPS, 'CPS', 'administrative');
+        await handleBulkUpload(filesRC, 'RC', 'administrative');
+        await handleBulkUpload(filesAvis, 'Avis', 'administrative');
+        await handleBulkUpload(filesBPE, 'BPE', 'administrative');
+        await handleBulkUpload(filesTech, 'Fichier Technique', 'technical');
+
+        // Reset states
+        setFilesCPS([]); setFilesRC([]); setFilesAvis([]); setFilesBPE([]); setFilesTech([]);
+
         if (isDraft) submitForReview({ variables: { projectId: item.id } });
         else toast.success("Documents mis à jour.");
-    };
-
-    const handleTeamChange = (type: 'infographisteIds' | 'team3DIds' | 'assistantIds', userId: string, isChecked: boolean) => {
-        setTeamData(prev => {
-            const currentIds = prev[type] || [];
-            const newIds = isChecked ? [...currentIds, userId] : currentIds.filter((id: string) => id !== userId);
-            return { ...prev, [type]: newIds };
-        });
-    };
-
-    const handleCreateTask = () => {
-        if (!newTaskDesc || !newTaskAssignee || !newTaskDept) { toast.error("Champs requis."); return; }
-        createTask({ variables: { input: { projectId: item.id, description: newTaskDesc, assignedToId: newTaskAssignee, department: newTaskDept } } });
     };
 
     React.useEffect(() => { setFormData({ ...item }); }, [item]);
@@ -361,7 +368,6 @@ export function ProjectEditDrawer({ item }: { item: any }) {
     const isToPrepare = item.preparationStatus === 'TO_PREPARE';
     const isFeasibilityPending = item.preparationStatus === 'FEASIBILITY_PENDING';
     const isCautionPending = item.preparationStatus === 'CAUTION_PENDING';
-    // ✅ STATUS PRODUCTION
     const isInProduction = item.preparationStatus === 'IN_PRODUCTION';
 
     const renderPanelContent = () => {
@@ -373,29 +379,29 @@ export function ProjectEditDrawer({ item }: { item: any }) {
                     </div>
                     <div className="space-y-3">
                         <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Documents Requis</h4>
-                        {/* 👇 CHANGE HERE: Pass existingDocs array instead of single getDoc() */}
+                        {/* ✅ UTILISATION DE files (Tableau) au lieu de file (Unique) */}
                         <DocumentRow
                             label="Cahier des Charges (CPS)"
                             type="CPS"
-                            existingDocs={administrativeDocs} // Pass full array
-                            file={fileCPS}
-                            setFile={setFileCPS}
+                            existingDocs={administrativeDocs}
+                            files={filesCPS}
+                            setFiles={setFilesCPS}
                             progress={uploadProgress['CPS'] || 0}
                         />
                         <DocumentRow
                             label="Règlement Consultation (RC)"
                             type="RC"
                             existingDocs={administrativeDocs}
-                            file={fileRC}
-                            setFile={setFileRC}
+                            files={filesRC}
+                            setFiles={setFilesRC}
                             progress={uploadProgress['RC'] || 0}
                         />
                         <DocumentRow
                             label="Avis de Marché"
                             type="Avis"
                             existingDocs={administrativeDocs}
-                            file={fileAvis}
-                            setFile={setFileAvis}
+                            files={filesAvis}
+                            setFiles={setFilesAvis}
                             progress={uploadProgress['Avis'] || 0}
                         />
                     </div>
@@ -406,17 +412,17 @@ export function ProjectEditDrawer({ item }: { item: any }) {
                             label="Bordereau Prix (BPE)"
                             type="BPE"
                             existingDocs={administrativeDocs}
-                            file={fileBPE}
-                            setFile={setFileBPE}
+                            files={filesBPE}
+                            setFiles={setFilesBPE}
                             progress={uploadProgress['BPE'] || 0}
                             isOptional
                         />
                         <DocumentRow
                             label="Dossier Technique"
-                            type="Fichier Technique" // Ensure this matches your docType string
-                            existingDocs={technicalDocs} // Note: Technical docs come from technical stage
-                            file={fileTech}
-                            setFile={setFileTech}
+                            type="Fichier Technique"
+                            existingDocs={technicalDocs}
+                            files={filesTech}
+                            setFiles={setFilesTech}
                             progress={uploadProgress['Fichier Technique'] || 0}
                             isOptional
                         />
@@ -425,7 +431,7 @@ export function ProjectEditDrawer({ item }: { item: any }) {
             );
         }
 
-        // ✅ VUE ADMIN: Panneau de Validation Professionnel
+        // ... (Reste des conditions pour ADMIN, etc. identique) ...
         if (userRole === 'ADMIN' && isPendingAdminReview) {
             return (
                 <form id="admin-assign-form" className="flex flex-col gap-6" onSubmit={handleAdminSubmit}>
@@ -456,99 +462,55 @@ export function ProjectEditDrawer({ item }: { item: any }) {
                     <div className="space-y-3">
                         <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Assignation Chef de Projet</h4>
                         {loadingUsers ? <Skeleton className="h-10" /> : (
-                            <Select
-                                value={adminFormData.projectManagerId}
-                                onValueChange={(v) => handleAdminFormChange("projectManagerId", v)}
-                            >
-                                <SelectTrigger className="h-10 bg-background">
-                                    <SelectValue placeholder="Sélectionner un responsable..." />
-                                </SelectTrigger>
+                            <Select value={adminFormData.projectManagerId} onValueChange={(v) => handleAdminFormChange("projectManagerId", v)}>
+                                <SelectTrigger className="h-10 bg-background"><SelectValue placeholder="Sélectionner un responsable..." /></SelectTrigger>
                                 <SelectContent>
                                     <SelectGroup>
                                         <SelectLabel>Chefs de Projet & Directeurs</SelectLabel>
-                                        {allUsersData?.users
-                                            .filter((u: any) => ['PROJECT_MANAGER', 'DIRECTOR_EVENT', 'ADMIN'].includes(u.role.name))
-                                            .map((pm: any) => (
-                                                <SelectItem key={pm.id} value={pm.id}>
-                                                    {pm.name} <span className="text-muted-foreground text-xs ml-2">({pm.role.name})</span>
-                                                </SelectItem>
-                                            ))}
+                                        {allUsersData?.users.filter((u: any) => ['PROJECT_MANAGER', 'DIRECTOR_EVENT', 'ADMIN'].includes(u.role.name)).map((pm: any) => (
+                                            <SelectItem key={pm.id} value={pm.id}>{pm.name} <span className="text-muted-foreground text-xs ml-2">({pm.role.name})</span></SelectItem>
+                                        ))}
                                     </SelectGroup>
                                     <SelectGroup>
                                         <SelectLabel>Autres Utilisateurs</SelectLabel>
-                                        {allUsersData?.users
-                                            .filter((u: any) => !['PROJECT_MANAGER', 'DIRECTOR_EVENT', 'ADMIN'].includes(u.role.name))
-                                            .map((pm: any) => (
-                                                <SelectItem key={pm.id} value={pm.id}>
-                                                    {pm.name} <span className="text-muted-foreground text-xs ml-2">({pm.role.name})</span>
-                                                </SelectItem>
-                                            ))}
+                                        {allUsersData?.users.filter((u: any) => !['PROJECT_MANAGER', 'DIRECTOR_EVENT', 'ADMIN'].includes(u.role.name)).map((pm: any) => (
+                                            <SelectItem key={pm.id} value={pm.id}>{pm.name} <span className="text-muted-foreground text-xs ml-2">({pm.role.name})</span></SelectItem>
+                                        ))}
                                     </SelectGroup>
                                 </SelectContent>
                             </Select>
                         )}
-                        <p className="text-[10px] text-muted-foreground">Vous pouvez assigner n'importe quel utilisateur comme responsable principal.</p>
                     </div>
                 </form>
             );
         }
 
-        // ✅ MODIFICATION DEMANDEE: Suppression des inputs financiers, Ajout du bouton, Summary
         if ((userPermissions.includes('manage_assigned_projects') || isAssignedPM) && isToPrepare) {
+            // (Code identique à votre version, juste remis ici pour contexte)
             return (
                 <div className="flex flex-col gap-6 w-full">
                     <div className="bg-blue-50 border border-blue-200 text-blue-800 p-3 rounded-md text-sm flex items-center gap-2"><IconChartPie size={18} />Préparer l'estimation financière.</div>
-
-                    {/* ✅ 1. BOUTON VERS DETAIL TECHNIQUE & DEVIS */}
-                    <Button
-                        onClick={() => router.push(`/dashboard/projects/${item.id}/technical`)}
-                        className="w-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-md py-6"
-                    >
-                        <IconFileDescription className="w-5 h-5 mr-2" />
-                        Accéder au Détail Technique & Devis
-                        <IconArrowRight className="w-4 h-4 ml-2 opacity-70" />
+                    <Button onClick={() => router.push(`/dashboard/projects/${item.id}/technical`)} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-md py-6">
+                        <IconFileDescription className="w-5 h-5 mr-2" />Accéder au Détail Technique & Devis<IconArrowRight className="w-4 h-4 ml-2 opacity-70" />
                     </Button>
-
-                    {/* ✅ 2. RESUME FINANCIER (READ ONLY) */}
                     <div className="space-y-3">
                         <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Résumé Financier (Live)</h4>
-                        <MarginCalculator
-                            marketPrice={Number(item.marketEstimate) || 0}
-                            costPrice={Number(item.estimatedBudget) || 0}
-                        />
+                        <MarginCalculator marketPrice={Number(item.marketEstimate) || 0} costPrice={Number(item.estimatedBudget) || 0} />
                     </div>
-
                     <Separator />
-
-                    {/* ✅ 3. UPLOAD OPTIONNEL */}
                     <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                            <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Fichiers Techniques (Optionnel)</h4>
-                        </div>
+                        <div className="flex items-center justify-between"><h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Fichiers Techniques (Optionnel)</h4></div>
                         <DocumentRow
-                            label="Estimation Excel (CPS)"
-                            type="CP_ESTIMATE"
-                            existingDoc={getTechDoc('CP_ESTIMATE')}
-                            file={fileEstimate}
-                            setFile={setFileEstimate}
-                            progress={uploadProgress['CP_ESTIMATE'] || 0}
-                            isOptional={true}
+                            label="Estimation Excel (CPS)" type="CP_ESTIMATE" existingDocs={technicalDocs} // Use technicalDocs for this check
+                            files={fileEstimate ? [fileEstimate] : []} // Adapter pour le composant multi
+                            setFiles={(files: File[]) => setFileEstimate(files[0] || null)}
+                            progress={uploadProgress['CP_ESTIMATE'] || 0} isOptional={true}
                         />
-                        {/* Instant Upload Button for this file if selected */}
                         {fileEstimate && !uploadProgress['CP_ESTIMATE'] && (
-                            <Button
-                                size="sm"
-                                onClick={handleSubmitEstimate}
-                                disabled={loading}
-                                className="w-full mt-1 bg-blue-600 hover:bg-blue-700"
-                            >
-                                {isUploadingFiles ? "Upload..." : "Uploader le fichier maintenant"}
-                            </Button>
+                            <Button size="sm" onClick={handleSubmitEstimate} disabled={loading} className="w-full mt-1 bg-blue-600 hover:bg-blue-700">{isUploadingFiles ? "Upload..." : "Uploader le fichier maintenant"}</Button>
                         )}
                     </div>
-
                     <Separator />
-
                     <div className="space-y-3">
                         <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Décision</h4>
                         <Select value={avisData.status} onValueChange={(v) => handleAvisFormChange("status", v)}><SelectTrigger><SelectValue placeholder="Sélectionner une décision..." /></SelectTrigger><SelectContent><SelectItem value="ACCEPTED">✅ Valider (Prêt pour Faisabilité)</SelectItem><SelectItem value="NOT_ACCEPTED">❌ Refuser (Non Faisable)</SelectItem></SelectContent></Select>
@@ -571,7 +533,7 @@ export function ProjectEditDrawer({ item }: { item: any }) {
                         {getTechDoc('CP_ESTIMATE') ? (
                             <div className="flex items-center justify-between p-3 border rounded-lg bg-muted/20">
                                 <div className="flex items-center gap-3"><div className="h-8 w-8 rounded-full bg-green-100 text-green-600 flex items-center justify-center"><IconFileText size={16} /></div><div className="flex flex-col"><span className="text-sm font-medium">Estimation Détaillée (Excel)</span><span className="text-xs text-muted-foreground">Uploadé par le CP</span></div></div>
-                                <Button variant="outline" size="sm" asChild><a href={`https://backoffice.urbagroupe.ma/${getTechDoc('CP_ESTIMATE').fileUrl}`} target="_blank"><IconDownload size={14} className="mr-2" /> Télécharger</a></Button>
+                                <Button variant="outline" size="sm" asChild><a href={getFileUrl(getTechDoc('CP_ESTIMATE').fileUrl)} target="_blank"><IconDownload size={14} className="mr-2" /> Télécharger</a></Button>
                             </div>
                         ) : <div className="p-3 border border-dashed rounded-lg text-center text-sm text-muted-foreground">⚠️ Aucune estimation Excel.</div>}
                     </div>
@@ -594,21 +556,17 @@ export function ProjectEditDrawer({ item }: { item: any }) {
 
         if (userPermissions.includes('manage_cautions') && isCautionPending) return <div className="p-4 border rounded-lg"><h4 className="font-semibold">Demande de Caution</h4><p className="text-muted-foreground text-sm">Veuillez confirmer la demande.</p></div>;
 
-        // ✅ INTEGRATION DU PRODUCTION MANAGER (PANIER)
         if ((userPermissions.includes('assign_creative_tasks') || userRole === 'ADMIN' || isAssignedPM) && isInProduction) {
             return (
-                // ✅ LA CORRECTION
                 <ProductionManager
                     projectId={item.id}
-                    initialTeam={{ // On passe un objet structuré
+                    initialTeam={{
                         infographisteIds: item.team?.infographistes?.map((u: any) => u.id) || [],
                         team3DIds: item.team?.team3D?.map((u: any) => u.id) || [],
                         coordinatorIds: item.team?.coordinators?.map((u: any) => u.id) || [],
-                        pmJuniorIds: item.team?.pmJuniors?.map((u: any) => u.id) || [] // Ajouté si présent dans votre modèle
+                        pmJuniorIds: item.team?.pmJuniors?.map((u: any) => u.id) || []
                     }}
-                    onSave={() => {
-                        toast.success("Production mise à jour");
-                    }}
+                    onSave={() => { toast.success("Production mise à jour"); }}
                 />
             );
         }
@@ -620,38 +578,22 @@ export function ProjectEditDrawer({ item }: { item: any }) {
 
     const renderPanelFooter = () => {
         if (userRole === 'PROPOSAL_MANAGER' && (isDraft || isPendingAdminReview)) {
-            const hasMandatory = (fileCPS || getDoc('CPS')) && (fileRC || getDoc('RC')) && (fileAvis || getDoc('Avis'));
-            const hasNewUploads = fileCPS || fileRC || fileAvis || fileBPE || fileTech;
+            const hasMandatory = (filesCPS.length > 0 || getDoc('CPS')) && (filesRC.length > 0 || getDoc('RC')) && (filesAvis.length > 0 || getDoc('Avis'));
+            const hasNewUploads = filesCPS.length > 0 || filesRC.length > 0 || filesAvis.length > 0 || filesBPE.length > 0 || filesTech.length > 0;
             return <Button onClick={handleSubmitForReview} disabled={loading || (!hasNewUploads && !isDraft) || (isDraft && !hasMandatory)} className={cn("w-full transition-all", !isDraft ? "bg-blue-600 hover:bg-blue-700" : "bg-green-600 hover:bg-green-700")}>{isUploadingFiles ? "Upload en cours..." : !isDraft ? (hasNewUploads ? "Mettre à jour" : "Sélectionner un fichier") : "Valider et Soumettre"}</Button>;
         }
-
-        if ((userPermissions.includes('manage_assigned_projects') || isAssignedPM) && isToPrepare) {
-            // ✅ Clean footer since actions are inside
-            return <Button variant="outline" className="w-full">Fermer</Button>;
-        }
-
+        // ... (Reste des conditions footer identiques) ...
+        if ((userPermissions.includes('manage_assigned_projects') || isAssignedPM) && isToPrepare) return <Button variant="outline" className="w-full">Fermer</Button>;
         if (userRole === 'ADMIN' && isFeasibilityPending) {
             const canLaunch = feasibilityData.administrative === 'PASS' && feasibilityData.technical === 'PASS' && feasibilityData.financial === 'PASS';
             return <Button onClick={handleLaunchProject} disabled={loading || !canLaunch} className="bg-green-600 hover:bg-green-700 w-full">Lancer le Projet</Button>;
         }
-
         if (userRole === 'ADMIN' && isPendingAdminReview) return <Button form="admin-assign-form" type="submit" disabled={loading} className="w-full">Confirmer l'Assignation</Button>;
         if (userPermissions.includes('manage_cautions') && isCautionPending) return <Button onClick={handleRequestCaution} disabled={loading} className="bg-blue-600 hover:bg-blue-700 w-full">Confirmer Caution</Button>;
-
-        // ✅ 4. MODIFICATION ICI : BOUTON VERS LA PAGE BRIEF
         if (isInProduction) {
             return (
                 <div className="flex flex-col gap-3 w-full">
-                    {/* Le Bouton Principal qui redirige vers la nouvelle page */}
-                    <Button
-                        onClick={() => router.push(`/dashboard/projects/${item.id}/brief`)}
-                        className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-6 shadow-md"
-                    >
-                        <IconFileDescription className="w-5 h-5 mr-2" />
-                        Accéder au Brief & Détails
-                        <IconArrowRight className="w-4 h-4 ml-2 opacity-70" />
-                    </Button>
-
+                    <Button onClick={() => router.push(`/dashboard/projects/${item.id}/brief`)} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-6 shadow-md"><IconFileDescription className="w-5 h-5 mr-2" />Accéder au Brief & Détails<IconArrowRight className="w-4 h-4 ml-2 opacity-70" /></Button>
                     <Button variant="outline" className="w-full">Fermer</Button>
                 </div>
             );

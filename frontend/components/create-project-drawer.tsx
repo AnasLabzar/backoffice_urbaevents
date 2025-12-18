@@ -4,10 +4,7 @@ import * as React from "react";
 import { gql } from "@apollo/client";
 import { useMutation, useQuery } from "@apollo/client/react";
 import { toast } from "sonner";
-import { format } from "date-fns";
-import { fr } from "date-fns/locale";
 import {
-  Calendar as CalendarIcon,
   Plus,
   Info,
   AlertCircle,
@@ -16,7 +13,6 @@ import {
   CheckCircle2,
   Pencil
 } from "lucide-react";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 
 import { PriceInput } from "@/components/ui/price-input";
@@ -30,10 +26,6 @@ import { Label } from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import {
-  Popover, PopoverContent, PopoverTrigger,
-} from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
@@ -43,15 +35,32 @@ import { DatePickerInput } from "@/components/ui/date-picker-input";
 const CREATE_PROJECT_MUTATION = gql`
   mutation CreateProject($input: CreateProjectInput!) {
     proposal_createProject(input: $input) { 
-      id projectCode title technicalOfferRequired 
+      id 
+      projectCode 
+      title 
+      estimatedBudget
+      cautionAmount
     }
   }
 `;
 
 const UPDATE_PROJECT_MUTATION = gql`
   mutation UpdateProject($id: ID!, $input: UpdateProjectInput!) {
-    proposal_updateProject(id: $id, input: $input) {
-      id title object status
+    updateProject(id: $id, input: $input) {
+      id 
+      title 
+      object 
+      generalStatus 
+      preparationStatus
+      
+      # Refresh Cache Fields
+      estimatedBudget
+      cautionAmount
+      marketEstimate
+      referenceAO
+      submissionDeadline
+      technicalOfferRequired
+      projectType
     }
   }
 `;
@@ -60,7 +69,23 @@ const GET_PROJECTS_FEED = gql`
   query GetProjectsFeed {
     projects_feed {
       project {
-        id title object status: generalStatus preparationStatus
+        id 
+        title 
+        object 
+        status: generalStatus 
+        preparationStatus
+        
+        # Champs Edit
+        projectType
+        referenceAO
+        submissionDeadline
+        technicalOfferRequired
+        
+        # Financials
+        marketEstimate
+        estimatedBudget
+        cautionAmount
+
         projectManagers { name }
         stages { administrative { documents { id fileName } } }
       }
@@ -75,13 +100,25 @@ const ME_QUERY = gql` query Me { me { id role { name } } }`;
 const safeDate = (dateInput: any): Date | undefined => {
   if (!dateInput) return undefined;
   if (dateInput instanceof Date) return dateInput;
-  // Handle timestamp strings
   const isNumberString = !isNaN(Number(dateInput));
   if (isNumberString) return new Date(Number(dateInput));
-  // Handle ISO strings
   const parsed = new Date(dateInput);
   return isNaN(parsed.getTime()) ? undefined : parsed;
 };
+
+// --- INTERFACE POUR LE STATE (C'EST ÇA QUI MANQUAIT) ---
+interface ProjectFormData {
+  title: string;
+  object: string;
+  projectType: string;
+  submissionDeadline: Date | undefined;
+  referenceAO: string;
+  // On autorise string | number pour gérer le formatage "1,200,000"
+  estimatedBudget: string | number;
+  cautionAmount: string | number;
+  marketEstimate: string | number;
+  technicalOfferRequired: boolean;
+}
 
 // --- FORM CONTENT ---
 function ProjectFormContent({
@@ -94,7 +131,17 @@ function ProjectFormContent({
   loading,
   userRole,
   isEditMode
-}: any) {
+}: {
+  formData: ProjectFormData;
+  handleChange: (e: any) => void;
+  handleSelectChange: (id: string, val: any) => void;
+  handleDateChange: (date: Date | undefined) => void;
+  handleCheckboxChange: (id: string, val: boolean) => void;
+  handleSubmit: (e: React.FormEvent) => void;
+  loading: boolean;
+  userRole: string;
+  isEditMode: boolean;
+}) {
 
   const canCreate = userRole === 'PROPOSAL_MANAGER' || userRole === 'ADMIN';
   const isDirectProd = formData.projectType === 'CONFIRMED' || formData.projectType === 'INTERNAL';
@@ -182,14 +229,14 @@ function ProjectFormContent({
         <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
           <span className="font-bold text-green-600 text-xs border border-green-200 px-1 rounded">DH</span> Financier
         </h3>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label htmlFor="estimatedBudget">Budget Est. (DH)</Label>
-            <PriceInput id="estimatedBudget" value={formData.estimatedBudget || ""} onChange={(val) => handleSelectChange("estimatedBudget", val)} placeholder="0.00" />
+            <PriceInput id="estimatedBudget" value={formData.estimatedBudget} onChange={(val) => handleSelectChange("estimatedBudget", val)} placeholder="0.00" />
           </div>
           <div className="space-y-2">
             <Label htmlFor="cautionAmount">Caution (DH)</Label>
-            <PriceInput id="cautionAmount" value={formData.cautionAmount || ""} onChange={(val) => handleSelectChange("cautionAmount", val)} placeholder="0.00" />
+            <PriceInput id="cautionAmount" value={formData.cautionAmount} onChange={(val) => handleSelectChange("cautionAmount", val)} placeholder="0.00" />
           </div>
         </div>
       </div>
@@ -222,26 +269,56 @@ export function ProjectSheet({ projectToEdit, trigger, open: controlledOpen, onO
   const userRole = meData?.me.role.name;
   const isEditMode = !!projectToEdit;
 
-  const defaultState = {
-    title: "", object: "", projectType: "PUBLIC_TENDER",
-    submissionDeadline: undefined as Date | undefined,
-    referenceAO: "",
-    estimatedBudget: 0, cautionAmount: 0, technicalOfferRequired: true,
+  // 1. Parsing Helper: String "1,000" -> Number 1000
+  const parseAmount = (amount: any): number => {
+    if (amount === undefined || amount === null || amount === "") return 0;
+    if (typeof amount === 'number') return amount;
+    const cleanString = amount.toString().replace(/[^0-9.]/g, '');
+    return Number(cleanString) || 0;
   };
 
-  const [formData, setFormData] = React.useState(defaultState);
+  // 2. Formatting Helper: Number 1000 -> String "1,000"
+  const formatVal = (val: any): string => {
+    if (val === undefined || val === null) return "";
+    const num = Number(val);
+    if (isNaN(num)) return "";
+    if (num === 0) return ""; // Optionnel : afficher vide si 0, ou "0"
+    return new Intl.NumberFormat("en-US").format(num);
+  };
 
-  // --- STATE HYDRATION (FIXED) ---
+  const defaultState: ProjectFormData = {
+    title: "",
+    object: "",
+    projectType: "PUBLIC_TENDER",
+    submissionDeadline: undefined,
+    referenceAO: "",
+    estimatedBudget: "",
+    cautionAmount: "",
+    marketEstimate: "",
+    technicalOfferRequired: true,
+  };
+
+  // ✅ Utilisation de l'interface dans useState pour éviter les erreurs TS
+  const [formData, setFormData] = React.useState<ProjectFormData>(defaultState);
+
   React.useEffect(() => {
     if (isOpen && projectToEdit) {
+      console.log("🔥 ProjectSheet REÇOIT:", projectToEdit);
+
       setFormData({
         title: projectToEdit.title || "",
         object: projectToEdit.object || "",
         projectType: projectToEdit.projectType || "PUBLIC_TENDER",
         submissionDeadline: safeDate(projectToEdit.submissionDeadline),
+
+        // Si referenceAO est vide ici, le problème vient du Parent (Query)
         referenceAO: projectToEdit.referenceAO || "",
-        estimatedBudget: projectToEdit.estimatedBudget ? Number(projectToEdit.estimatedBudget) : 0,
-        cautionAmount: projectToEdit.cautionAmount ? Number(projectToEdit.cautionAmount) : 0,
+
+        // On formate les nombres en strings pour l'affichage
+        estimatedBudget: formatVal(projectToEdit.estimatedBudget),
+        cautionAmount: formatVal(projectToEdit.cautionAmount),
+        marketEstimate: formatVal(projectToEdit.marketEstimate),
+
         technicalOfferRequired: projectToEdit.technicalOfferRequired ?? true,
       });
     } else if (isOpen && !projectToEdit) {
@@ -272,16 +349,21 @@ export function ProjectSheet({ projectToEdit, trigger, open: controlledOpen, onO
 
   const handleChange = (e: any) => setFormData({ ...formData, [e.target.id]: e.target.value });
   const handleSelectChange = (id: string, val: any) => setFormData({ ...formData, [id]: val });
-  const handleDateChange = (date: any) => date && setFormData({ ...formData, submissionDeadline: date });
+  const handleDateChange = (date: Date | undefined) => setFormData({ ...formData, submissionDeadline: date });
   const handleCheckboxChange = (id: string, val: boolean) => setFormData({ ...formData, [id]: val });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Nettoyage avant envoi au backend (String -> Number)
     const inputData = {
       ...formData,
-      estimatedBudget: Number(formData.estimatedBudget),
-      cautionAmount: Number(formData.cautionAmount),
+      estimatedBudget: parseAmount(formData.estimatedBudget),
+      cautionAmount: parseAmount(formData.cautionAmount),
+      marketEstimate: parseAmount(formData.marketEstimate),
     };
+
+    console.log("Envoi au Backend:", inputData);
 
     if (isEditMode) {
       updateProject({
@@ -319,10 +401,14 @@ export function ProjectSheet({ projectToEdit, trigger, open: controlledOpen, onO
         {Header}
         <div className="flex-1 overflow-y-auto px-6 py-4">
           <ProjectFormContent
-            formData={formData} handleChange={handleChange}
-            handleSelectChange={handleSelectChange} handleDateChange={handleDateChange}
-            handleCheckboxChange={handleCheckboxChange} handleSubmit={handleSubmit}
-            loading={loading} userRole={userRole}
+            formData={formData}
+            handleChange={handleChange}
+            handleSelectChange={handleSelectChange}
+            handleDateChange={handleDateChange}
+            handleCheckboxChange={handleCheckboxChange}
+            handleSubmit={handleSubmit}
+            loading={loading}
+            userRole={userRole}
             isEditMode={isEditMode}
           />
         </div>
@@ -331,7 +417,6 @@ export function ProjectSheet({ projectToEdit, trigger, open: controlledOpen, onO
     </Sheet>
   );
 }
-
 
 export function CreateProjectDrawer() {
   return (
@@ -345,7 +430,6 @@ export function CreateProjectDrawer() {
   );
 }
 
-// O tqdr tzid hta hadi ila bghiti tsta3mlha f blayss khrin
 export function EditProjectButton({ project }: { project: any }) {
   return (
     <ProjectSheet

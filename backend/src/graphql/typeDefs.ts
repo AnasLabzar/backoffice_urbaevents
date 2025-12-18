@@ -356,7 +356,7 @@ export const typeDefs = gql`
     spaces: [String]
   }
 
-  input CreateProjectInput {
+input CreateProjectInput {
     projectType: String!
     title: String!
     object: String!
@@ -365,6 +365,9 @@ export const typeDefs = gql`
     location: String
     submissionDeadline: String!
     cautionRequestDate: String
+    
+    # ✅ J'ai ajouté marketEstimate ici (il manquait)
+    marketEstimate: Float 
     estimatedBudget: Float
     cautionAmount: Float
   }
@@ -373,8 +376,16 @@ export const typeDefs = gql`
     title: String
     object: String
     status: String
+    
     marketEstimate: Float
     estimatedBudget: Float
+    cautionAmount: Float
+    
+    # 👇 ZID HADO ILA MAKANOCH
+    referenceAO: String 
+    submissionDeadline: String
+    technicalOfferRequired: Boolean
+    projectType: String
   }
 
   input AdminAssignProjectInput {

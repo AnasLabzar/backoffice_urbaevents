@@ -238,26 +238,44 @@ export const projectResolvers = {
         proposal_createProject: async (_: unknown, { input }: any, context: IContext) => {
             await checkPermission(context, 'create_project_proposal');
 
-            const projectCount = await Project.countDocuments();
-            // Génération automatique du code
-            const projectCode = `${input.projectType.slice(0, 2)}-${(projectCount + 1).toString().padStart(4, '0')}`;
+            // 1. Génération Code Projet
+            const lastProject = await Project.findOne({}, { projectCode: 1 }).sort({ createdAt: -1 });
+            let nextSequence = 1;
+            if (lastProject && lastProject.projectCode) {
+                const parts = lastProject.projectCode.split('-');
+                if (parts.length === 2 && !isNaN(parseInt(parts[1]))) nextSequence = parseInt(parts[1]) + 1;
+            }
 
-            // --- LOGIC JDIDA DYAL STATUS ---
-            // Ila kan CONFIRMED ola INTERNAL -> Direct Production (TO_PREPARE)
-            // Ila kan PUBLIC_TENDER (Appel d'offre) -> DRAFT
+            const prefixMap: Record<string, string> = { 'PUBLIC_TENDER': 'PU', 'CONFIRMED': 'CO', 'INTERNAL': 'IN' };
+            const prefix = prefixMap[input.projectType] || input.projectType.slice(0, 2).toUpperCase();
+            const projectCode = `${prefix}-${nextSequence.toString().padStart(4, '0')}`;
+
+            // 2. Logic Status
             const isDirectProduction = input.projectType === 'CONFIRMED' || input.projectType === 'INTERNAL';
-
             const initialStatus = isDirectProduction ? 'TO_PREPARE' : 'DRAFT';
             const initialStage = isDirectProduction ? 'ADMINISTRATIVE' : 'PROPOSAL';
-            // -------------------------------
 
+            // 3. Création (AVEC BUDGETS EXPLICITES)
             const project = await Project.create({
-                ...input,
+                // Données de base
+                title: input.title,
+                object: input.object,
+                projectType: input.projectType,
+                referenceAO: input.referenceAO,
+                submissionDeadline: input.submissionDeadline,
+                technicalOfferRequired: input.technicalOfferRequired,
+
+                // 👇 HAHOMA L-BUDGETS BAYNIN HNA 👇
+                marketEstimate: input.marketEstimate || 0,
+                estimatedBudget: input.estimatedBudget || 0,
+                cautionAmount: input.cautionAmount || 0,
+
+                // Meta data
                 projectCode,
                 createdBy: context.user!.id,
-                preparationStatus: initialStatus, // <--- Hna fin tbedlat
+                preparationStatus: initialStatus,
                 generalStatus: 'IN_PROGRESS',
-                currentStage: initialStage,      // <--- Hna tbedlat bach tbda direct
+                currentStage: initialStage,
                 stages: {
                     administrative: { responsible: ['PROPOSAL_MANAGER', 'ADMIN'], documents: [] },
                     technical: { responsible: ['PROPOSAL_MANAGER', 'PROJECT_MANAGER', 'ASSISTANT_PM', 'COORDINATOR'], documents: [] },
@@ -274,7 +292,7 @@ export const projectResolvers = {
                 userId: context.user!.id as any,
                 action: 'PROPOSAL_CREATE',
                 project: project._id,
-                details: `Projet créé: "${project.title}" (Status: ${initialStatus})`
+                details: `Projet créé: "${project.title}" (${projectCode}) - Budget: ${input.estimatedBudget}`
             });
 
             return project;
@@ -287,7 +305,7 @@ export const projectResolvers = {
 
             const newDocument = await handleUpload(fileUrl, originalFileName, docType, context.user!.id);
             ((project.stages as any)[stageName].documents as any).push(newDocument._id);
-            
+
             const isCPS = docType.includes('CPS') || originalFileName.toLowerCase().includes('cps');
 
             if (isCPS) {

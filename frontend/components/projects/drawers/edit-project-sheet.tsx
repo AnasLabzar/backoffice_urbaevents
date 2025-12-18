@@ -4,8 +4,8 @@
 import React, { useState, useEffect } from "react";
 import { gql, useMutation, useQuery } from "@apollo/client";
 import { toast } from "sonner";
-import { 
-  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter, SheetClose 
+import {
+  Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter, SheetClose
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +21,7 @@ import { ME_QUERY } from "@/lib/graphql/projects";
 // --- MUTATION ---
 const UPDATE_PROJECT_MUTATION = gql`
   mutation UpdateProject($id: ID!, $input: UpdateProjectInput!) {
-    updateProject(id: $id, input: $input) {
+    updateProject(id: $id, input: $input) { 
       id
       title
       object
@@ -29,6 +29,7 @@ const UPDATE_PROJECT_MUTATION = gql`
       estimatedBudget
       cautionAmount
       technicalOfferRequired
+      referenceAO # <--- Zid hadi bach t-update f cache
     }
   }
 `;
@@ -61,16 +62,16 @@ export function EditProjectSheet({ project, isOpen, onClose }: EditProjectSheetP
   // Update form melli projet kaytbeddel
   useEffect(() => {
     if (project) {
-        setFormData({
-            title: project.title || "",
-            object: project.object || "",
-            projectType: project.projectType || "PUBLIC_TENDER",
-            submissionDeadline: project.submissionDeadline ? new Date(project.submissionDeadline) : new Date(),
-            referenceAO: project.referenceAO || "",
-            estimatedBudget: project.estimatedBudget || 0,
-            cautionAmount: project.cautionAmount || 0,
-            technicalOfferRequired: project.technicalOfferRequired ?? true,
-        });
+      setFormData({
+        title: project.title || "",
+        object: project.object || "",
+        projectType: project.projectType || "PUBLIC_TENDER",
+        submissionDeadline: project.submissionDeadline ? new Date(project.submissionDeadline) : new Date(),
+        referenceAO: project.referenceAO || "",
+        estimatedBudget: project.estimatedBudget || 0,
+        cautionAmount: project.cautionAmount || 0,
+        technicalOfferRequired: project.technicalOfferRequired ?? true,
+      });
     }
   }, [project]);
 
@@ -117,18 +118,18 @@ export function EditProjectSheet({ project, isOpen, onClose }: EditProjectSheetP
 
         <div className="flex-1 overflow-y-auto px-1 pr-2">
           <form id="edit-project-form" onSubmit={handleSubmit} className="flex flex-col gap-6">
-            
+
             {/* General Info */}
             <div className="space-y-4">
-              <h3 className="text-sm font-semibold flex items-center gap-2"><User className="h-4 w-4"/> Client & Objet</h3>
+              <h3 className="text-sm font-semibold flex items-center gap-2"><User className="h-4 w-4" /> Client & Objet</h3>
               <div className="grid gap-4">
                 <div className="space-y-2">
-                    <Label htmlFor="title">Nom du Client</Label>
-                    <Input id="title" value={formData.title} onChange={handleChange} required />
+                  <Label htmlFor="title">Nom du Client</Label>
+                  <Input id="title" value={formData.title} onChange={handleChange} required />
                 </div>
                 <div className="space-y-2">
-                    <Label htmlFor="object">Objet</Label>
-                    <Input id="object" value={formData.object} onChange={handleChange} required />
+                  <Label htmlFor="object">Objet</Label>
+                  <Input id="object" value={formData.object} onChange={handleChange} required />
                 </div>
               </div>
             </div>
@@ -137,59 +138,72 @@ export function EditProjectSheet({ project, isOpen, onClose }: EditProjectSheetP
 
             {/* Technical */}
             <div className="space-y-4">
-                <h3 className="text-sm font-semibold flex items-center gap-2"><Hash className="h-4 w-4"/> Détails</h3>
-                <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                        <Label>Type</Label>
-                        <Select value={formData.projectType} onValueChange={(v) => handleSelectChange("projectType", v)}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="PUBLIC_TENDER">Appel d'Offre</SelectItem>
-                                <SelectItem value="CONFIRMED">Projet Confirmé</SelectItem>
-                                <SelectItem value="INTERNAL">Interne</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="space-y-2">
-                         <Label>Deadline</Label>
-                         <DatePickerInput date={formData.submissionDeadline} setDate={handleDateChange} />
-                    </div>
+              <h3 className="text-sm font-semibold flex items-center gap-2"><Hash className="h-4 w-4" /> Détails</h3>
+              {/* 👇 Zidt referenceAO hna */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Type</Label>
+                  <Select value={formData.projectType} onValueChange={(v) => handleSelectChange("projectType", v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="PUBLIC_TENDER">Appel d'Offre</SelectItem>
+                      <SelectItem value="CONFIRMED">Projet Confirmé</SelectItem>
+                      <SelectItem value="INTERNAL">Interne</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
+
+                {/* 👇 HADA KAN NAQSSK F L'AFFICHAGE */}
+                <div className="space-y-2">
+                  <Label htmlFor="referenceAO">Référence AO</Label>
+                  <Input
+                    id="referenceAO"
+                    value={formData.referenceAO}
+                    onChange={handleChange}
+                    placeholder="Ex: 12/2025/..."
+                  />
+                </div>
+
+                <div className="space-y-2 md:col-span-2">
+                  <Label>Deadline</Label>
+                  <DatePickerInput date={formData.submissionDeadline} setDate={handleDateChange} />
+                </div>
+              </div>
             </div>
 
             <Separator />
 
             {/* Financial */}
-             <div className="space-y-4">
-                <h3 className="text-sm font-semibold flex items-center gap-2">Financier (DH)</h3>
-                <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                        <Label>Budget Est.</Label>
-                        <PriceInput id="estimatedBudget" value={formData.estimatedBudget} onChange={(v) => handleSelectChange("estimatedBudget", v)} />
-                    </div>
-                    <div className="space-y-2">
-                        <Label>Caution</Label>
-                        <PriceInput id="cautionAmount" value={formData.cautionAmount} onChange={(v) => handleSelectChange("cautionAmount", v)} />
-                    </div>
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold flex items-center gap-2">Financier (DH)</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Budget Est.</Label>
+                  <PriceInput id="estimatedBudget" value={formData.estimatedBudget} onChange={(v) => handleSelectChange("estimatedBudget", v)} />
                 </div>
-             </div>
+                <div className="space-y-2">
+                  <Label>Caution</Label>
+                  <PriceInput id="cautionAmount" value={formData.cautionAmount} onChange={(v) => handleSelectChange("cautionAmount", v)} />
+                </div>
+              </div>
+            </div>
 
-             {/* Checkbox */}
+            {/* Checkbox */}
             <div className="flex items-center space-x-3 bg-muted/30 p-4 rounded-lg border">
-                <Checkbox id="technicalOfferRequired" checked={formData.technicalOfferRequired} onCheckedChange={(c) => handleCheckboxChange("technicalOfferRequired", c as boolean)} />
-                <div className="grid gap-1">
-                    <Label htmlFor="technicalOfferRequired" className="text-sm font-medium">Offre Technique Requise ?</Label>
-                </div>
+              <Checkbox id="technicalOfferRequired" checked={formData.technicalOfferRequired} onCheckedChange={(c) => handleCheckboxChange("technicalOfferRequired", c as boolean)} />
+              <div className="grid gap-1">
+                <Label htmlFor="technicalOfferRequired" className="text-sm font-medium">Offre Technique Requise ?</Label>
+              </div>
             </div>
 
           </form>
         </div>
 
         <SheetFooter className="mt-4 pt-4 border-t">
-            <SheetClose asChild><Button variant="ghost">Annuler</Button></SheetClose>
-            <Button type="submit" form="edit-project-form" disabled={loading}>
-                {loading ? "Enregistrement..." : "Enregistrer les modifications"}
-            </Button>
+          <SheetClose asChild><Button variant="ghost">Annuler</Button></SheetClose>
+          <Button type="submit" form="edit-project-form" disabled={loading}>
+            {loading ? "Enregistrement..." : "Enregistrer les modifications"}
+          </Button>
         </SheetFooter>
       </SheetContent>
     </Sheet>
