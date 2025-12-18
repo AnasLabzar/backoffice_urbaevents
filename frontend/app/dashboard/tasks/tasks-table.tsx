@@ -26,17 +26,18 @@ import {
 } from "@/components/ui/table";
 import {
   Tabs,
-  TabsContent,
   TabsList,
   TabsTrigger,
 } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuTrigger,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
@@ -48,7 +49,6 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useIsMobile } from "@/hooks/use-mobile";
 import {
   IconChevronDown,
   IconChevronLeft,
@@ -60,6 +60,9 @@ import {
   IconEye,
   IconEdit,
   IconDownload,
+  IconAlertTriangle,
+  IconFileText,
+  IconCalendar,
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import {
@@ -70,9 +73,13 @@ import {
   DrawerFooter,
   DrawerHeader,
   DrawerTitle,
-  DrawerTrigger,
 } from "@/components/ui/drawer";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
+// --- QUERIES ---
 const GET_MY_TASKS_QUERY = gql`
   query GetMyTasks {
     myTasks {
@@ -98,20 +105,12 @@ const GET_MY_TASKS_QUERY = gql`
         fileName
         fileUrl
         originalFileName
-        uploadedBy {
-          id
-          name
-        }
       }
       finalUpload {
         id
         fileName
         fileUrl
         originalFileName
-        uploadedBy {
-          id
-          name
-        }
       }
     }
   }
@@ -142,29 +141,18 @@ const GET_ALL_TASKS_QUERY = gql`
         fileName
         fileUrl
         originalFileName
-        uploadedBy {
-          id
-          name
-        }
       }
       finalUpload {
         id
         fileName
         fileUrl
         originalFileName
-        uploadedBy {
-          id
-          name
-        }
       }
     }
   }
 `;
 
-console.log("ALL TASKS", GET_ALL_TASKS_QUERY);
-console.log("MY TASKS", GET_MY_TASKS_QUERY);
-
-// Task interface
+// --- TYPES ---
 export interface Task {
   id: string;
   description: string;
@@ -188,241 +176,165 @@ export interface Task {
     fileName: string;
     fileUrl: string;
     originalFileName: string;
-    uploadedBy: {
-      id: string;
-      name: string;
-    };
   }>;
   finalUpload: {
     id: string;
     fileName: string;
     fileUrl: string;
     originalFileName: string;
-    uploadedBy: {
-      id: string;
-      name: string;
-    };
   } | null;
 }
 
-// --- Status Badge Component ---
-function TaskStatusBadge({ status }: { status: Task["status"] }) {
-  const statusConfig = {
-    TODO: { label: "À Faire", className: "bg-yellow-100 text-yellow-800 border-yellow-200" },
-    IN_PROGRESS: { label: "En Cours", className: "bg-blue-100 text-blue-800 border-blue-200" },
-    DONE: { label: "Terminé", className: "bg-green-100 text-green-800 border-green-200" },
-  };
-
-  const config = statusConfig[status] || statusConfig.TODO;
-
-  return (
-    <Button variant="outline" className={cn("capitalize", config.className)}>
-      {config.label}
-    </Button>
-  );
-}
+// --- HELPERS ---
 
 const getFileUrl = (filePath: string) => {
   if (!filePath) return "#";
-
-  // Check if we are on the client side (window exists)
   const baseUrl = typeof window !== 'undefined' && window.location.hostname === 'localhost'
-    ? 'http://localhost:5002'            // Dev Mode
-    : 'https://backoffice.urbagroupe.ma'; // Production Mode
-
-  // Combine base URL with file path
-  // Note: Ensure filePath doesn't start with a slash if you add one here, or vice versa
+    ? 'http://localhost:5002'
+    : 'https://backoffice.urbagroupe.ma';
   return `${baseUrl}/${filePath.startsWith('/') ? filePath.slice(1) : filePath}`;
 };
 
-// --- Department Badge Component ---
-function DepartmentBadge({ department }: { department: Task["department"] }) {
-  const deptConfig = {
-    CREATIVE: { label: "Créatif", className: "bg-purple-100 text-purple-800 border-purple-200" },
-    TECHNICAL_OFFICE: { label: "Bureau Technique", className: "bg-blue-100 text-blue-800 border-blue-200" },
-    WORKSHOP: { label: "Atelier", className: "bg-orange-100 text-orange-800 border-orange-200" },
-    FIELD: { label: "Terrain", className: "bg-green-100 text-green-800 border-green-200" },
-    LOGISTICS: { label: "Logistique", className: "bg-gray-100 text-gray-800 border-gray-200" },
+function formatDate(dateString: string | null) {
+  if (!dateString) return "Non définie";
+  return new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(dateString));
+}
+
+// --- COMPONENTS ---
+
+// 1. Status Badge (Dark Mode Ready)
+function TaskStatusBadge({ status }: { status: string }) {
+  // Using generic color classes that work in both modes via opacity
+  const config: Record<string, string> = {
+    TODO: "bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-200/50 dark:border-orange-900/50",
+    IN_PROGRESS: "bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-200/50 dark:border-blue-900/50",
+    DONE: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-200/50 dark:border-emerald-900/50",
   };
 
+  const labels: Record<string, string> = { TODO: "À faire", IN_PROGRESS: "En cours", DONE: "Terminé" };
+
+  return (
+    <Badge variant="outline" className={cn("capitalize whitespace-nowrap font-medium", config[status] || config.TODO)}>
+      {labels[status] || status}
+    </Badge>
+  );
+}
+
+// 2. Department Badge (Dark Mode Ready)
+function DepartmentBadge({ department }: { department: Task["department"] }) {
+  const deptConfig = {
+    CREATIVE: { label: "Créatif", color: "bg-purple-500/15 text-purple-700 dark:text-purple-400 border-purple-200/50" },
+    TECHNICAL_OFFICE: { label: "Bureau Tech", color: "bg-cyan-500/15 text-cyan-700 dark:text-cyan-400 border-cyan-200/50" },
+    WORKSHOP: { label: "Atelier", color: "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-200/50" },
+    FIELD: { label: "Terrain", color: "bg-green-500/15 text-green-700 dark:text-green-400 border-green-200/50" },
+    LOGISTICS: { label: "Logistique", color: "bg-slate-500/15 text-slate-700 dark:text-slate-400 border-slate-200/50" },
+  };
   const config = deptConfig[department] || deptConfig.CREATIVE;
 
   return (
-    <Button variant="outline" className={cn("text-xs", config.className)}>
+    <div className={cn("text-[10px] px-2 py-0.5 rounded-full border w-fit font-semibold whitespace-nowrap", config.color)}>
       {config.label}
-    </Button>
+    </div>
   );
 }
 
-// --- Date Formatter ---
-function formatDate(dateString: string | null) {
-  if (!dateString) return "Non définie";
-
-  try {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) {
-      throw new Error("Invalid date value provided");
-    }
-
-    return new Intl.DateTimeFormat('fr-FR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    }).format(date);
-  } catch (error) {
-    console.error("Error formatting date:", dateString, error);
-    return "Date invalide";
-  }
-}
-
-// --- File Download Component ---
+// 3. File Downloads
 function FileDownloads({ task }: { task: Task }) {
+  const hasV1 = task.v1Uploads.length > 0;
+  const hasFinal = !!task.finalUpload;
+
+  if (!hasV1 && !hasFinal) return <span className="text-muted-foreground text-xs opacity-50">-</span>;
+
   return (
-    <div className="flex gap-1">
-      {task.v1Uploads.map((file) => (
-        <a
-          key={file.id}
-          href={getFileUrl(file.fileUrl)}
-          target="_blank"
-          rel="noopener noreferrer"
-          title={`Télécharger ${file.originalFileName}`}
-        >
-          <Button variant="outline" className="text-xs bg-blue-50 hover:bg-blue-100 cursor-pointer">
-            <IconDownload className="h-3 w-3 mr-1" />
-            V1
-          </Button>
-        </a>
-      ))}
-      {task.finalUpload && (
-        <a
-          href={getFileUrl(task.finalUpload.fileUrl)}
-          target="_blank"
-          rel="noopener noreferrer"
-          title={`Télécharger ${task.finalUpload.originalFileName}`}
-        >
-          <Button variant="outline" className="text-xs bg-green-50 hover:bg-green-100 cursor-pointer">
-            <IconDownload className="h-3 w-3 mr-1" />
-            Final
-          </Button>
-        </a>
+    <div className="flex gap-1.5">
+      {hasV1 && (
+        <TooltipProvider>
+          <Tooltip delayDuration={200}>
+            <TooltipTrigger asChild>
+              <div className="h-7 w-7 rounded-md border bg-background flex items-center justify-center text-muted-foreground hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors">
+                <span className="text-[10px] font-bold">V1</span>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent className="bg-popover text-popover-foreground border">
+              <div className="flex flex-col gap-2 p-1">
+                <span className="font-semibold text-xs border-b pb-1">Fichiers V1</span>
+                {task.v1Uploads.map(f => (
+                  <a key={f.id} href={getFileUrl(f.fileUrl)} target="_blank" className="text-xs hover:text-primary flex items-center gap-2">
+                    <IconDownload className="h-3 w-3" /> {f.originalFileName}
+                  </a>
+                ))}
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       )}
-      {task.v1Uploads.length === 0 && !task.finalUpload && (
-        <span className="text-xs text-muted-foreground">Aucun</span>
+      {hasFinal && (
+        <TooltipProvider>
+          <Tooltip delayDuration={200}>
+            <TooltipTrigger asChild>
+              <a
+                href={getFileUrl(task.finalUpload!.fileUrl)}
+                target="_blank"
+                className="h-7 w-7 rounded-md border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center hover:bg-emerald-500/20 transition-colors"
+              >
+                <IconDownload className="h-3.5 w-3.5" />
+              </a>
+            </TooltipTrigger>
+            <TooltipContent><p>Télécharger le fichier final</p></TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       )}
     </div>
   );
 }
 
-function TaskDetailsViewer({ task }: { task: Task }) {
-  const [isOpen, setIsOpen] = React.useState(false);
-  const isMobile = useIsMobile();
-
-  const content = (
-    <div className="space-y-4 py-4 px-4">
-      <div>
-        <Label>Assigné à:</Label>
-        <p className="font-medium">{task.assignedTo.name}</p>
-        <p className="text-sm text-muted-foreground">{task.assignedTo.email}</p>
-      </div>
-
-      <div>
-        <Label>Statut:</Label>
-        <TaskStatusBadge status={task.status} />
-      </div>
-
-      <div>
-        <Label>Département:</Label>
-        <DepartmentBadge department={task.department} />
-      </div>
-
-      <div>
-        <Label>Échéance:</Label>
-        <p>{formatDate(task.dueDate)}</p>
-      </div>
-
-      <div>
-        <Label>Créée le:</Label>
-        <p>{formatDate(task.createdAt)}</p>
-      </div>
-
-      <div>
-        <Label>Dernière mise à jour:</Label>
-        <p>{formatDate(task.updatedAt || task.createdAt)}</p>
-      </div>
-
-      <div>
-        <Label>Fichiers joints:</Label>
-        <FileDownloads task={task} />
-      </div>
-    </div>
-  );
-
-  return (
-    <Drawer open={isOpen} onOpenChange={setIsOpen} direction={isMobile ? "bottom" : "right"}>
-      <DrawerTrigger asChild onClick={() => setIsOpen(true)}>
-        <div className="flex flex-col space-y-1 hover:cursor-pointer">
-          <span className="font-medium text-sm hover:underline">{task.description}</span>
-          <span className="text-xs text-muted-foreground">
-            Projet: {task.project.object}
-          </span>
-        </div>
-      </DrawerTrigger>
-
-      <DrawerContent className={cn(
-        "p-4",
-        isMobile
-          ? "h-[90vh]"
-          : "sm:max-w-lg right-0 fixed top-0 h-full border-l"
-      )}>
-        <DrawerHeader className="gap-1 px-0 pt-0">
-          <DrawerTitle className="text-xl font-semibold">
-            {task.description}
-          </DrawerTitle>
-          <DrawerDescription>
-            Projet: {task.project.title} ({task.project.object})
-          </DrawerDescription>
-        </DrawerHeader>
-
-        <div className="flex-grow overflow-y-auto pr-2 -mr-4">
-          {content}
-        </div>
-
-        <DrawerFooter className="px-0 pb-0">
-          <DrawerClose asChild>
-            <Button variant="outline" className="w-full">
-              Fermer
-            </Button>
-          </DrawerClose>
-        </DrawerFooter>
-      </DrawerContent>
-    </Drawer>
-  );
-}
-
-// --- Columns Definition ---
+// --- TABLE COLUMNS DEFINITION ---
 export const getTaskColumns = (
   setSelectedTask: React.Dispatch<React.SetStateAction<Task | null>>,
   setIsDrawerOpen: React.Dispatch<React.SetStateAction<boolean>>
 ): ColumnDef<Task>[] => [
     {
       accessorKey: "description",
-      header: "Description de la Tâche",
+      header: "Description & Projet",
       cell: ({ row }) => (
-        <TaskDetailsViewer task={row.original} />
+        <div className="flex flex-col gap-1 max-w-[300px]">
+          <span
+            className="font-medium text-sm truncate text-foreground hover:text-primary cursor-pointer transition-colors"
+            onClick={() => { setSelectedTask(row.original); setIsDrawerOpen(true); }}
+          >
+            {row.original.description}
+          </span>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="truncate max-w-[150px]">{row.original.project.object}</span>
+          </div>
+        </div>
       ),
     },
     {
       accessorKey: "project.title",
       header: "Client",
       cell: ({ row }) => (
-        <span className="text-sm">{row.original.project.title}</span>
+        <div className="flex items-center gap-2">
+          <Badge variant="secondary" className="text-[10px] font-normal h-5 px-1.5">
+            {row.original.project.id.slice(-4)}
+          </Badge>
+          <span className="text-sm font-medium truncate max-w-[140px]" title={row.original.project.title}>
+            {row.original.project.title}
+          </span>
+        </div>
       ),
     },
     {
       accessorKey: "assignedTo.name",
-      header: "Assigné à",
+      header: "Responsable",
       cell: ({ row }) => (
-        <span className="text-sm">{row.original.assignedTo.name}</span>
+        <div className="flex items-center gap-2">
+          <Avatar className="h-6 w-6">
+            <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${row.original.assignedTo.name}`} />
+            <AvatarFallback className="text-[9px]">{row.original.assignedTo.name.slice(0, 2).toUpperCase()}</AvatarFallback>
+          </Avatar>
+          <span className="text-sm truncate max-w-[120px]">{row.original.assignedTo.name}</span>
+        </div>
       ),
     },
     {
@@ -438,25 +350,20 @@ export const getTaskColumns = (
     {
       accessorKey: "dueDate",
       header: "Échéance",
-      cell: ({ row }) => (
-        <span className={cn(
-          "text-sm",
-          row.original.dueDate && new Date(row.original.dueDate) < new Date() && row.original.status !== "DONE"
-            ? "text-red-600 font-medium"
-            : "text-muted-foreground"
-        )}>
-          {formatDate(row.original.dueDate)}
-        </span>
-      ),
-    },
-    {
-      accessorKey: "createdAt",
-      header: "Créée le",
-      cell: ({ row }) => (
-        <span className="text-xs text-muted-foreground">
-          {formatDate(row.original.createdAt)}
-        </span>
-      ),
+      cell: ({ row }) => {
+        const isOverdue = row.original.dueDate && new Date(row.original.dueDate) < new Date() && row.original.status !== "DONE";
+        return (
+          <div className={cn(
+            "flex items-center gap-1.5 text-sm whitespace-nowrap px-2 py-1 rounded-md w-fit",
+            isOverdue
+              ? "bg-red-500/10 text-red-600 dark:text-red-400 font-medium"
+              : "text-muted-foreground"
+          )}>
+            {isOverdue && <IconAlertTriangle className="h-3.5 w-3.5" />}
+            {formatDate(row.original.dueDate)}
+          </div>
+        );
+      },
     },
     {
       id: "uploads",
@@ -465,31 +372,30 @@ export const getTaskColumns = (
     },
     {
       id: "actions",
+      enableHiding: false,
       cell: ({ row }) => {
         const task = row.original;
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 w-8 p-0">
-                <IconDotsVertical className="h-4 w-4" />
+              <Button variant="ghost" className="h-8 w-8 p-0 hover:bg-muted">
+                <span className="sr-only">Menu</span>
+                <IconDotsVertical className="h-4 w-4 text-muted-foreground" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <Button
-                variant="ghost"
-                className="w-full justify-start"
-                onClick={() => {
-                  setSelectedTask(task);
-                  setIsDrawerOpen(true);
-                }}
-              >
-                <IconEye className="mr-2 h-4 w-4" />
-                Voir détails
-              </Button>
-              <Button variant="ghost" className="w-full justify-start">
-                <IconEdit className="mr-2 h-4 w-4" />
-                Modifier
-              </Button>
+            <DropdownMenuContent align="end" className="w-[160px]">
+              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => { setSelectedTask(task); setIsDrawerOpen(true); }}>
+                <IconEye className="mr-2 h-4 w-4" /> Détails
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <IconEdit className="mr-2 h-4 w-4" /> Modifier
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="text-red-600 dark:text-red-400 focus:text-red-600">
+                Supprimer
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         );
@@ -497,57 +403,43 @@ export const getTaskColumns = (
     },
   ];
 
-// --- Main Tasks Table Component ---
-interface TasksTableProps {
-  // No props needed since component handles its own data fetching
-}
-
-export function TasksTable({ }: TasksTableProps) {
-  const [rowSelection, setRowSelection] = React.useState({});
-  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
+// --- MAIN TABLE COMPONENT ---
+export function TasksTable() {
   const [sorting, setSorting] = React.useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
+  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
+  const [rowSelection, setRowSelection] = React.useState({});
   const [pagination, setPagination] = React.useState({ pageIndex: 0, pageSize: 10 });
   const [activeTab, setActiveTab] = React.useState<"my-tasks" | "all-tasks">("my-tasks");
   const [selectedTask, setSelectedTask] = React.useState<Task | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = React.useState(false);
 
-  // Fetch both queries separately
-  const { data: myTasksData, loading: myTasksLoading, error: myTasksError } = useQuery(GET_MY_TASKS_QUERY);
-  const { data: allTasksData, loading: allTasksLoading, error: allTasksError } = useQuery(GET_ALL_TASKS_QUERY);
+  // Data Fetching
+  const { data: myTasksData, loading: myLoading, error: myError } = useQuery(GET_MY_TASKS_QUERY);
+  const { data: allTasksData, loading: allLoading, error: allError } = useQuery(GET_ALL_TASKS_QUERY);
 
-  // Safely extract arrays
   const myTasks = myTasksData?.myTasks || [];
   const allTasks = allTasksData?.allTasks || [];
 
-  // Decide which tasks to display based on the active tab
+  // Memoize data to prevent re-renders
   const data = React.useMemo(() => {
     return activeTab === "my-tasks" ? myTasks : allTasks;
   }, [activeTab, myTasks, allTasks]);
 
-  // Generate columns
-  const columns = React.useMemo(
-    () => getTaskColumns(setSelectedTask, setIsDrawerOpen),
-    [setSelectedTask, setIsDrawerOpen]
-  );
+  const overdueCount = React.useMemo(() => {
+    return myTasks.filter((t: Task) => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== "DONE").length;
+  }, [myTasks]);
 
-  // Table setup
+  const columns = React.useMemo(() => getTaskColumns(setSelectedTask, setIsDrawerOpen), []);
+
   const table = useReactTable({
-    data: data,
+    data,
     columns,
-    state: {
-      sorting,
-      columnVisibility,
-      rowSelection,
-      columnFilters,
-      pagination,
-    },
-    getRowId: (row) => row.id,
-    enableRowSelection: true,
-    onRowSelectionChange: setRowSelection,
+    state: { sorting, columnFilters, columnVisibility, rowSelection, pagination },
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onColumnVisibilityChange: setColumnVisibility,
+    onRowSelectionChange: setRowSelection,
     onPaginationChange: setPagination,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -557,270 +449,267 @@ export function TasksTable({ }: TasksTableProps) {
     getFacetedUniqueValues: getFacetedUniqueValues(),
   });
 
-  // Loading & error handling
-  if (myTasksLoading || allTasksLoading) {
+  // Loading State
+  if (myLoading || allLoading) {
     return (
       <div className="space-y-4">
-        {[...Array(5)].map((_, i) => (
-          <Skeleton key={i} className="h-12 w-full" />
-        ))}
+        <div className="flex justify-between">
+          <Skeleton className="h-10 w-[250px]" />
+          <Skeleton className="h-10 w-[100px]" />
+        </div>
+        <Skeleton className="h-[400px] w-full rounded-xl" />
       </div>
     );
   }
 
-  if (myTasksError || allTasksError) {
+  // Error State
+  if (myError || allError) {
     return (
-      <div className="text-center py-8 text-red-600">
-        Erreur lors du chargement des tâches: {myTasksError?.message || allTasksError?.message}
+      <div className="rounded-md bg-destructive/15 p-4 text-destructive border border-destructive/20">
+        <h3 className="font-bold">Erreur de chargement</h3>
+        <p className="text-sm mt-1">{myError?.message || allError?.message}</p>
       </div>
     );
   }
 
   return (
-    <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "my-tasks" | "all-tasks")} className="w-full flex-col justify-start gap-6">
-      <div className="flex items-center justify-between lg:px-6 mb-6">
-        <TabsList>
-          <TabsTrigger value="my-tasks">Mes Tâches ({myTasks.length})</TabsTrigger>
-          <TabsTrigger value="all-tasks">Toutes les Tâches ({allTasks.length})</TabsTrigger>
-        </TabsList>
+    <div className="space-y-4 animate-in fade-in duration-500">
 
-        <div className="flex items-center gap-2">
-          {/* Columns toggle */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                <IconLayoutColumns />
-                <span className="hidden lg:inline">Colonnes</span>
-                <IconChevronDown />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              {table
-                .getAllColumns()
-                .filter((col) => col.getCanHide())
-                .map((col) => (
+      {/* 1. Dynamic Alert for Overdue Tasks */}
+      {overdueCount > 0 && (
+        <Alert variant="destructive" className="bg-red-500/10 border-red-500/20 text-red-600 dark:text-red-400">
+          <IconAlertTriangle className="h-4 w-4" />
+          <AlertTitle className="ml-2 font-bold">Attention requise</AlertTitle>
+          <AlertDescription className="ml-2 flex items-center justify-between w-full">
+            <span>Vous avez <strong>{overdueCount} tâche(s)</strong> en retard.</span>
+            <Button variant="link" size="sm" className="h-auto p-0 text-red-600 dark:text-red-400 underline" onClick={() => setActiveTab("my-tasks")}>
+              Voir mes tâches
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* 2. Controls & Tabs */}
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 py-2">
+
+          <TabsList className="bg-muted text-muted-foreground p-1 h-10">
+            <TabsTrigger value="my-tasks" className="px-4 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">
+              Mes Tâches <Badge variant="secondary" className="ml-2 h-5 bg-primary/10 text-primary">{myTasks.length}</Badge>
+            </TabsTrigger>
+            <TabsTrigger value="all-tasks" className="px-4 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">
+              Toutes les Tâches <span className="ml-2 text-xs text-muted-foreground">({allTasks.length})</span>
+            </TabsTrigger>
+          </TabsList>
+
+          <div className="flex items-center gap-2 w-full lg:w-auto">
+            <div className="relative w-full lg:w-[280px]">
+              <Input
+                placeholder="Filtrer par description..."
+                value={(table.getColumn("description")?.getFilterValue() as string) ?? ""}
+                onChange={(event) => table.getColumn("description")?.setFilterValue(event.target.value)}
+                className="h-9 w-full bg-background"
+              />
+            </div>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="ml-auto h-9 bg-background">
+                  <IconLayoutColumns className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">Vues</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-[150px]">
+                <DropdownMenuLabel>Colonnes</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {table.getAllColumns().filter(c => c.getCanHide()).map(column => (
                   <DropdownMenuCheckboxItem
-                    key={col.id}
+                    key={column.id}
                     className="capitalize"
-                    checked={col.getIsVisible()}
-                    onCheckedChange={(value) => col.toggleVisibility(!!value)}
+                    checked={column.getIsVisible()}
+                    onCheckedChange={(value) => column.toggleVisibility(!!value)}
                   >
-                    {typeof col.columnDef.header === 'string' ? col.columnDef.header : col.id}
+                    {column.id === "project_title" ? "Client" : column.id}
                   </DropdownMenuCheckboxItem>
                 ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* Filter input */}
-          <Input
-            placeholder="Filtrer les tâches..."
-            value={(table.getColumn("description")?.getFilterValue() as string) ?? ""}
-            onChange={(event) =>
-              table.getColumn("description")?.setFilterValue(event.target.value)
-            }
-            className="max-w-sm"
-          />
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
-      </div>
 
-      {/* Unified table rendering for both tabs */}
-      <div className="overflow-hidden rounded-lg border">
-        <Table>
-          <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id} style={{ width: header.getSize() !== 0 ? header.getSize() : undefined }}>
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(
-                        header.column.columnDef.header,
-                        header.getContext()
-                      )}
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-
-          <TableBody>
-            {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  data-state={row.getIsSelected() && "selected"}
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
+        {/* 3. Table Container */}
+        <div className="rounded-md border bg-card text-card-foreground shadow-sm overflow-hidden">
+          <Table>
+            <TableHeader className="bg-muted/50">
+              {table.getHeaderGroups().map((headerGroup) => (
+                <TableRow key={headerGroup.id} className="hover:bg-transparent">
+                  {headerGroup.headers.map((header) => (
+                    <TableHead key={header.id} className="h-10 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                    </TableHead>
                   ))}
                 </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">
-                  Aucune tâche trouvée.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {/* Task Details Drawer */}
-      <Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
-        <DrawerContent className="max-w-lg right-0 fixed top-0 h-full bg-white/95 backdrop-blur-md shadow-2xl border-l z-50">
-          {selectedTask ? (
-            <>
-              <DrawerHeader className="flex justify-between items-center">
-                <div>
-                  <DrawerTitle className="text-xl font-semibold">
-                    {selectedTask.description}
-                  </DrawerTitle>
-                  <DrawerDescription>
-                    Projet: {selectedTask.project.title} ({selectedTask.project.object})
-                  </DrawerDescription>
-                </div>
-                <DrawerClose asChild>
-                  <Button variant="ghost" size="icon" className="rounded-full hover:bg-muted">
-                    ✕
-                  </Button>
-                </DrawerClose>
-              </DrawerHeader>
-
-              <div className="space-y-4 py-4">
-                <div>
-                  <Label>Assigné à:</Label>
-                  <p className="font-medium">{selectedTask.assignedTo.name}</p>
-                  <p className="text-sm text-muted-foreground">{selectedTask.assignedTo.email}</p>
-                </div>
-
-                <div>
-                  <Label>Statut:</Label>
-                  <TaskStatusBadge status={selectedTask.status} />
-                </div>
-
-                <div>
-                  <Label>Département:</Label>
-                  <DepartmentBadge department={selectedTask.department} />
-                </div>
-
-                <div>
-                  <Label>Échéance:</Label>
-                  <p>{formatDate(selectedTask.dueDate)}</p>
-                </div>
-
-                <div>
-                  <Label>Créée le:</Label>
-                  <p>{formatDate(selectedTask.createdAt)}</p>
-                </div>
-
-                <div>
-                  <Label>Dernière mise à jour:</Label>
-                  <p>{formatDate(selectedTask.updatedAt || selectedTask.createdAt)}</p>
-                </div>
-
-                <div>
-                  <Label>Fichiers joints:</Label>
-                  <FileDownloads task={selectedTask} />
-                </div>
-              </div>
-
-              <DrawerFooter>
-                <DrawerClose asChild>
-                  <Button variant="outline" className="w-full">
-                    Fermer
-                  </Button>
-                </DrawerClose>
-              </DrawerFooter>
-            </>
-          ) : (
-            <div className="p-6 text-center text-muted-foreground">
-              Aucune tâche sélectionnée.
-            </div>
-          )}
-        </DrawerContent>
-      </Drawer>
-
-      {/* Pagination */}
-      <div className="flex items-center justify-between px-4 py-4">
-        <div className="text-muted-foreground hidden flex-1 text-sm lg:flex">
-          {table.getFilteredSelectedRowModel().rows.length} sur{" "}
-          {table.getFilteredRowModel().rows.length} tâche(s) sélectionnée(s).
+              ))}
+            </TableHeader>
+            <TableBody>
+              {table.getRowModel().rows?.length ? (
+                table.getRowModel().rows.map((row) => (
+                  <TableRow key={row.id} data-state={row.getIsSelected() && "selected"} className="hover:bg-muted/30 border-b border-border/50">
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell key={cell.id} className="py-3">
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={columns.length} className="h-48 text-center">
+                    <div className="flex flex-col items-center justify-center text-muted-foreground/50">
+                      <IconFileText className="h-10 w-10 mb-3 opacity-20" />
+                      <p className="text-sm font-medium">Aucun résultat trouvé</p>
+                      <p className="text-xs">Essayez d'ajuster vos filtres.</p>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
         </div>
-        <div className="flex w-full items-center gap-8 lg:w-fit">
-          <div className="hidden items-center gap-2 lg:flex">
-            <Label htmlFor="rows-per-page" className="text-sm font-medium">
-              Lignes par page
-            </Label>
+
+        {/* 4. Full Pagination (Restored) */}
+        <div className="flex flex-col sm:flex-row items-center justify-between px-2 py-4 gap-4">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground order-2 sm:order-1">
+            <span>Lignes par page</span>
             <Select
               value={`${table.getState().pagination.pageSize}`}
-              onValueChange={(value) => {
-                table.setPageSize(Number(value));
-              }}
+              onValueChange={(value) => table.setPageSize(Number(value))}
             >
-              <SelectTrigger size="sm" className="w-20" id="rows-per-page">
-                <SelectValue
-                  placeholder={table.getState().pagination.pageSize}
-                />
+              <SelectTrigger className="h-8 w-[70px] bg-background">
+                <SelectValue placeholder={table.getState().pagination.pageSize} />
               </SelectTrigger>
               <SelectContent side="top">
-                {[10, 20, 30, 40, 50].map((pageSize) => (
-                  <SelectItem key={pageSize} value={`${pageSize}`}>
-                    {pageSize}
-                  </SelectItem>
+                {[5, 10, 20, 50].map((pageSize) => (
+                  <SelectItem key={pageSize} value={`${pageSize}`}>{pageSize}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
-          <div className="flex w-fit items-center justify-center text-sm font-medium">
-            Page {table.getState().pagination.pageIndex + 1} sur{" "}
-            {table.getPageCount()}
-          </div>
-          <div className="ml-auto flex items-center gap-2 lg:ml-0">
-            <Button
-              variant="outline"
-              className="hidden h-8 w-8 p-0 lg:flex"
-              onClick={() => table.setPageIndex(0)}
-              disabled={!table.getCanPreviousPage()}
-            >
-              <span className="sr-only">Première page</span>
-              <IconChevronsLeft />
-            </Button>
-            <Button
-              variant="outline"
-              className="size-8"
-              size="icon"
-              onClick={() => table.previousPage()}
-              disabled={!table.getCanPreviousPage()}
-            >
-              <span className="sr-only">Page précédente</span>
-              <IconChevronLeft />
-            </Button>
-            <Button
-              variant="outline"
-              className="size-8"
-              size="icon"
-              onClick={() => table.nextPage()}
-              disabled={!table.getCanNextPage()}
-            >
-              <span className="sr-only">Page suivante</span>
-              <IconChevronRight />
-            </Button>
-            <Button
-              variant="outline"
-              className="hidden size-8 lg:flex"
-              size="icon"
-              onClick={() => table.setPageIndex(table.getPageCount() - 1)}
-              disabled={!table.getCanNextPage()}
-            >
-              <span className="sr-only">Dernière page</span>
-              <IconChevronsRight />
-            </Button>
+
+          <div className="flex items-center gap-2 order-1 sm:order-2">
+            <div className="text-sm font-medium mr-2 text-muted-foreground">
+              Page {table.getState().pagination.pageIndex + 1} sur {table.getPageCount()}
+            </div>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                className="h-8 w-8 p-0 bg-background"
+                onClick={() => table.setPageIndex(0)}
+                disabled={!table.getCanPreviousPage()}
+              >
+                <IconChevronsLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                className="h-8 w-8 p-0 bg-background"
+                onClick={() => table.previousPage()}
+                disabled={!table.getCanPreviousPage()}
+              >
+                <IconChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                className="h-8 w-8 p-0 bg-background"
+                onClick={() => table.nextPage()}
+                disabled={!table.getCanNextPage()}
+              >
+                <IconChevronRight className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                className="h-8 w-8 p-0 bg-background"
+                onClick={() => table.setPageIndex(table.getPageCount() - 1)}
+                disabled={!table.getCanNextPage()}
+              >
+                <IconChevronsRight className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
-    </Tabs>
+      </Tabs>
+
+      {/* 5. Details Drawer (Professional & Dark Mode Ready) */}
+      <Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
+        <DrawerContent className="fixed right-0 top-0 h-full w-full sm:w-[450px] mt-0 rounded-none border-l bg-background shadow-2xl focus:outline-none z-50">
+          {selectedTask && (
+            <div className="h-full flex flex-col">
+              <DrawerHeader className="border-b bg-muted/20 px-6 py-5">
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge variant="outline" className="bg-background">{selectedTask.project.title}</Badge>
+                  <span className="text-xs text-muted-foreground ml-auto">{formatDate(selectedTask.createdAt)}</span>
+                </div>
+                <DrawerTitle className="text-xl font-bold leading-tight">{selectedTask.description}</DrawerTitle>
+                <DrawerDescription className="mt-1">Projet ID: {selectedTask.project.id}</DrawerDescription>
+              </DrawerHeader>
+
+              <div className="flex-1 overflow-y-auto px-6 py-6 space-y-8">
+                {/* Status Section */}
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <Label className="text-xs uppercase text-muted-foreground font-semibold">Statut actuel</Label>
+                    <div><TaskStatusBadge status={selectedTask.status} /></div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs uppercase text-muted-foreground font-semibold">Priorité/Date</Label>
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      <IconCalendar className="h-4 w-4 text-muted-foreground" />
+                      {formatDate(selectedTask.dueDate)}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Assignment Section */}
+                <div className="space-y-3 p-4 rounded-lg border bg-card/50">
+                  <Label className="text-xs uppercase text-muted-foreground font-semibold">Responsable</Label>
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-10 w-10 border">
+                      <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${selectedTask.assignedTo.name}`} />
+                      <AvatarFallback>USER</AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="text-sm font-bold">{selectedTask.assignedTo.name}</p>
+                      <p className="text-xs text-muted-foreground">{selectedTask.assignedTo.email}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Details Section */}
+                <div className="space-y-3">
+                  <Label className="text-xs uppercase text-muted-foreground font-semibold">Détails de la mission</Label>
+                  <div className="text-sm leading-relaxed text-foreground/90 bg-muted/30 p-4 rounded-md border border-border/50">
+                    {selectedTask.description}
+                  </div>
+                </div>
+
+                {/* Files Section */}
+                <div className="space-y-3">
+                  <Label className="text-xs uppercase text-muted-foreground font-semibold">Fichiers joints</Label>
+                  <div className="flex items-center gap-4">
+                    <FileDownloads task={selectedTask} />
+                  </div>
+                </div>
+              </div>
+
+              <DrawerFooter className="border-t bg-muted/20 px-6 py-4">
+                <Button className="w-full">Marquer comme terminé</Button>
+                <DrawerClose asChild>
+                  <Button variant="outline" className="w-full bg-background hover:bg-muted">Fermer</Button>
+                </DrawerClose>
+              </DrawerFooter>
+            </div>
+          )}
+        </DrawerContent>
+      </Drawer>
+    </div>
   );
 }

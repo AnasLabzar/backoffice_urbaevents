@@ -50,6 +50,7 @@ export const taskResolvers = {
                         _id: 1,
                         description: 1,
                         status: 1,
+                        priority: 1, // <--- ADD THIS LINE
                         department: 1,
                         dueDate: 1,
                         createdAt: 1,
@@ -170,7 +171,8 @@ export const taskResolvers = {
     Mutation: {
         pm_createTask: async (_: unknown, { input }: any, context: IContext) => {
             await checkPermission(context, 'assign_creative_tasks');
-            const { description, projectId, assignedToId, department, dueDate } = input;
+            // Destructure priority from input
+            const { description, projectId, assignedToId, department, dueDate, priority } = input;
 
             const task = await Task.create({
                 description,
@@ -178,6 +180,7 @@ export const taskResolvers = {
                 assignedTo: assignedToId,
                 department,
                 status: 'TODO',
+                priority: priority || 'LOW', // <--- ADD THIS (Default to LOW if null)
                 dueDate: dueDate ? new Date(dueDate) : null,
             });
 

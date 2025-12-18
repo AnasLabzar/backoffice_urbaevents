@@ -129,21 +129,28 @@ const startServer = async () => {
     const httpServer = http.createServer(app);
 
     app.use(cors({
-    origin: [
-        "http://localhost:3000", 
-        "http://localhost:5002", 
-        "https://backoffice.urbagroupe.ma" // ✅ ZID HADI
-    ],
-    credentials: true
-}));
+        origin: [
+            "http://localhost:3000",
+            "http://localhost:5002",
+            "https://backoffice.urbagroupe.ma" // ✅ ZID HADI
+        ],
+        credentials: true
+    }));
     app.use(express.json({ limit: '50mb' }));
     app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-    const uploadsPath = path.join(__dirname, '../../uploads');
+    // 👇 UTILISE process.cwd() C'EST PLUS SÛR
+    const uploadsPath = path.join(process.cwd(), 'uploads');
+
+    // Vérification et création si nécessaire
     if (!fs.existsSync(uploadsPath)) {
         fs.mkdirSync(uploadsPath, { recursive: true });
         console.log('📂 Created uploads directory:', uploadsPath);
+    } else {
+        console.log('📂 Serving uploads from:', uploadsPath);
     }
+
+    // Cette ligne rend les fichiers accessibles via http://.../uploads/...
     app.use('/uploads', express.static(uploadsPath));
 
     const storage = multer.diskStorage({

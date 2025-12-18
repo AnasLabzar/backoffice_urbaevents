@@ -85,15 +85,12 @@ export function DataTable({ data, columnFilters, onColumnFiltersChange }: {
             table.getColumn('doc_cps')?.toggleVisibility(false);
             table.getColumn('doc_rc')?.toggleVisibility(false);
             table.getColumn('doc_avis')?.toggleVisibility(false);
-            table.getColumn('doc_bpe')?.toggleVisibility(false); // <-- Masquer BPE pour finance aussi
+            table.getColumn('doc_bpe')?.toggleVisibility(false);
         }
         // 3. CREATIVE / TEAM (inchangé)
         else if (['CREATIVE', '3D_ARTIST', 'ASSISTANT_PM'].includes(userRole)) {
-            ['doc_cps', 'doc_rc', 'doc_avis', 'doc_bpe', /*...*/].forEach(col => table.getColumn(col)?.toggleVisibility(false));
+            ['doc_cps', 'doc_rc', 'doc_avis', 'doc_bpe'].forEach(col => table.getColumn(col)?.toggleVisibility(false));
         }
-
-        // NOTE: Pour le PROJECT_MANAGER (PM), on ne cache RIEN par défaut concernant les docs.
-        // Donc il verra automatiquement la nouvelle colonne 'doc_bpe' ajoutée dans columns.tsx.
 
     }, [userRole, roleLoading, table]);
 

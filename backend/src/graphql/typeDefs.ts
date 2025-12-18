@@ -219,6 +219,7 @@ export const typeDefs = gql`
     assignedTo: User!
     department: String!
     status: String!
+    priority: String
     dueDate: String
     createdAt: String!
     updatedAt: String!
@@ -401,6 +402,7 @@ export const typeDefs = gql`
     projectId: ID!
     assignedToId: ID!
     department: String!
+    priority: String
     dueDate: String
   }
    

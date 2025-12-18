@@ -68,7 +68,7 @@ export const projectResolvers = {
             return projects;
         },
 
-        projects_feed: async (_: unknown, __: unknown, context: IContext) => {
+                                                                                                                                                                                                                                                                                            projects_feed: async (_: unknown, __: unknown, context: IContext) => {
             if (!context.user) throw new ApolloError('Not authenticated', 'UNAUTHENTICATED');
 
             const user = await User.findById(context.user.id).populate('role');
