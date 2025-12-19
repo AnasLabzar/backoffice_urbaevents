@@ -14,13 +14,21 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
-    IconDotsVertical, IconTrash, IconListDetails, IconAlertTriangle, IconEdit
+    IconDotsVertical,
+    IconTrash,
+    IconListDetails,
+    IconAlertTriangle,
+    IconEdit,
+    IconFiles // 👈 Hna importina l'icone jdida
 } from "@tabler/icons-react";
 import { toast } from "sonner";
 import { ProjectPreviewPanel } from "./drawers/project-preview";
 
-// 👇 HNA: Importi ProjectSheet li saybna (bdl l path ila kan mkhbia f dossier akhor)
+// Import ProjectSheet (Original)
 import { ProjectSheet } from "@/components/create-project-drawer";
+
+// 👇 HNA: Importina Sheet jdida dyal Documents (khass tkoun créitiha)
+import { EditDocumentsSheet } from "./drawers/edit-documents-sheet";
 
 // Mutation delete & Query feed
 const DELETE_PROJECT_MUTATION = gql`
@@ -43,9 +51,10 @@ export function ProjectActionsMenu({ project }: { project: any }) {
 
     // States
     const [isAlertOpen, setIsAlertOpen] = useState(false);
-
-    // 👇 Hada howa state li kayt7km f Sheet dyal modification
     const [isEditOpen, setIsEditOpen] = useState(false);
+
+    // 👇 State jdid dyal documents
+    const [isDocsOpen, setIsDocsOpen] = useState(false);
 
     // Permissions
     const canEdit = userRole === 'ADMIN' || userRole === 'PROPOSAL_MANAGER';
@@ -76,21 +85,34 @@ export function ProjectActionsMenu({ project }: { project: any }) {
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
-                    {/* Preview (Drawer view) */}
+                    {/* Preview */}
                     <ProjectPreviewPanel project={project} />
 
-                    {/* Tasks (Placeholder) */}
+                    {/* Tasks */}
                     <DropdownMenuItem onClick={() => toast.info("Bientôt disponible")} className="cursor-pointer">
                         <IconListDetails className="mr-2 h-4 w-4 text-muted-foreground" />
                         <span>Voir les Tâches</span>
                     </DropdownMenuItem>
+
+                    {/* 👇 BUTTON JDID: DOCUMENTS */}
+                    {canEdit && (
+                        <DropdownMenuItem
+                            onClick={(e) => {
+                                e.preventDefault();
+                                setIsDocsOpen(true);
+                            }}
+                            className="cursor-pointer"
+                        >
+                            <IconFiles className="mr-2 h-4 w-4 text-blue-500" />
+                            <span>Gérer les Documents</span>
+                        </DropdownMenuItem>
+                    )}
 
                     {/* EDIT ACTION */}
                     {canEdit && (
                         <DropdownMenuItem
                             onClick={(e) => {
                                 e.preventDefault();
-                                // 👇 Hna kan7lo l sheet
                                 setIsEditOpen(true);
                             }}
                             className="cursor-pointer"
@@ -100,7 +122,7 @@ export function ProjectActionsMenu({ project }: { project: any }) {
                         </DropdownMenuItem>
                     )}
 
-                    {/* DELETE ACTION (Admin Only) */}
+                    {/* DELETE ACTION */}
                     {canDelete && (
                         <>
                             <DropdownMenuSeparator />
@@ -119,12 +141,21 @@ export function ProjectActionsMenu({ project }: { project: any }) {
                 </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* --- SHEET DYAL MODIFICATION (INTEGRATION) --- */}
+            {/* --- SHEET DYAL MODIFICATION --- */}
             {canEdit && (
                 <ProjectSheet
-                    projectToEdit={project}      // 👈 Hna kan3tiweh l data bach y3mer l inputs
-                    open={isEditOpen}            // 👈 Kanrbtouh b state
-                    onOpenChange={setIsEditOpen} // 👈 Bach yqder ytsd bo7do
+                    projectToEdit={project}
+                    open={isEditOpen}
+                    onOpenChange={setIsEditOpen}
+                />
+            )}
+
+            {/* 👇 SHEET JDIDA DYAL DOCUMENTS */}
+            {canEdit && (
+                <EditDocumentsSheet
+                    project={project}
+                    open={isDocsOpen}
+                    onOpenChange={setIsDocsOpen}
                 />
             )}
 

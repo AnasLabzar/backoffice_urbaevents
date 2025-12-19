@@ -840,6 +840,66 @@ export const projectResolvers = {
 
             return true;
         },
+        proposal_deleteDocument: async (_: unknown, { projectId, documentId, stageName }: { projectId: string, documentId: string, stageName: string }, context: IContext) => {
+            // 1. Check Permissions
+            await checkPermission(context, 'create_project_proposal');
+
+            // 2. Find Project
+            const project = await Project.findById(projectId);
+            if (!project) throw new ApolloError('Project not found');
+
+            // 3. Verify Stage Exists (Safety Check)
+            // @ts-ignore - access dynamic stage property
+            if (!project.stages || !project.stages[stageName]) {
+                throw new ApolloError(`Stage '${stageName}' not found in project.`);
+            }
+
+            // 4. Update Project: Remove document ID from the specific stage array
+            // We use findByIdAndUpdate to atomically pull the ID from the array
+            const updateQuery = {
+                $pull: { [`stages.${stageName}.documents`]: documentId }
+            };
+
+            const updatedProject = await Project.findByIdAndUpdate(
+                projectId,
+                updateQuery,
+                { new: true } // Return the updated document
+            );
+
+            // 5. Delete the actual Document record from the 'documents' collection
+            const deletedDoc = await Document.findByIdAndDelete(documentId);
+
+            // Optional: You might want to delete the file from disk/S3 here using deletedDoc.fileUrl
+
+            // 6. Log Activity
+            await logActivity({
+                userId: context.user!.id as any,
+                action: 'FILE_DELETE',
+                project: project._id,
+                details: `Document deleted: "${deletedDoc?.originalFileName || documentId}" from ${stageName}`,
+            });
+
+            // 7. Populate and Return
+            // We need to populate the documents again to return the fresh list to the frontend
+            await updatedProject?.populate({
+                path: `stages.${stageName}.documents`,
+                populate: { path: 'uploadedBy', select: userSelect },
+            });
+
+            // Also populate the other stage if needed, or just return the whole project structure
+            // depending on what your frontend query expects.
+            // For completeness based on your typical query:
+            await updatedProject?.populate({
+                path: 'stages.administrative.documents',
+                populate: { path: 'uploadedBy', select: userSelect }
+            });
+            await updatedProject?.populate({
+                path: 'stages.technical.documents',
+                populate: { path: 'uploadedBy', select: userSelect }
+            });
+
+            return updatedProject;
+        },
     },
 
     // ✅ Field Resolvers

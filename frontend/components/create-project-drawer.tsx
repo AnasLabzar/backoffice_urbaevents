@@ -121,11 +121,12 @@ interface ProjectFormData {
 }
 
 // --- FORM CONTENT ---
+// Vers la ligne 128
 function ProjectFormContent({
   formData,
   handleChange,
   handleSelectChange,
-  handleDateChange,
+  handleDateChange, // <--- C'est ici
   handleCheckboxChange,
   handleSubmit,
   loading,
@@ -135,7 +136,8 @@ function ProjectFormContent({
   formData: ProjectFormData;
   handleChange: (e: any) => void;
   handleSelectChange: (id: string, val: any) => void;
-  handleDateChange: (date: Date | undefined) => void;
+  // 👇 MODIFICATION ICI : Ajoute "| null"
+  handleDateChange: (date: Date | undefined | null) => void;
   handleCheckboxChange: (id: string, val: boolean) => void;
   handleSubmit: (e: React.FormEvent) => void;
   loading: boolean;
@@ -347,9 +349,16 @@ export function ProjectSheet({ projectToEdit, trigger, open: controlledOpen, onO
 
   const loading = creating || updating;
 
+  // Vers la ligne 344 (dans ProjectSheet)
   const handleChange = (e: any) => setFormData({ ...formData, [e.target.id]: e.target.value });
   const handleSelectChange = (id: string, val: any) => setFormData({ ...formData, [id]: val });
-  const handleDateChange = (date: Date | undefined) => setFormData({ ...formData, submissionDeadline: date });
+
+  // 👇 MODIFICATION ICI :
+  // 1. Accepte 'null' dans les arguments
+  // 2. Utilise '|| undefined' pour convertir le null en undefined avant de set le state
+  const handleDateChange = (date: Date | undefined | null) =>
+    setFormData({ ...formData, submissionDeadline: date || undefined });
+
   const handleCheckboxChange = (id: string, val: boolean) => setFormData({ ...formData, [id]: val });
 
   const handleSubmit = (e: React.FormEvent) => {

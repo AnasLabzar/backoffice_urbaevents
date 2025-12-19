@@ -501,6 +501,8 @@ input CreateProjectInput {
     addPrestation(input: AddPrestationInput!): Prestation!
     updatePrestation(id: ID!, input: UpdatePrestationInput!): Prestation!
     deletePrestation(id: ID!): Boolean
+
+    proposal_deleteDocument(projectId: ID!, documentId: ID!, stageName: String!): Project!
     
     # ✅ NEW: Invoicing Mutations
     addInvoiceItem(input: AddInvoiceItemInput!): InvoiceItem!

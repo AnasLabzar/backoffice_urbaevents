@@ -280,3 +280,15 @@ export const GIVE_PROPOSAL_AVIS_MUTATION = gql`
     }
   }
 `;
+
+export const DELETE_DOCUMENT_MUTATION = gql`
+  mutation DeleteDocument($projectId: ID!, $documentId: ID!, $stageName: String!) {
+    proposal_deleteDocument(projectId: $projectId, documentId: $documentId, stageName: $stageName) {
+      id
+      stages { 
+        administrative { documents { id fileName originalFileName } }
+        technical { documents { id fileName originalFileName } }
+      }
+    }
+  }
+`;
