@@ -196,17 +196,25 @@ export function DataTable({ data, columnFilters, onColumnFiltersChange }: {
 
     React.useEffect(() => {
         if (roleLoading) return;
+
+        // Logic PROPOSAL_MANAGER (Rien à changer ici)
         if (userRole === 'PROPOSAL_MANAGER') {
             table.getColumn('project.preparationStatus')?.toggleVisibility(false);
             table.getColumn('project.projectManagers')?.toggleVisibility(false);
             table.getColumn('remainingTime')?.toggleVisibility(false);
         }
+        // Logic FINANCE (Rien à changer ici)
         else if (userRole === 'FINANCE') {
             ['doc_cps', 'doc_rc', 'doc_avis', 'doc_bpe'].forEach(col => table.getColumn(col)?.toggleVisibility(false));
         }
-        else if (['CREATIVE', '3D_ARTIST', 'ASSISTANT_PM'].includes(userRole)) {
+
+        // 👇👇 C'EST ICI LA MODIFICATION 👇👇
+        // J'ai supprimé 'ASSISTANT_PM' de cette liste.
+        // Daba, Assistant PM ghadi ybqa yban lih les colonnes b7al Admin.
+        else if (['CREATIVE', '3D_ARTIST'].includes(userRole)) {
             ['doc_cps', 'doc_rc', 'doc_avis', 'doc_bpe'].forEach(col => table.getColumn(col)?.toggleVisibility(false));
         }
+
     }, [userRole, roleLoading, table]);
 
     return (
