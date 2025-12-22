@@ -15,7 +15,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { gql, useQuery } from "@apollo/client";
+import { gql } from "@apollo/client"; // Kept import if you need it later, but not used in component
 import {
   Table,
   TableBody,
@@ -24,11 +24,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Tabs,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -50,7 +45,6 @@ import {
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  IconChevronDown,
   IconChevronLeft,
   IconChevronRight,
   IconChevronsLeft,
@@ -81,14 +75,14 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-// --- QUERIES (Updated with priority) ---
-const GET_MY_TASKS_QUERY = gql`
+// --- QUERIES (Kept for reference if needed by parent) ---
+export const GET_MY_TASKS_QUERY = gql`
   query GetMyTasks {
     myTasks {
       id
       description
       status
-      priority # ✅ Ajouté
+      priority
       department
       dueDate
       createdAt
@@ -119,13 +113,13 @@ const GET_MY_TASKS_QUERY = gql`
   }
 `;
 
-const GET_ALL_TASKS_QUERY = gql`
+export const GET_ALL_TASKS_QUERY = gql`
   query GetAllTasks {
     allTasks {
       id
       description
       status
-      priority # ✅ Ajouté
+      priority
       department
       dueDate
       createdAt
@@ -161,7 +155,7 @@ export interface Task {
   id: string;
   description: string;
   status: "TODO" | "IN_PROGRESS" | "DONE";
-  priority: "HIGH" | "NORMAL" | "LOW"; // ✅ Ajouté
+  priority: "HIGH" | "NORMAL" | "LOW";
   department: "CREATIVE" | "TECHNICAL_OFFICE" | "WORKSHOP" | "FIELD" | "LOGISTICS";
   dueDate: string | null;
   createdAt: string;
@@ -188,6 +182,12 @@ export interface Task {
     fileUrl: string;
     originalFileName: string;
   } | null;
+}
+
+interface TasksTableProps {
+  initialData: Task[];
+  isManager: boolean;
+  isLoading?: boolean;
 }
 
 // --- HELPERS ---
@@ -225,20 +225,20 @@ function TaskStatusBadge({ status }: { status: string }) {
   );
 }
 
-// 2. Priority Badge (NEW)
+// 2. Priority Badge
 function TaskPriorityBadge({ priority }: { priority: string }) {
   const config: Record<string, { color: string, icon: React.ReactNode, label: string }> = {
-    HIGH: { 
+    HIGH: {
       color: "bg-red-500/15 text-red-700 dark:text-red-400 border-red-200/50 dark:border-red-900/50",
       icon: <IconFlag className="h-3 w-3 fill-current" />,
       label: "Haute"
     },
-    NORMAL: { 
+    NORMAL: {
       color: "bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-200/50 dark:border-blue-900/50",
       icon: <IconFlag className="h-3 w-3" />,
       label: "Normale"
     },
-    LOW: { 
+    LOW: {
       color: "bg-slate-500/15 text-slate-700 dark:text-slate-400 border-slate-200/50 dark:border-slate-800/50",
       icon: <IconFlag className="h-3 w-3" />,
       label: "Basse"
@@ -368,7 +368,6 @@ export const getTaskColumns = (
       },
     },
     {
-      // ✅ Nouvelle colonne Priorité avec Tri
       accessorKey: "priority",
       header: ({ column }) => {
         return (
@@ -383,7 +382,6 @@ export const getTaskColumns = (
         )
       },
       cell: ({ row }) => <TaskPriorityBadge priority={row.original.priority} />,
-      // Logique de tri personnalisé : HIGH > NORMAL > LOW
       sortingFn: (rowA, rowB) => {
         const priorityOrder: Record<string, number> = { HIGH: 3, NORMAL: 2, LOW: 1 };
         const valA = priorityOrder[rowA.original.priority as string] || 0;
@@ -482,32 +480,24 @@ export const getTaskColumns = (
   ];
 
 // --- MAIN TABLE COMPONENT ---
-export function TasksTable() {
+export function TasksTable({ initialData, isManager, isLoading = false }: TasksTableProps) {
   // ✅ Tri par défaut : Priorité Descendant (High first)
   const [sorting, setSorting] = React.useState<SortingState>([{ id: 'priority', desc: true }]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = React.useState({});
   const [pagination, setPagination] = React.useState({ pageIndex: 0, pageSize: 10 });
-  const [activeTab, setActiveTab] = React.useState<"my-tasks" | "all-tasks">("my-tasks");
+
   const [selectedTask, setSelectedTask] = React.useState<Task | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = React.useState(false);
 
-  // Data Fetching
-  const { data: myTasksData, loading: myLoading, error: myError } = useQuery(GET_MY_TASKS_QUERY);
-  const { data: allTasksData, loading: allLoading, error: allError } = useQuery(GET_ALL_TASKS_QUERY);
+  // ✅ CORRECT : On utilise directement les données passées par le parent
+  const data = React.useMemo(() => initialData || [], [initialData]);
 
-  const myTasks = myTasksData?.myTasks || [];
-  const allTasks = allTasksData?.allTasks || [];
-
-  // Memoize data to prevent re-renders
-  const data = React.useMemo(() => {
-    return activeTab === "my-tasks" ? myTasks : allTasks;
-  }, [activeTab, myTasks, allTasks]);
-
+  // ✅ CORRECT : On calcule le retard sur les données reçues
   const overdueCount = React.useMemo(() => {
-    return myTasks.filter((t: Task) => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== "DONE").length;
-  }, [myTasks]);
+    return data.filter((t: Task) => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== "DONE").length;
+  }, [data]);
 
   const columns = React.useMemo(() => getTaskColumns(setSelectedTask, setIsDrawerOpen), []);
 
@@ -529,7 +519,7 @@ export function TasksTable() {
   });
 
   // Loading State
-  if (myLoading || allLoading) {
+  if (isLoading) {
     return (
       <div className="space-y-4">
         <div className="flex justify-between">
@@ -537,16 +527,6 @@ export function TasksTable() {
           <Skeleton className="h-10 w-[100px]" />
         </div>
         <Skeleton className="h-[400px] w-full rounded-xl" />
-      </div>
-    );
-  }
-
-  // Error State
-  if (myError || allError) {
-    return (
-      <div className="rounded-md bg-destructive/15 p-4 text-destructive border border-destructive/20">
-        <h3 className="font-bold">Erreur de chargement</h3>
-        <p className="text-sm mt-1">{myError?.message || allError?.message}</p>
       </div>
     );
   }
@@ -560,26 +540,20 @@ export function TasksTable() {
           <IconAlertTriangle className="h-4 w-4" />
           <AlertTitle className="ml-2 font-bold">Attention requise</AlertTitle>
           <AlertDescription className="ml-2 flex items-center justify-between w-full">
-            <span>Vous avez <strong>{overdueCount} tâche(s)</strong> en retard.</span>
-            <Button variant="link" size="sm" className="h-auto p-0 text-red-600 dark:text-red-400 underline" onClick={() => setActiveTab("my-tasks")}>
-              Voir mes tâches
-            </Button>
+            <span>Vous avez <strong>{overdueCount} tâche(s)</strong> en retard dans cette vue.</span>
           </AlertDescription>
         </Alert>
       )}
 
-      {/* 2. Controls & Tabs */}
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
+      {/* 2. Controls & Toolbar */}
+      <div className="w-full">
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 py-2">
 
-          <TabsList className="bg-muted text-muted-foreground p-1 h-10">
-            <TabsTrigger value="my-tasks" className="px-4 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">
-              Mes Tâches <Badge variant="secondary" className="ml-2 h-5 bg-primary/10 text-primary">{myTasks.length}</Badge>
-            </TabsTrigger>
-            <TabsTrigger value="all-tasks" className="px-4 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm">
-              Toutes les Tâches <span className="ml-2 text-xs text-muted-foreground">({allTasks.length})</span>
-            </TabsTrigger>
-          </TabsList>
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="h-7 px-3 bg-primary/10 text-primary">
+              Total: {data.length}
+            </Badge>
+          </div>
 
           <div className="flex items-center gap-2 w-full lg:w-auto">
             <div className="relative w-full lg:w-[280px]">
@@ -617,7 +591,7 @@ export function TasksTable() {
         </div>
 
         {/* 3. Table Container */}
-        <div className="rounded-md border bg-card text-card-foreground shadow-sm overflow-hidden">
+        <div className="rounded-md border bg-card text-card-foreground shadow-sm overflow-hidden mt-2">
           <Table>
             <TableHeader className="bg-muted/50">
               {table.getHeaderGroups().map((headerGroup) => (
@@ -715,7 +689,7 @@ export function TasksTable() {
             </div>
           </div>
         </div>
-      </Tabs>
+      </div>
 
       {/* 5. Details Drawer */}
       <Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>

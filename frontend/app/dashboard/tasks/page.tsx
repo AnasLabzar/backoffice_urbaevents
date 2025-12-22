@@ -21,7 +21,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 
-// --- 1. QUERY MISE À JOUR (Récupère myTasks ET allTasks) ---
+// --- 1. QUERY MISE À JOUR (COMPLÈTE POUR LE TABLEAU) ---
 const GET_PAGE_DATA = gql`
   query GetPageData {
     me {
@@ -41,7 +41,11 @@ const GET_PAGE_DATA = gql`
       department
       dueDate
       createdAt
-      assignedTo { id name }
+      updatedAt
+      assignedTo { id name email }
+      project { id object title }   # ✅ Ajouté pour le tableau
+      v1Uploads { id fileUrl originalFileName } # ✅ Ajouté
+      finalUpload { id fileUrl originalFileName } # ✅ Ajouté
     }
     # Toutes les tâches (Pour Admin/PM)
     allTasks {
@@ -52,7 +56,11 @@ const GET_PAGE_DATA = gql`
       department
       dueDate
       createdAt
-      assignedTo { id name }
+      updatedAt
+      assignedTo { id name email }
+      project { id object title }   # ✅ Ajouté pour le tableau
+      v1Uploads { id fileUrl originalFileName } # ✅ Ajouté
+      finalUpload { id fileUrl originalFileName } # ✅ Ajouté
     }
   }
 `;
@@ -83,10 +91,8 @@ export default function TasksPage() {
   const role = me?.role?.name;
 
   // --- 2. LOGIQUE DE RÔLE ---
-  // Est considéré comme Manager : ADMIN, PM, DIRECTEUR
   const isManager = ['ADMIN', 'PROJECT_MANAGER', 'DIRECTOR_EVENT'].includes(role);
 
-  // Sélection des données à afficher
   // Si Manager -> allTasks, Sinon -> myTasks
   const tasks = isManager ? (data?.allTasks || []) : (data?.myTasks || []);
 
@@ -95,20 +101,17 @@ export default function TasksPage() {
   const completedTasks = tasks.filter((t: any) => t.status === "DONE").length;
   const pendingTasks = tasks.filter((t: any) => t.status !== "DONE").length;
 
-  // Calcul Urgence (< 24h ou HIGH)
   const urgentTasks = tasks.filter((t: any) => {
     if (t.status === "DONE") return false;
-    if (t.priority === "HIGH") return true; // Priorité haute toujours urgente
+    if (t.priority === "HIGH") return true;
     if (!t.dueDate) return false;
 
     const now = new Date();
     const due = new Date(t.dueDate);
     const diffHours = (due.getTime() - now.getTime()) / (1000 * 60 * 60);
-
     return diffHours < 24;
   }).length;
 
-  // Taux de complétion
   const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
   const getGreeting = () => {
@@ -163,11 +166,10 @@ export default function TasksPage() {
               </div>
             </div>
 
-            {/* Indicateur de Vue (Globale vs Perso) */}
             <div className="flex items-center gap-2">
               {isManager ? (
                 <span className="flex items-center gap-2 text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 px-3 py-1 rounded-full border border-blue-200 dark:border-blue-800">
-                  <IconUsers className="w-3.5 h-3.5" /> Vue Globale (Équipe)
+                  <IconUsers className="w-3.5 h-3.5" /> Vue Globale
                 </span>
               ) : (
                 <span className="flex items-center gap-2 text-xs font-medium bg-muted text-muted-foreground px-3 py-1 rounded-full border">
@@ -179,43 +181,17 @@ export default function TasksPage() {
 
           {/* 2. Key Metrics Grid */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <StatCard
-              title={isManager ? "Total Tâches (Global)" : "Mes Tâches"}
-              value={loading ? "-" : totalTasks}
-              description={isManager ? "Toutes les tâches actives" : "Assignées à moi"}
-              icon={IconChecklist}
-            />
-
-            <StatCard
-              title="Priorité Haute"
-              value={loading ? "-" : urgentTasks}
-              description="Urgentes ou < 24h"
-              icon={IconAlertCircle}
-              className={urgentTasks > 0 ? "border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-900/10" : ""}
-            />
-
-            <StatCard
-              title="Productivité"
-              value={loading ? "-" : `${completionRate}%`}
-              description="Taux de complétion"
-              icon={IconChartPie}
-              trend={<Progress value={completionRate} className="h-1.5 bg-muted" indicatorClassName="bg-emerald-600" />}
-            />
-
-            <StatCard
-              title="En Cours"
-              value={loading ? "-" : pendingTasks}
-              description="À traiter"
-              icon={IconClock}
-            />
+            <StatCard title={isManager ? "Total Tâches" : "Mes Tâches"} value={loading ? "-" : totalTasks} description="Actives" icon={IconChecklist} />
+            <StatCard title="Priorité Haute" value={loading ? "-" : urgentTasks} description="Urgentes" icon={IconAlertCircle} className={urgentTasks > 0 ? "border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-900/10" : ""} />
+            <StatCard title="Productivité" value={loading ? "-" : `${completionRate}%`} description="Taux de complétion" icon={IconChartPie} trend={<Progress value={completionRate} className="h-1.5 bg-muted" indicatorClassName="bg-emerald-600" />} />
+            <StatCard title="En Cours" value={loading ? "-" : pendingTasks} description="À traiter" icon={IconClock} />
           </div>
 
           {/* 3. Main Data Table */}
           <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
             <div className="p-1">
-              {/* On passe la liste filtrée selon le rôle au composant Table */}
-              {/* Assurez-vous que TasksTable accepte une prop 'data' ou modifiez-le pour utiliser les données passées */}
-              <TasksTable initialData={tasks} isManager={isManager} />
+              {/* ✅ COMPOSANT CORRIGÉ : On passe les données, on ne fetch pas dedans */}
+              <TasksTable initialData={tasks} isManager={isManager} isLoading={loading} />
             </div>
           </div>
         </div>
