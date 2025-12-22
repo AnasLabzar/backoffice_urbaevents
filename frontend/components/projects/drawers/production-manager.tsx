@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation"; // 👈 IMPORT JDID
+import { useRouter } from "next/navigation"; // 👈 For navigation
 import { gql, useQuery, useMutation } from "@apollo/client";
 import {
     IconUpload, IconUsers, IconChecklist, IconPlus,
     IconFile, IconX, IconBriefcase, IconDeviceDesktopAnalytics,
-    IconUser, IconLayoutKanban, IconLoader, IconExternalLink // 👈 IMPORT ICON
+    IconUser, IconLayoutKanban, IconLoader, IconExternalLink, IconFileDescription // 👈 New Icons
 } from "@tabler/icons-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -62,7 +62,7 @@ type TabType = "team" | "assets" | "tasks";
 // --- 3. MAIN COMPONENT ---
 
 export function ProductionManager({ projectId, initialTeam, onSave }: ProductionManagerProps) {
-    const router = useRouter(); // 👈 ROUTER HOOK
+    const router = useRouter(); // 👈 Router instance
     const [activeTab, setActiveTab] = useState<TabType>("team");
 
     // Form States
@@ -161,11 +161,10 @@ export function ProductionManager({ projectId, initialTeam, onSave }: Production
 
                     {/* Status Badge & FULL SPACE BUTTON */}
                     <div className="flex items-center gap-2">
-                        {/* 👇 ZIDT HAD LE BOUTTON HNA */}
                         <Button
                             variant="ghost"
                             size="sm"
-                            className="h-7 text-xs gap-1.5 text-muted-foreground hover:text-primary"
+                            className="h-7 text-xs gap-1.5 text-muted-foreground hover:text-primary border border-transparent hover:border-border"
                             onClick={() => router.push(`/dashboard/projects/${projectId}/production`)}
                         >
                             <IconExternalLink className="w-3.5 h-3.5" />
@@ -228,6 +227,7 @@ export function ProductionManager({ projectId, initialTeam, onSave }: Production
                             />
                         </div>
 
+                        {/* ✅ FOOTER INTÉGRÉ ICI POUR L'ÉQUIPE (Plus propre) */}
                         <div className="flex items-center justify-between p-4 bg-card rounded-lg border shadow-sm sticky bottom-0">
                             <div className="flex items-center gap-2">
                                 <div className="flex -space-x-2">
@@ -244,10 +244,12 @@ export function ProductionManager({ projectId, initialTeam, onSave }: Production
                                 </div>
                                 <span className="text-sm text-muted-foreground ml-2">membres assignés</span>
                             </div>
-                            <Button onClick={() => assignTeam({ variables: { input: { projectId, ...teamData } } })} disabled={loadingAssign}>
-                                {loadingAssign && <IconLoader className="mr-2 h-4 w-4 animate-spin" />}
-                                Sauvegarder
-                            </Button>
+                            <div className="flex gap-2">
+                                <Button onClick={() => assignTeam({ variables: { input: { projectId, ...teamData } } })} disabled={loadingAssign}>
+                                    {loadingAssign && <IconLoader className="mr-2 h-4 w-4 animate-spin" />}
+                                    Sauvegarder
+                                </Button>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -256,7 +258,7 @@ export function ProductionManager({ projectId, initialTeam, onSave }: Production
                 {activeTab === "assets" && (
                     <div className="h-full flex flex-col gap-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
                         <FileDropzone file={selectedFile} onFileSelect={setSelectedFile} />
-                        <div className="flex justify-end">
+                        <div className="flex justify-end gap-2">
                             <Button size="lg" onClick={handleFileUpload} disabled={!selectedFile || loadingUpload}>
                                 {loadingUpload && <IconLoader className="mr-2 h-4 w-4 animate-spin" />}
                                 {loadingUpload ? "Envoi..." : "Uploader"}
@@ -268,7 +270,6 @@ export function ProductionManager({ projectId, initialTeam, onSave }: Production
                 {/* --- TAB 3: TASKS --- */}
                 {activeTab === "tasks" && (
                     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                        {/* Task Creation */}
                         <div className="p-1.5 bg-background border rounded-xl shadow-sm flex flex-col sm:flex-row gap-2 sticky top-0 z-10">
                             <Input
                                 placeholder="Nouvelle tâche..."
@@ -305,7 +306,6 @@ export function ProductionManager({ projectId, initialTeam, onSave }: Production
                             </div>
                         </div>
 
-                        {/* List */}
                         <div className="space-y-3 pb-10">
                             {data?.tasksByProject?.length === 0 && (
                                 <div className="flex flex-col items-center justify-center py-12 text-muted-foreground bg-muted/10 rounded-xl border border-dashed">
@@ -319,6 +319,29 @@ export function ProductionManager({ projectId, initialTeam, onSave }: Production
                         </div>
                     </div>
                 )}
+            </div>
+
+            {/* --- FIXED FOOTER (BOTTOM) --- */}
+            {/* Added "Voir le Brief" button here */}
+            <div className="flex-none p-4 border-t bg-background mt-auto flex justify-between items-center">
+                <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2 text-muted-foreground hover:text-foreground"
+                    onClick={() => router.push(`/dashboard/projects/${projectId}/brief`)}
+                >
+                    <IconFileDescription className="w-4 h-4" />
+                    Voir le Brief
+                </Button>
+
+                {/* Note: In a Drawer context, usually the parent controls the "Close/Cancel" button via DrawerClose. 
+                    If this component is used standalone, you might want a Cancel button here. 
+                    Since it's likely inside a Drawer, we rely on the parent's DrawerFooter or DrawerClose. 
+                    However, if you want a visual cancel button inside this component that acts as a close:
+                */}
+                {/* <DrawerClose asChild>
+                    <Button variant="ghost" size="sm">Fermer</Button>
+                </DrawerClose> */}
             </div>
         </div>
     );

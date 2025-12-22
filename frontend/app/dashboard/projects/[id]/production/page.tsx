@@ -8,7 +8,8 @@ import {
     IconClock, IconCheck, IconAlertTriangle, IconLoader,
     IconBriefcase, IconChecklist, IconCloudUpload,
     IconFile, IconDownload, IconX, IconFlag,
-    IconCalendar, IconUserCircle, IconLock, IconInfoCircle
+    IconCalendar, IconUserCircle, IconLock, IconInfoCircle,
+    IconFileDescription // ✅ Import ajouté pour le bouton Brief
 } from "@tabler/icons-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -125,7 +126,6 @@ const formatDate = (dateString: string | null) => {
 };
 
 const getDueDateStyles = (dateStr: string | null | undefined, status: string) => {
-    // 1. État par défaut (Pas de date ou Terminé)
     if (!dateStr || status === 'DONE') {
         return {
             color: "text-muted-foreground",
@@ -137,11 +137,9 @@ const getDueDateStyles = (dateStr: string | null | undefined, status: string) =>
 
     let date = new Date(dateStr);
 
-    // 2. Gestion des Timestamps (ex: "1766444400")
     if (isNaN(date.getTime())) {
         const timestamp = Number(dateStr);
         if (!isNaN(timestamp) && timestamp > 0) {
-            // Si Timestamp en secondes (10 chiffres), on convertit en ms
             if (timestamp < 10000000000) {
                 date = new Date(timestamp * 1000);
             } else {
@@ -150,7 +148,6 @@ const getDueDateStyles = (dateStr: string | null | undefined, status: string) =>
         }
     }
 
-    // 3. Si toujours invalide, on retourne une erreur visuelle propre
     if (isNaN(date.getTime())) {
         return {
             color: "text-red-600 dark:text-red-400",
@@ -160,7 +157,6 @@ const getDueDateStyles = (dateStr: string | null | undefined, status: string) =>
         };
     }
 
-    // 4. Logique de style (Compatible Dark/Light Mode)
     try {
         if (isToday(date)) return {
             color: "text-orange-700 dark:text-orange-400",
@@ -287,7 +283,18 @@ export default function ProductionPage({ params }: { params: Promise<{ id: strin
                                     <span className="opacity-50">/</span>
                                     <span className="font-mono font-medium text-foreground/80">{project.projectCode}</span>
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-3">
+                                    {/* ✅ NOUVEAU BOUTON BRIEF */}
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-7 text-xs font-medium gap-2 border border-dashed text-muted-foreground hover:text-primary hover:bg-primary/5 hover:border-primary/20 hidden sm:flex"
+                                        onClick={() => router.push(`/dashboard/projects/${projectId}/brief`)}
+                                    >
+                                        <IconFileDescription className="w-3.5 h-3.5" />
+                                        Voir le Brief
+                                    </Button>
+
                                     <Badge variant="outline" className={cn("text-[10px] uppercase font-bold tracking-wider", project.status === 'DONE' ? "bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800" : "bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800")}>
                                         {project.status === 'DONE' ? 'TERMINÉ' : 'EN PRODUCTION'}
                                     </Badge>

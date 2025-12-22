@@ -63,6 +63,8 @@ import {
   IconAlertTriangle,
   IconFileText,
   IconCalendar,
+  IconFlag,
+  IconArrowsSort
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 import {
@@ -79,13 +81,14 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-// --- QUERIES ---
+// --- QUERIES (Updated with priority) ---
 const GET_MY_TASKS_QUERY = gql`
   query GetMyTasks {
     myTasks {
       id
       description
       status
+      priority # ✅ Ajouté
       department
       dueDate
       createdAt
@@ -122,6 +125,7 @@ const GET_ALL_TASKS_QUERY = gql`
       id
       description
       status
+      priority # ✅ Ajouté
       department
       dueDate
       createdAt
@@ -157,6 +161,7 @@ export interface Task {
   id: string;
   description: string;
   status: "TODO" | "IN_PROGRESS" | "DONE";
+  priority: "HIGH" | "NORMAL" | "LOW"; // ✅ Ajouté
   department: "CREATIVE" | "TECHNICAL_OFFICE" | "WORKSHOP" | "FIELD" | "LOGISTICS";
   dueDate: string | null;
   createdAt: string;
@@ -197,28 +202,20 @@ const getFileUrl = (filePath: string) => {
 
 function formatDate(dateString: string | null) {
   if (!dateString) return "Non définie";
-
   const date = new Date(dateString);
-
-  // VÉRIFICATION DE SÉCURITÉ : Si la date est invalide, on ne plante pas
-  if (isNaN(date.getTime())) {
-    return "Date invalide";
-  }
-
+  if (isNaN(date.getTime())) return "Date invalide";
   return new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }).format(date);
 }
 
 // --- COMPONENTS ---
 
-// 1. Status Badge (Dark Mode Ready)
+// 1. Status Badge
 function TaskStatusBadge({ status }: { status: string }) {
-  // Using generic color classes that work in both modes via opacity
   const config: Record<string, string> = {
     TODO: "bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-200/50 dark:border-orange-900/50",
     IN_PROGRESS: "bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-200/50 dark:border-blue-900/50",
     DONE: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-200/50 dark:border-emerald-900/50",
   };
-
   const labels: Record<string, string> = { TODO: "À faire", IN_PROGRESS: "En cours", DONE: "Terminé" };
 
   return (
@@ -228,7 +225,37 @@ function TaskStatusBadge({ status }: { status: string }) {
   );
 }
 
-// 2. Department Badge (Dark Mode Ready)
+// 2. Priority Badge (NEW)
+function TaskPriorityBadge({ priority }: { priority: string }) {
+  const config: Record<string, { color: string, icon: React.ReactNode, label: string }> = {
+    HIGH: { 
+      color: "bg-red-500/15 text-red-700 dark:text-red-400 border-red-200/50 dark:border-red-900/50",
+      icon: <IconFlag className="h-3 w-3 fill-current" />,
+      label: "Haute"
+    },
+    NORMAL: { 
+      color: "bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-200/50 dark:border-blue-900/50",
+      icon: <IconFlag className="h-3 w-3" />,
+      label: "Normale"
+    },
+    LOW: { 
+      color: "bg-slate-500/15 text-slate-700 dark:text-slate-400 border-slate-200/50 dark:border-slate-800/50",
+      icon: <IconFlag className="h-3 w-3" />,
+      label: "Basse"
+    },
+  };
+
+  const style = config[priority] || config.NORMAL;
+
+  return (
+    <div className={cn("flex items-center gap-1.5 text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border w-fit", style.color)}>
+      {style.icon}
+      {style.label}
+    </div>
+  );
+}
+
+// 3. Department Badge
 function DepartmentBadge({ department }: { department: Task["department"] }) {
   const deptConfig = {
     CREATIVE: { label: "Créatif", color: "bg-purple-500/15 text-purple-700 dark:text-purple-400 border-purple-200/50" },
@@ -246,7 +273,7 @@ function DepartmentBadge({ department }: { department: Task["department"] }) {
   );
 }
 
-// 3. File Downloads
+// 4. File Downloads
 function FileDownloads({ task }: { task: Task }) {
   const hasV1 = task.v1Uploads.length > 0;
   const hasFinal = !!task.finalUpload;
@@ -296,7 +323,7 @@ function FileDownloads({ task }: { task: Task }) {
   );
 }
 
-// --- TABLE COLUMNS DEFINITION (CORRIGÉ) ---
+// --- TABLE COLUMNS DEFINITION ---
 export const getTaskColumns = (
   setSelectedTask: React.Dispatch<React.SetStateAction<Task | null>>,
   setIsDrawerOpen: React.Dispatch<React.SetStateAction<boolean>>
@@ -305,15 +332,15 @@ export const getTaskColumns = (
       accessorKey: "description",
       header: "Description & Projet",
       cell: ({ row }) => (
-        <div className="flex flex-col gap-1 max-w-[300px]">
+        <div className="flex flex-col gap-1 max-w-[280px]">
           <span
             className="font-medium text-sm truncate text-foreground hover:text-primary cursor-pointer transition-colors"
+            title={row.original.description}
             onClick={() => { setSelectedTask(row.original); setIsDrawerOpen(true); }}
           >
             {row.original.description}
           </span>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            {/* Ajout de ?. et || pour éviter le crash si project est null */}
             <span className="truncate max-w-[150px]">
               {row.original.project?.object || "Objet non spécifié"}
             </span>
@@ -341,11 +368,34 @@ export const getTaskColumns = (
       },
     },
     {
+      // ✅ Nouvelle colonne Priorité avec Tri
+      accessorKey: "priority",
+      header: ({ column }) => {
+        return (
+          <Button
+            variant="ghost"
+            className="h-8 -ml-4 hover:bg-muted text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Priorité
+            <IconArrowsSort className="ml-2 h-3 w-3" />
+          </Button>
+        )
+      },
+      cell: ({ row }) => <TaskPriorityBadge priority={row.original.priority} />,
+      // Logique de tri personnalisé : HIGH > NORMAL > LOW
+      sortingFn: (rowA, rowB) => {
+        const priorityOrder: Record<string, number> = { HIGH: 3, NORMAL: 2, LOW: 1 };
+        const valA = priorityOrder[rowA.original.priority as string] || 0;
+        const valB = priorityOrder[rowB.original.priority as string] || 0;
+        return valA < valB ? -1 : valA > valB ? 1 : 0;
+      }
+    },
+    {
       accessorKey: "assignedTo.name",
       header: "Responsable",
       cell: ({ row }) => {
         const user = row.original.assignedTo;
-        // Si aucun utilisateur n'est assigné, on affiche un placeholder au lieu de crasher
         if (!user) {
           return (
             <div className="flex items-center gap-2 opacity-50">
@@ -354,7 +404,6 @@ export const getTaskColumns = (
             </div>
           );
         }
-
         return (
           <div className="flex items-center gap-2">
             <Avatar className="h-6 w-6">
@@ -434,7 +483,8 @@ export const getTaskColumns = (
 
 // --- MAIN TABLE COMPONENT ---
 export function TasksTable() {
-  const [sorting, setSorting] = React.useState<SortingState>([]);
+  // ✅ Tri par défaut : Priorité Descendant (High first)
+  const [sorting, setSorting] = React.useState<SortingState>([{ id: 'priority', desc: true }]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = React.useState({});
@@ -606,7 +656,7 @@ export function TasksTable() {
           </Table>
         </div>
 
-        {/* 4. Full Pagination (Restored) */}
+        {/* 4. Pagination */}
         <div className="flex flex-col sm:flex-row items-center justify-between px-2 py-4 gap-4">
           <div className="flex items-center gap-2 text-sm text-muted-foreground order-2 sm:order-1">
             <span>Lignes par page</span>
@@ -667,7 +717,7 @@ export function TasksTable() {
         </div>
       </Tabs>
 
-      {/* 5. Details Drawer (Professional & Dark Mode Ready) */}
+      {/* 5. Details Drawer */}
       <Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
         <DrawerContent className="fixed right-0 top-0 h-full w-full sm:w-[450px] mt-0 rounded-none border-l bg-background shadow-2xl focus:outline-none z-50">
           {selectedTask && (
@@ -677,6 +727,7 @@ export function TasksTable() {
                   <Badge variant="outline" className="bg-background">
                     {selectedTask.project?.title || "Projet Inconnu"}
                   </Badge>
+                  <TaskPriorityBadge priority={selectedTask.priority} />
                   <span className="text-xs text-muted-foreground ml-auto">{formatDate(selectedTask.createdAt)}</span>
                 </div>
                 <DrawerTitle className="text-xl font-bold leading-tight">{selectedTask.description}</DrawerTitle>
@@ -693,7 +744,7 @@ export function TasksTable() {
                     <div><TaskStatusBadge status={selectedTask.status} /></div>
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-xs uppercase text-muted-foreground font-semibold">Priorité/Date</Label>
+                    <Label className="text-xs uppercase text-muted-foreground font-semibold">Échéance</Label>
                     <div className="flex items-center gap-2 text-sm font-medium">
                       <IconCalendar className="h-4 w-4 text-muted-foreground" />
                       {formatDate(selectedTask.dueDate)}
@@ -701,7 +752,7 @@ export function TasksTable() {
                   </div>
                 </div>
 
-                {/* Assignment Section (SÉCURISÉ) */}
+                {/* Assignment Section */}
                 <div className="space-y-3 p-4 rounded-lg border bg-card/50">
                   <Label className="text-xs uppercase text-muted-foreground font-semibold">Responsable</Label>
                   {selectedTask.assignedTo ? (

@@ -173,11 +173,11 @@ export const typeDefs = gql`
     pmJuniors: [User!]!    
   }
 
-  type ProjectBriefRequirements {
+  type BriefRequirements {
     logistics: String
+    audiovisual: String
     accommodation: String
     catering: String
-    audiovisual: String
     transport: String
     digital: String
     hr: String
@@ -207,7 +207,7 @@ export const typeDefs = gql`
     themeConcept: String
     themeDeclination: String
     constraints: String
-    requirements: ProjectBriefRequirements
+    requirements: BriefRequirements
     spaces: [String]
     updatedAt: String
   }
@@ -319,11 +319,11 @@ export const typeDefs = gql`
     unitPrice: Float
   }
 
-  input ProjectBriefRequirementsInput {
+ input BriefRequirementsInput {
     logistics: String
+    audiovisual: String
     accommodation: String
     catering: String
-    audiovisual: String
     transport: String
     digital: String
     hr: String
@@ -352,7 +352,10 @@ export const typeDefs = gql`
     themeConcept: String
     themeDeclination: String
     constraints: String
-    requirements: ProjectBriefRequirementsInput
+    
+    # ✅ FIX: Use the Input type here, not the Object type
+    requirements: BriefRequirementsInput 
+    
     spaces: [String]
   }
 
@@ -510,7 +513,7 @@ input CreateProjectInput {
     importPrestationsFromExcel(projectId: ID!, invoiceId: ID!, fileUrl: String!): [InvoiceItem] # Updated return type
 
     # Brief
-    saveProjectBrief(input: ProjectBriefInput!): ProjectBrief!
+    saveProjectBrief(input: ProjectBriefInput!): ProjectBrief
 
     # Admin
     admin_createUser(input: CreateUserInput!): User!

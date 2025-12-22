@@ -55,6 +55,7 @@ export const resolvers = {
     Role: { id: (parent: any) => parent._id ? parent._id.toString() : parent.id },
     Supplier: { id: (parent: any) => parent._id ? parent._id.toString() : parent.id },
     Prestation: { id: (parent: any) => parent._id ? parent._id.toString() : parent.id },
+    ProjectBrief: { id: (parent: any) => parent._id ? parent._id.toString() : parent.id },
 
     // ✅ Type Resolver pour Invoice (et Items field link)
     Invoice: {

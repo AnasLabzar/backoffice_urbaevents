@@ -13,14 +13,15 @@ import {
   IconAlertCircle,
   IconChartPie,
   IconCalendar,
-  IconBriefcase
+  IconBriefcase,
+  IconUsers
 } from "@tabler/icons-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 
-// --- QUERY ---
+// --- 1. QUERY MISE À JOUR (Récupère myTasks ET allTasks) ---
 const GET_PAGE_DATA = gql`
   query GetPageData {
     me {
@@ -31,10 +32,27 @@ const GET_PAGE_DATA = gql`
         name
       }
     }
+    # Tâches de l'utilisateur connecté
     myTasks {
       id
+      description
       status
+      priority
+      department
       dueDate
+      createdAt
+      assignedTo { id name }
+    }
+    # Toutes les tâches (Pour Admin/PM)
+    allTasks {
+      id
+      description
+      status
+      priority
+      department
+      dueDate
+      createdAt
+      assignedTo { id name }
     }
   }
 `;
@@ -57,25 +75,40 @@ function StatCard({ title, value, icon: Icon, description, className, trend }: a
 }
 
 export default function TasksPage() {
-  const { data, loading, error } = useQuery(GET_PAGE_DATA);
+  const { data, loading, error } = useQuery(GET_PAGE_DATA, {
+    pollInterval: 5000 // Rafraîchissement auto
+  });
 
   const me = data?.me;
-  const tasks = data?.myTasks || [];
+  const role = me?.role?.name;
 
-  // Logic for Statistics
+  // --- 2. LOGIQUE DE RÔLE ---
+  // Est considéré comme Manager : ADMIN, PM, DIRECTEUR
+  const isManager = ['ADMIN', 'PROJECT_MANAGER', 'DIRECTOR_EVENT'].includes(role);
+
+  // Sélection des données à afficher
+  // Si Manager -> allTasks, Sinon -> myTasks
+  const tasks = isManager ? (data?.allTasks || []) : (data?.myTasks || []);
+
+  // --- 3. CALCUL DES STATS ---
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter((t: any) => t.status === "DONE").length;
-  const pendingTasks = tasks.filter((t: any) => t.status === "TODO" || t.status === "IN_PROGRESS").length;
+  const pendingTasks = tasks.filter((t: any) => t.status !== "DONE").length;
 
-  // Logic for "Urgent" (Due in < 24h)
+  // Calcul Urgence (< 24h ou HIGH)
   const urgentTasks = tasks.filter((t: any) => {
-    if (!t.dueDate || t.status === "DONE") return false;
-    const diffTime = new Date(t.dueDate).getTime() - new Date().getTime();
-    const diffDays = diffTime / (1000 * 3600 * 24);
-    return diffDays < 1;
+    if (t.status === "DONE") return false;
+    if (t.priority === "HIGH") return true; // Priorité haute toujours urgente
+    if (!t.dueDate) return false;
+
+    const now = new Date();
+    const due = new Date(t.dueDate);
+    const diffHours = (due.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+    return diffHours < 24;
   }).length;
 
-  // Completion Rate
+  // Taux de complétion
   const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
   const getGreeting = () => {
@@ -85,7 +118,7 @@ export default function TasksPage() {
     return "Bonsoir";
   };
 
-  if (error) return <div className="p-8 text-center text-destructive">Erreur de chargement des données.</div>;
+  if (error) return <div className="p-8 text-center text-red-500">Erreur de chargement des données.</div>;
 
   return (
     <SidebarProvider
@@ -117,46 +150,62 @@ export default function TasksPage() {
                   {loading ? <Skeleton className="h-6 w-40" /> : `${getGreeting()}, ${me?.name}`}
                 </h1>
                 <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-1.5 bg-muted/50 px-2 py-0.5 rounded-md">
+                  <div className={cn("flex items-center gap-1.5 px-2 py-0.5 rounded-md", isManager ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300" : "bg-muted/50")}>
                     <IconBriefcase className="h-3 w-3" />
-                    <span className="font-medium">{me?.role?.name || "Membre d'équipe"}</span>
+                    <span className="font-medium">{role || "Membre d'équipe"}</span>
                   </div>
                   <span className="hidden md:inline">•</span>
                   <div className="flex items-center gap-1.5">
                     <IconCalendar className="h-3 w-3" />
-                    <span>{new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
+                    <span className="capitalize">{new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Indicateur de Vue (Globale vs Perso) */}
+            <div className="flex items-center gap-2">
+              {isManager ? (
+                <span className="flex items-center gap-2 text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 px-3 py-1 rounded-full border border-blue-200 dark:border-blue-800">
+                  <IconUsers className="w-3.5 h-3.5" /> Vue Globale (Équipe)
+                </span>
+              ) : (
+                <span className="flex items-center gap-2 text-xs font-medium bg-muted text-muted-foreground px-3 py-1 rounded-full border">
+                  <IconBriefcase className="w-3.5 h-3.5" /> Mes Tâches
+                </span>
+              )}
             </div>
           </div>
 
           {/* 2. Key Metrics Grid */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <StatCard
-              title="Total Assigné"
+              title={isManager ? "Total Tâches (Global)" : "Mes Tâches"}
               value={loading ? "-" : totalTasks}
-              description="Tâches totales"
+              description={isManager ? "Toutes les tâches actives" : "Assignées à moi"}
               icon={IconChecklist}
             />
+
             <StatCard
-              title="Urgence (24h)"
+              title="Priorité Haute"
               value={loading ? "-" : urgentTasks}
-              description="Nécessite attention immédiate"
+              description="Urgentes ou < 24h"
               icon={IconAlertCircle}
               className={urgentTasks > 0 ? "border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-900/10" : ""}
             />
+
             <StatCard
               title="Productivité"
               value={loading ? "-" : `${completionRate}%`}
-              description="Taux d'achèvement"
+              description="Taux de complétion"
               icon={IconChartPie}
               trend={<Progress value={completionRate} className="h-1.5 bg-muted" indicatorClassName="bg-emerald-600" />}
             />
+
             <StatCard
-              title="En attente"
+              title="En Cours"
               value={loading ? "-" : pendingTasks}
-              description="À faire ou en cours"
+              description="À traiter"
               icon={IconClock}
             />
           </div>
@@ -164,7 +213,9 @@ export default function TasksPage() {
           {/* 3. Main Data Table */}
           <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
             <div className="p-1">
-              <TasksTable />
+              {/* On passe la liste filtrée selon le rôle au composant Table */}
+              {/* Assurez-vous que TasksTable accepte une prop 'data' ou modifiez-le pour utiliser les données passées */}
+              <TasksTable initialData={tasks} isManager={isManager} />
             </div>
           </div>
         </div>
