@@ -1,77 +1,321 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { gql, useQuery } from "@apollo/client";
 import { Project } from "@/lib/types";
-import { StructureAccordion } from "@/components/structure-accordion";
+
+// UI Components
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { IconSearch } from "@tabler/icons-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Card, CardContent } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+    IconSearch,
+    IconLayoutDashboard,
+    IconChevronDown,
+    IconChevronUp,
+    IconUsers,
+    IconListCheck,
+    IconClock,
+    IconCalendar,
+    IconUserCircle,
+    IconArrowRight,
+    IconLoader
+} from "@tabler/icons-react";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
+import { fr } from "date-fns/locale";
 
 // --- COMPONENTS ---
 import { StructureStats } from "@/components/structure-stats";
 import { StructureChart } from "@/components/structure-chart";
 
-// --- 1. USE THE EXISTING QUERY (Same as ProjectsPage) ---
-// src/lib/graphql/projects.ts
+// --- GRAPHQL QUERIES ---
 
+// 1. Main Feed
 const GET_PROJECTS_FEED = gql`
   query GetProjectsFeed {
     projects_feed {
       project {
         id
+        projectCode
         title
         object
         status: generalStatus
         preparationStatus
         
-        # 👇 CES DEUX LIGNES SONT-ELLES BIEN ICI ? 👇
-        marketEstimate
-        estimatedBudget
-        # 👆 SI ELLES MANQUENT, C'EST ÇA LE PROBLÈME 👆
-        
         projectManagers { id name }
-        stages { 
-          administrative { documents { id fileName fileUrl } }
-          technical { documents { id fileName fileUrl originalFileName } }
-        }
-        submissionDeadline
-        cautionRequestDate
-        feasibilityChecks {
-          administrative
-          technical
-          financial
-        }
-        caution {
-          status
-        }
         team {
           infographistes { id name }
           team3D { id name }
           coordinators { id name }
         }
-        proposalAvis {
-          status
-          reason
-          givenBy { name }
-          givenAt
-        }
       }
-      latestTask { id description status createdAt }
     }
   }
 `;
 
+// 2. Managers
 const GET_PROJECT_MANAGERS = gql`
   query GetProjectManagers {
     users(role: "PROJECT_MANAGER") { id name }
   }
 `;
 
+// 3. Tasks
+const GET_PROJECT_TASKS = gql`
+  query GetProjectTasks($projectId: ID!) {
+    tasksByProject(projectId: $projectId) {
+      id
+      description
+      status
+      priority
+      dueDate
+      createdAt
+      assignedTo { id name }
+    }
+  }
+`;
+
+// --- HELPER DATE SÉCURISÉ ---
+const formatTaskDate = (dateStr: any) => {
+    if (!dateStr) return null;
+    let date = new Date(dateStr);
+
+    if (isNaN(date.getTime())) {
+        const timestamp = Number(dateStr);
+        if (!isNaN(timestamp) && timestamp > 0) {
+            date = new Date(timestamp < 10000000000 ? timestamp * 1000 : timestamp);
+        }
+    }
+
+    if (isNaN(date.getTime())) return null;
+    return format(date, "d MMM", { locale: fr });
+};
+
+// --- COMPOSANT : EXPLORATEUR D'ÉQUIPE & TÂCHES (Inside Row) ---
+function TeamTaskExplorer({ projectId, teamMembers }: { projectId: string, teamMembers: any[] }) {
+    const [selectedMemberId, setSelectedMemberId] = React.useState<string | null>(null);
+    const { data, loading, error } = useQuery(GET_PROJECT_TASKS, { variables: { projectId } });
+
+    const memberTasks = React.useMemo(() => {
+        if (!data?.tasksByProject || !selectedMemberId) return [];
+        return data.tasksByProject.filter((t: any) => t.assignedTo?.id === selectedMemberId);
+    }, [data, selectedMemberId]);
+
+    const getPriorityColor = (p: string) => {
+        if (p === 'HIGH') return "text-red-500 bg-red-50 border-red-200";
+        if (p === 'LOW') return "text-slate-500 bg-slate-50 border-slate-200";
+        return "text-blue-500 bg-blue-50 border-blue-200";
+    };
+
+    return (
+        <div className="flex flex-col md:flex-row gap-6 animate-in fade-in slide-in-from-top-2 duration-300">
+
+            {/* COLONNE GAUCHE : ÉQUIPE */}
+            {/* Responsive: Border Bottom sur mobile, Border Right sur Desktop */}
+            <div className="w-full md:w-1/3 space-y-3 border-b md:border-b-0 md:border-r pb-6 md:pb-0 pr-0 md:pr-6">
+                <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                    <IconUsers className="w-3.5 h-3.5" />
+                    Équipe Assignée
+                </div>
+
+                <ScrollArea className="h-[200px] pr-2">
+                    <div className="space-y-2">
+                        {teamMembers.length > 0 ? (
+                            teamMembers.map((member: any) => {
+                                const isSelected = selectedMemberId === member.id;
+                                return (
+                                    <div
+                                        key={member.id}
+                                        onClick={() => setSelectedMemberId(isSelected ? null : member.id)}
+                                        className={cn(
+                                            "flex items-center gap-3 p-2 rounded-lg border cursor-pointer transition-all hover:bg-muted",
+                                            isSelected ? "bg-primary/10 border-primary shadow-sm" : "bg-card border-transparent hover:border-border"
+                                        )}
+                                    >
+                                        <Avatar className="w-8 h-8 border">
+                                            <AvatarFallback className={cn("text-[10px] font-bold", isSelected ? "bg-primary text-primary-foreground" : "bg-muted")}>
+                                                {member.name.substring(0, 2).toUpperCase()}
+                                            </AvatarFallback>
+                                        </Avatar>
+                                        <div className="flex flex-col min-w-0">
+                                            <span className={cn("text-sm font-medium truncate", isSelected ? "text-primary" : "text-foreground")}>
+                                                {member.name}
+                                            </span>
+                                            <span className="text-[10px] text-muted-foreground">Cliquez pour voir les tâches</span>
+                                        </div>
+                                        {isSelected && <IconArrowRight className="w-4 h-4 ml-auto text-primary shrink-0" />}
+                                    </div>
+                                );
+                            })
+                        ) : (
+                            <div className="text-sm text-muted-foreground italic p-2">Aucune équipe assignée</div>
+                        )}
+                    </div>
+                </ScrollArea>
+            </div>
+
+            {/* COLONNE DROITE : TÂCHES */}
+            <div className="flex-1 space-y-3">
+                <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                    <div className="flex items-center gap-2">
+                        <IconListCheck className="w-3.5 h-3.5" />
+                        Tâches {selectedMemberId ? "Assignées" : ""}
+                    </div>
+                    {memberTasks.length > 0 && <Badge variant="secondary" className="h-5 px-1.5">{memberTasks.length}</Badge>}
+                </div>
+
+                <div className="bg-muted/30 rounded-xl border p-1 min-h-[200px]">
+                    {loading ? (
+                        <div className="flex flex-col items-center justify-center h-full py-10 gap-2">
+                            <IconLoader className="w-6 h-6 animate-spin text-muted-foreground" />
+                            <span className="text-xs text-muted-foreground">Chargement des tâches...</span>
+                        </div>
+                    ) : !selectedMemberId ? (
+                        <div className="flex flex-col items-center justify-center h-full py-10 gap-3 text-muted-foreground/50">
+                            <IconUserCircle className="w-12 h-12 stroke-1" />
+                            <p className="text-sm text-center px-4">Sélectionnez un membre à gauche pour voir ses tâches</p>
+                        </div>
+                    ) : memberTasks.length > 0 ? (
+                        <ScrollArea className="h-[200px]">
+                            <div className="space-y-1 p-1">
+                                {memberTasks.map((task: any) => {
+                                    const dateStr = formatTaskDate(task.dueDate);
+                                    return (
+                                        <div key={task.id} className="bg-background p-3 rounded-lg border shadow-sm flex flex-col gap-2 hover:bg-muted/20 transition-colors">
+                                            <div className="flex justify-between items-start gap-2">
+                                                <p className="text-sm font-medium text-foreground line-clamp-1 break-all">{task.description}</p>
+                                                <Badge variant="outline" className={cn("text-[9px] h-5 px-1 font-bold border shrink-0", getPriorityColor(task.priority))}>
+                                                    {task.priority || "NORMAL"}
+                                                </Badge>
+                                            </div>
+                                            <div className="flex items-center gap-3 text-[10px] text-muted-foreground flex-wrap">
+                                                <span className={cn("flex items-center gap-1 px-1.5 py-0.5 rounded", task.status === 'DONE' ? "bg-green-100 text-green-700" : "bg-slate-100 text-slate-700")}>
+                                                    <div className={cn("w-1.5 h-1.5 rounded-full", task.status === 'DONE' ? "bg-green-500" : "bg-slate-500")} />
+                                                    {task.status}
+                                                </span>
+                                                {dateStr && (
+                                                    <span className="flex items-center gap-1">
+                                                        <IconCalendar className="w-3 h-3" />
+                                                        {dateStr}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </ScrollArea>
+                    ) : (
+                        <div className="flex flex-col items-center justify-center h-full py-10 gap-2 text-muted-foreground">
+                            <IconListCheck className="w-8 h-8 opacity-20" />
+                            <p className="text-xs">Aucune tâche pour ce membre</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// --- COMPOSANT ROW (Main) ---
+function ProjectRow({ item }: { item: any }) {
+    const router = useRouter();
+    const [isOpen, setIsOpen] = React.useState(false);
+    const { project } = item;
+
+    const getStatusColor = (status: string) => {
+        switch (status) {
+            case 'DONE': return "bg-green-100 text-green-700 border-green-200";
+            case 'IN_PROGRESS': return "bg-blue-100 text-blue-700 border-blue-200";
+            case 'BLOCKED': return "bg-red-100 text-red-700 border-red-200";
+            default: return "bg-slate-100 text-slate-700 border-slate-200";
+        }
+    };
+
+    const teamMembers = [
+        ...(project.team?.infographistes || []),
+        ...(project.team?.team3D || []),
+        ...(project.team?.coordinators || [])
+    ];
+
+    return (
+        <>
+            <TableRow className={cn("hover:bg-muted/5 transition-colors group border-b relative", isOpen && "bg-muted/5 border-b-0")}>
+                {/* Code: Whitespace nowrap pour éviter le retour à la ligne */}
+                <TableCell className="font-mono text-xs font-medium text-muted-foreground align-top py-4 w-[100px] whitespace-nowrap">
+                    {project.projectCode || "N/A"}
+                </TableCell>
+
+                <TableCell className="align-top py-4 w-[120px]">
+                    <Badge className={cn("text-[10px] uppercase border font-bold shadow-none whitespace-nowrap", getStatusColor(project.preparationStatus || project.status))}>
+                        {project.preparationStatus === 'IN_PRODUCTION' ? 'Prod' : 'Autre'}
+                    </Badge>
+                </TableCell>
+
+                <TableCell className="align-top py-4">
+                    <div className="flex flex-col gap-1 max-w-[200px] sm:max-w-[300px] md:max-w-[500px]">
+                        <span
+                            className="font-semibold text-sm truncate text-foreground cursor-pointer hover:text-primary transition-colors select-none"
+                            onClick={() => setIsOpen(!isOpen)}
+                            title={project.title}
+                        >
+                            {project.title}
+                        </span>
+                        <span className="text-xs text-muted-foreground truncate opacity-80">
+                            {project.object}
+                        </span>
+                    </div>
+                </TableCell>
+
+                <TableCell className="text-right align-top py-4">
+                    <div className="flex items-center justify-end gap-2">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setIsOpen(!isOpen)}
+                            className={cn("h-8 gap-1 text-muted-foreground hover:text-foreground hover:bg-muted", isOpen && "text-primary bg-primary/10")}
+                        >
+                            <span className="text-xs font-medium hidden sm:inline">{isOpen ? "Fermer" : "Aperçu"}</span>
+                            {isOpen ? <IconChevronUp className="w-4 h-4" /> : <IconChevronDown className="w-4 h-4" />}
+                        </Button>
+
+                        <Button
+                            size="sm"
+                            className="h-8 gap-2 bg-primary/90 hover:bg-primary shadow-sm text-xs font-medium whitespace-nowrap"
+                            onClick={() => router.push(`/dashboard/projects/${project.id}/production`)}
+                        >
+                            <IconLayoutDashboard className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">Production</span>
+                        </Button>
+                    </div>
+                </TableCell>
+            </TableRow>
+
+            {isOpen && (
+                <TableRow className="hover:bg-muted/5 bg-muted/5 border-t-0 shadow-inner">
+                    <TableCell colSpan={4} className="p-0">
+                        <div className="p-4 sm:p-6 border-b">
+                            <TeamTaskExplorer projectId={project.id} teamMembers={teamMembers} />
+                        </div>
+                    </TableCell>
+                </TableRow>
+            )}
+        </>
+    );
+}
+
+// --- PAGE MAIN CONTENT ---
 function StructurePageContent() {
     const [searchTerm, setSearchTerm] = React.useState("");
     const [pmFilter, setPmFilter] = React.useState("all");
@@ -79,20 +323,15 @@ function StructurePageContent() {
     const { data, loading, error } = useQuery(GET_PROJECTS_FEED);
     const { data: pmData, loading: loadingPMs } = useQuery(GET_PROJECT_MANAGERS);
 
-    // --- 2. DATA MAPPING (Important: Extract project from wrapper) ---
-    // The existing query returns { project: {...}, latestTask: {...} }
-    // We need to map it to just get the project object.
     const allProjects = React.useMemo(() => {
         return data?.projects_feed?.map((item: any) => item.project) || [];
     }, [data]);
 
-    // --- 3. STATS CALCULATIONS ---
+    const feedItems = React.useMemo(() => data?.projects_feed || [], [data]);
+
     const stats = React.useMemo(() => {
         if (!allProjects.length) return { active: 0, pms: 0, creatives: 0, coordinators: 0 };
-
-        // Active = Projects In Production
         const active = allProjects.filter((p: any) => p.preparationStatus === 'IN_PRODUCTION');
-
         const uniquePMs = new Set();
         const uniqueCreatives = new Set();
         const uniquecoordinators = new Set();
@@ -112,54 +351,43 @@ function StructurePageContent() {
         };
     }, [allProjects]);
 
-    // --- 4. FILTER LOGIC ---
-    const filteredProjects: Project[] = React.useMemo(() => {
-        // Start with IN_PRODUCTION projects for the accordion (or all if you prefer)
-        let projects = allProjects.filter(
-            (p: Project) => p.preparationStatus === 'IN_PRODUCTION'
+    const filteredFeedItems = React.useMemo(() => {
+        let items = feedItems.filter(
+            (item: any) => item.project.preparationStatus === 'IN_PRODUCTION'
         );
 
         if (searchTerm) {
-            projects = projects.filter((p: Project) =>
-                p.object.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                p.title.toLowerCase().includes(searchTerm.toLowerCase())
+            items = items.filter((item: any) =>
+                item.project.object.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                item.project.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (item.project.projectCode && item.project.projectCode.toLowerCase().includes(searchTerm.toLowerCase()))
             );
         }
 
         if (pmFilter !== "all") {
-            projects = projects.filter((p: Project) =>
-                p.projectManagers.some((pm: any) => pm.id === pmFilter)
+            items = items.filter((item: any) =>
+                item.project.projectManagers.some((pm: any) => pm.id === pmFilter)
             );
         }
 
-        return projects;
-    }, [allProjects, searchTerm, pmFilter]);
+        return items;
+    }, [feedItems, searchTerm, pmFilter]);
 
     if (error) {
         return <p className="p-6 text-red-500">Erreur: {error.message}</p>;
     }
 
     return (
-        // Apply the same GAP-12 layout we fixed for ProjectsPage
-        <div className="flex flex-col gap-12 p-4 md:p-8 pt-6">
+        // Max-width 1920px pour aligner avec les autres pages
+        <div className="flex flex-col gap-12 p-4 md:p-8 pt-6 max-w-[1920px] mx-auto w-full">
 
-            {/* --- SECTION 1: CHART & STATS (Fixed Height) --- */}
+            {/* CHART & STATS */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-auto lg:h-[450px]">
-                {/* Chart Column */}
                 <div className="lg:col-span-2 h-full">
-                    {loading ? (
-                        <Skeleton className="h-full w-full rounded-xl" />
-                    ) : (
-                        // This handles the missing createdAt by using ID extraction internally
-                        <StructureChart data={allProjects} />
-                    )}
+                    {loading ? <Skeleton className="h-full w-full rounded-xl" /> : <StructureChart data={allProjects} />}
                 </div>
-
-                {/* Stats Column */}
                 <div className="lg:col-span-1 h-full">
-                    {loading ? (
-                        <Skeleton className="h-full w-full rounded-xl" />
-                    ) : (
+                    {loading ? <Skeleton className="h-full w-full rounded-xl" /> : (
                         <StructureStats
                             className="h-full"
                             activeProjects={stats.active}
@@ -171,16 +399,14 @@ function StructurePageContent() {
                 </div>
             </div>
 
-            {/* --- SPACER DIV (The Glue Fix) --- */}
             <div className="hidden lg:block h-8 w-full" />
 
-            {/* --- SECTION 2: CONTENT --- */}
+            {/* CONTENT & FILTERS */}
             <div className="w-full mt-10 space-y-6">
                 <div className="flex items-center justify-between">
                     <h2 className="text-3xl font-bold tracking-tight">Structure des Projets</h2>
                 </div>
 
-                {/* Filters */}
                 <div className="flex flex-col sm:flex-row items-center gap-4">
                     <div className="relative w-full sm:w-80">
                         <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -198,7 +424,7 @@ function StructurePageContent() {
                         <SelectContent>
                             <SelectItem value="all">Tous les Chefs de Projet</SelectItem>
                             {loadingPMs ? (
-                                <SelectItem value="loading" disabled>Loading...</SelectItem>
+                                <SelectItem value="loading" disabled>Chargement...</SelectItem>
                             ) : (
                                 pmData?.users.map((pm: any) => (
                                     <SelectItem key={pm.id} value={pm.id}>{pm.name}</SelectItem>
@@ -208,21 +434,49 @@ function StructurePageContent() {
                     </Select>
                 </div>
 
-                {/* Accordion */}
-                {loading ? (
-                    <div className="p-4 space-y-3 border rounded-lg">
-                        <Skeleton className="h-20 w-full" />
-                        <Skeleton className="h-20 w-full" />
+                {/* TABLE AVEC OVERFLOW POUR MOBILE */}
+                <div className="rounded-xl border bg-card text-card-foreground shadow-sm overflow-hidden">
+                    <div className="overflow-x-auto w-full"> {/* ✅ FIX RESPONSIVE TABLE */}
+                        {loading ? (
+                            <div className="p-4 space-y-4">
+                                <Skeleton className="h-12 w-full" />
+                                <Skeleton className="h-12 w-full" />
+                                <Skeleton className="h-12 w-full" />
+                            </div>
+                        ) : (
+                            <Table className="min-w-[600px]"> {/* Min width pour éviter le squish sur mobile */}
+                                <TableHeader className="bg-muted/50">
+                                    <TableRow>
+                                        <TableHead className="w-[100px] py-4 whitespace-nowrap">Code</TableHead>
+                                        <TableHead className="w-[120px] py-4 whitespace-nowrap">Status</TableHead>
+                                        <TableHead className="py-4">Projet</TableHead>
+                                        <TableHead className="text-right py-4 whitespace-nowrap">Actions</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {filteredFeedItems.length > 0 ? (
+                                        filteredFeedItems.map((item: any) => (
+                                            <ProjectRow key={item.project.id} item={item} />
+                                        ))
+                                    ) : (
+                                        <TableRow>
+                                            <TableCell colSpan={4} className="h-24 text-center text-muted-foreground italic">
+                                                Aucun projet trouvé.
+                                            </TableCell>
+                                        </TableRow>
+                                    )}
+                                </TableBody>
+                            </Table>
+                        )}
                     </div>
-                ) : (
-                    <StructureAccordion projects={filteredProjects} />
-                )}
+                </div>
+
             </div>
         </div>
     );
 }
 
-// Layout
+// Layout Wrapper
 export default function StructurePage() {
     return (
         <SidebarProvider

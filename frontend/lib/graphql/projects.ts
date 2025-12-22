@@ -37,14 +37,13 @@ export const GET_PROJECTS_FEED = gql`
         status: generalStatus
         preparationStatus
         
-        # ✅ AJOUTÉ : Champs indispensables pour le mode Edit
+        # Champs Edit
         projectType
         referenceAO
         technicalOfferRequired
         submissionDeadline
-        # -------------------------------------------------
-
-        # Les champs financiers
+        
+        # Champs financiers
         marketEstimate
         estimatedBudget
         cautionAmount
@@ -56,7 +55,13 @@ export const GET_PROJECTS_FEED = gql`
             generatedAt
         }
         
-        projectManagers { id name }
+        # 👇 AJOUT DE L'EMAIL ICI (Important pour les avatars)
+        projectManagers { 
+            id 
+            name 
+            email 
+        }
+
         stages { 
           administrative { documents { id fileName fileUrl } }
           technical { documents { id fileName fileUrl originalFileName } }
@@ -71,11 +76,14 @@ export const GET_PROJECTS_FEED = gql`
         caution {
           status
         }
+        
+        # 👇 AJOUT DE L'EMAIL DANS TOUTE L'ÉQUIPE (Important pour les avatars)
         team {
-          infographistes { id name }
-          team3D { id name }
-          coordinators { id name }
+          infographistes { id name email }
+          team3D { id name email }
+          coordinators { id name email }
         }
+        
         proposalAvis {
           status
           reason
@@ -90,7 +98,12 @@ export const GET_PROJECTS_FEED = gql`
 
 export const GET_PROJECT_MANAGERS = gql`
   query GetProjectManagers {
-    users(role: "PROJECT_MANAGER") { id name }
+    # 👇 AJOUT DE L'EMAIL ICI AUSSI (Pour le filtre dropdown)
+    users(role: "PROJECT_MANAGER") { 
+        id 
+        name 
+        email 
+    }
   }
 `;
 

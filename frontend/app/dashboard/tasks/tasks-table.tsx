@@ -197,7 +197,15 @@ const getFileUrl = (filePath: string) => {
 
 function formatDate(dateString: string | null) {
   if (!dateString) return "Non définie";
-  return new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(dateString));
+
+  const date = new Date(dateString);
+
+  // VÉRIFICATION DE SÉCURITÉ : Si la date est invalide, on ne plante pas
+  if (isNaN(date.getTime())) {
+    return "Date invalide";
+  }
+
+  return new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }).format(date);
 }
 
 // --- COMPONENTS ---
@@ -288,7 +296,7 @@ function FileDownloads({ task }: { task: Task }) {
   );
 }
 
-// --- TABLE COLUMNS DEFINITION ---
+// --- TABLE COLUMNS DEFINITION (CORRIGÉ) ---
 export const getTaskColumns = (
   setSelectedTask: React.Dispatch<React.SetStateAction<Task | null>>,
   setIsDrawerOpen: React.Dispatch<React.SetStateAction<boolean>>
@@ -305,7 +313,10 @@ export const getTaskColumns = (
             {row.original.description}
           </span>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="truncate max-w-[150px]">{row.original.project.object}</span>
+            {/* Ajout de ?. et || pour éviter le crash si project est null */}
+            <span className="truncate max-w-[150px]">
+              {row.original.project?.object || "Objet non spécifié"}
+            </span>
           </div>
         </div>
       ),
@@ -313,29 +324,47 @@ export const getTaskColumns = (
     {
       accessorKey: "project.title",
       header: "Client",
-      cell: ({ row }) => (
-        <div className="flex items-center gap-2">
-          <Badge variant="secondary" className="text-[10px] font-normal h-5 px-1.5">
-            {row.original.project.id.slice(-4)}
-          </Badge>
-          <span className="text-sm font-medium truncate max-w-[140px]" title={row.original.project.title}>
-            {row.original.project.title}
-          </span>
-        </div>
-      ),
+      cell: ({ row }) => {
+        const project = row.original.project;
+        if (!project) return <span className="text-xs text-muted-foreground">Aucun projet</span>;
+
+        return (
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="text-[10px] font-normal h-5 px-1.5">
+              {project.id ? project.id.slice(-4) : "????"}
+            </Badge>
+            <span className="text-sm font-medium truncate max-w-[140px]" title={project.title}>
+              {project.title}
+            </span>
+          </div>
+        );
+      },
     },
     {
       accessorKey: "assignedTo.name",
       header: "Responsable",
-      cell: ({ row }) => (
-        <div className="flex items-center gap-2">
-          <Avatar className="h-6 w-6">
-            <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${row.original.assignedTo.name}`} />
-            <AvatarFallback className="text-[9px]">{row.original.assignedTo.name.slice(0, 2).toUpperCase()}</AvatarFallback>
-          </Avatar>
-          <span className="text-sm truncate max-w-[120px]">{row.original.assignedTo.name}</span>
-        </div>
-      ),
+      cell: ({ row }) => {
+        const user = row.original.assignedTo;
+        // Si aucun utilisateur n'est assigné, on affiche un placeholder au lieu de crasher
+        if (!user) {
+          return (
+            <div className="flex items-center gap-2 opacity-50">
+              <div className="h-6 w-6 rounded-full bg-muted border flex items-center justify-center text-[9px]">?</div>
+              <span className="text-sm italic">Non assigné</span>
+            </div>
+          );
+        }
+
+        return (
+          <div className="flex items-center gap-2">
+            <Avatar className="h-6 w-6">
+              <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${user.name}`} />
+              <AvatarFallback className="text-[9px]">{user.name ? user.name.slice(0, 2).toUpperCase() : "??"}</AvatarFallback>
+            </Avatar>
+            <span className="text-sm truncate max-w-[120px]">{user.name}</span>
+          </div>
+        );
+      },
     },
     {
       accessorKey: "department",
@@ -645,11 +674,15 @@ export function TasksTable() {
             <div className="h-full flex flex-col">
               <DrawerHeader className="border-b bg-muted/20 px-6 py-5">
                 <div className="flex items-center gap-2 mb-2">
-                  <Badge variant="outline" className="bg-background">{selectedTask.project.title}</Badge>
+                  <Badge variant="outline" className="bg-background">
+                    {selectedTask.project?.title || "Projet Inconnu"}
+                  </Badge>
                   <span className="text-xs text-muted-foreground ml-auto">{formatDate(selectedTask.createdAt)}</span>
                 </div>
                 <DrawerTitle className="text-xl font-bold leading-tight">{selectedTask.description}</DrawerTitle>
-                <DrawerDescription className="mt-1">Projet ID: {selectedTask.project.id}</DrawerDescription>
+                <DrawerDescription className="mt-1">
+                  Projet ID: {selectedTask.project?.id || "N/A"}
+                </DrawerDescription>
               </DrawerHeader>
 
               <div className="flex-1 overflow-y-auto px-6 py-6 space-y-8">
@@ -668,19 +701,23 @@ export function TasksTable() {
                   </div>
                 </div>
 
-                {/* Assignment Section */}
+                {/* Assignment Section (SÉCURISÉ) */}
                 <div className="space-y-3 p-4 rounded-lg border bg-card/50">
                   <Label className="text-xs uppercase text-muted-foreground font-semibold">Responsable</Label>
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-10 w-10 border">
-                      <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${selectedTask.assignedTo.name}`} />
-                      <AvatarFallback>USER</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="text-sm font-bold">{selectedTask.assignedTo.name}</p>
-                      <p className="text-xs text-muted-foreground">{selectedTask.assignedTo.email}</p>
+                  {selectedTask.assignedTo ? (
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-10 w-10 border">
+                        <AvatarImage src={`https://api.dicebear.com/7.x/initials/svg?seed=${selectedTask.assignedTo.name}`} />
+                        <AvatarFallback>USER</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="text-sm font-bold">{selectedTask.assignedTo.name}</p>
+                        <p className="text-xs text-muted-foreground">{selectedTask.assignedTo.email}</p>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="text-sm text-muted-foreground italic">Aucun responsable assigné</div>
+                  )}
                 </div>
 
                 {/* Details Section */}

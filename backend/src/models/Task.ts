@@ -5,7 +5,7 @@ import { IUser } from './User';
 
 export type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'DONE';
 // Add Priority Type
-export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH';
+export type TaskPriority = 'LOW' | 'NORMAL' | 'MEDIUM' | 'HIGH';
 export type Department = 'CREATIVE' | 'TECHNICAL_OFFICE' | 'WORKSHOP' | 'FIELD' | 'LOGISTICS' | 'PROJECT_MANAGEMENT';
 
 export interface ITask extends Document {
@@ -34,7 +34,7 @@ const TaskSchema: Schema = new Schema(
     // --- ADD THIS SECTION ---
     priority: {
       type: String,
-      enum: ['LOW', 'MEDIUM', 'HIGH'],
+      enum: ['LOW', 'NORMAL', 'MEDIUM', 'HIGH'],
       default: 'LOW',
     },
     // ------------------------
