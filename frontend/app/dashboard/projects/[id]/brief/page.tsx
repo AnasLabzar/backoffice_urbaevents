@@ -1,12 +1,12 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import { useQuery, gql } from "@apollo/client";
 import { useParams, useRouter } from "next/navigation";
-import { IconArrowLeft, IconLayoutDashboard } from "@tabler/icons-react";
+import { IconArrowLeft } from "@tabler/icons-react";
 
 // Components
-import { BriefForm } from "@/components/production/brief-form";
+import { BriefForm } from "@/components/production/brief-form"; // Vérifier le chemin exact
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -14,17 +14,16 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
 
-// GraphQL Query : On récupère aussi les documents pour le ZIP
+// ✅ CORRECTION DU QUERY : Ajout de 'id' et 'constraints'
 const GET_PROJECT_BRIEF_PAGE = gql`
   query GetProjectBriefPage($id: ID!) {
     project(id: $id) {
       id
       title
-      object # C'est souvent ici qu'est le nom du client ou l'objet
+      object
       projectCode
       preparationStatus 
       
-      # Récupération des documents pour la section téléchargement
       stages {
         administrative {
           documents { id fileName fileUrl originalFileName }
@@ -35,7 +34,7 @@ const GET_PROJECT_BRIEF_PAGE = gql`
       }
 
       brief {
-        # On ne récupère plus clientName/projectName ici car on utilise ceux du projet parent
+        id              # ⚠️ TRES IMPORTANT : Pour que le formulaire sache qu'il existe déjà
         clientNature
         eventFormat
         toneStyle
@@ -45,10 +44,11 @@ const GET_PROJECT_BRIEF_PAGE = gql`
         startDate
         endDate
         estimatedBudget
-        eventGoal
-        targetAudience
+        eventGoal       # Array
+        targetAudience  # Array
         mainObjective
         history
+        constraints     # ⚠️ ETAIT MANQUANT : C'est le champ 'Conditions & Contraintes'
         requirements {
           logistics
           audiovisual
@@ -70,6 +70,7 @@ export default function ProjectBriefPage() {
     const projectId = params.id as string;
     const router = useRouter();
 
+    // On utilise network-only pour être sûr d'avoir la dernière version de la DB
     const { data, loading, error, refetch } = useQuery(GET_PROJECT_BRIEF_PAGE, {
         variables: { id: projectId },
         fetchPolicy: "network-only"
@@ -80,7 +81,10 @@ export default function ProjectBriefPage() {
 
     const project = data?.project;
 
-    // Consolidation des documents pour le composant BriefForm
+    // DEBUG : Voir si le brief arrive bien
+    // console.log("Project Data:", project);
+    // console.log("Brief Data:", project?.brief);
+
     const projectDocuments = [
         ...(project.stages?.administrative?.documents || []),
         ...(project.stages?.technical?.documents || [])
@@ -99,7 +103,7 @@ export default function ProjectBriefPage() {
 
                 <main className="flex-1 flex flex-col bg-[#F9FAFB] dark:bg-background min-h-screen">
 
-                    {/* --- HEADER ÉPURÉ --- */}
+                    {/* --- HEADER --- */}
                     <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-md border-b px-6 py-4">
                         <div className="max-w-7xl mx-auto flex items-center justify-between">
                             <div className="flex items-center gap-4">
@@ -127,12 +131,16 @@ export default function ProjectBriefPage() {
 
                     {/* --- MAIN CONTENT --- */}
                     <div className="flex-1 w-full max-w-7xl mx-auto p-4 md:p-8">
+                        {/* On passe project.brief comme initialData. 
+                            Si c'est null, le formulaire sera vide (mode création).
+                            Si c'est rempli, le useEffect du formulaire remplira les champs. 
+                        */}
                         <BriefForm
                             projectId={projectId}
                             projectTitle={project.title}
                             projectObject={project.object}
                             initialData={project.brief}
-                            documents={projectDocuments} // On passe les docs pour le téléchargement
+                            documents={projectDocuments}
                             onSave={() => refetch()}
                         />
                     </div>
@@ -142,7 +150,7 @@ export default function ProjectBriefPage() {
     );
 }
 
-// --- LOADING STATE (Minimalist) ---
+// --- LOADING STATE ---
 function BriefLoadingLayout() {
     return (
         <SidebarProvider>
@@ -173,9 +181,9 @@ function BriefLoadingLayout() {
 
 function BriefErrorLayout({ message, onBack }: { message: string, onBack: () => void }) {
     return (
-        <div className="h-screen w-full flex flex-col items-center justify-center p-4">
-            <p className="text-red-500 mb-4">{message}</p>
-            <Button onClick={onBack}>Retour</Button>
+        <div className="h-screen w-full flex flex-col items-center justify-center p-4 gap-4">
+            <p className="text-red-500 font-medium">Erreur de chargement: {message}</p>
+            <Button onClick={onBack} variant="outline">Retour au projet</Button>
         </div>
     );
 }

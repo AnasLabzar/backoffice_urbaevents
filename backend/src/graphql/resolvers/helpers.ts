@@ -32,7 +32,7 @@ const DYNAMIC_PM_CANDIDATE_ROLES = [
     'IT_MANAGER',
     'CREATIVE',
     'TEAM_MEMBER',
-    'ASSISTANT_PM'
+    'COORDINATOR'
 ] as const;
 
 // --- FUNCTIONS ---

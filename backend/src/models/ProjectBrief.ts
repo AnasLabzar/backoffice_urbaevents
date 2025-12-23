@@ -54,7 +54,7 @@ const ProjectBriefSchema: Schema = new Schema(
         endDate: { type: Date },
         durationDays: { type: Number },
         estimatedBudget: { type: Number },
-        eventGoal: { type: String },
+        eventGoal: [{ type: String }], 
         targetAudience: [{ type: String }],
         mainObjective: { type: String },
         subObjectives: [{ type: String }],

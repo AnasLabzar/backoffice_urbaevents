@@ -107,6 +107,9 @@ export const typeDefs = gql`
     finalSubmission: String
 
     aiSummary: AiSummary
+
+    createdAt: String
+    updatedAt: String
   }
 
   # ✅ MODIFIED: Prestation is now just a Catalog Item
@@ -199,7 +202,7 @@ export const typeDefs = gql`
     endDate: String
     durationDays: Int
     estimatedBudget: Float
-    eventGoal: String
+    eventGoal:[String]
     targetAudience: [String]
     mainObjective: String
     subObjectives: [String]
@@ -344,7 +347,7 @@ export const typeDefs = gql`
     endDate: String
     durationDays: Int
     estimatedBudget: Float
-    eventGoal: String
+    eventGoal: [String]
     targetAudience: [String]
     mainObjective: String
     subObjectives: [String]

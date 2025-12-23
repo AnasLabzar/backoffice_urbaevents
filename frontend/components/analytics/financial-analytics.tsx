@@ -1,109 +1,131 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { IconDownload, IconTrendingUp } from "@tabler/icons-react";
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from "recharts";
-import { downloadCSV, getCreatedAtFromId } from "@/lib/analytics-helper";
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from "recharts";
 
-export function FinancialAnalytics({ projects }: { projects: any[] }) {
+// 1. Professional Currency Formatter
+const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('fr-MA', {
+        style: 'currency',
+        currency: 'MAD',
+        maximumFractionDigits: 0,
+    }).format(value);
+};
 
-    // Process Data
-    const chartData = projects.reduce((acc: any[], curr) => {
-        const date = getCreatedAtFromId(curr.id);
-        const month = date.toLocaleString('default', { month: 'short' });
-        const existing = acc.find(i => i.name === month);
+// 2. Custom Tooltip - Fully Adapted for Dark/Light
+const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+        return (
+            // Changed: Used standard semantic classes (bg-popover, border-border) 
+            // Removed manual rings/shadows that might clash in dark mode
+            <div className="rounded-lg border border-border bg-popover p-3 shadow-xl">
+                <p className="mb-2 text-sm font-medium text-popover-foreground">{label}</p>
+                <div className="flex flex-col gap-1">
+                    {payload.map((entry: any, index: number) => (
+                        <div key={index} className="flex items-center gap-2">
+                            <span
+                                className="h-2 w-2 rounded-full"
+                                style={{ backgroundColor: entry.color }}
+                            />
+                            <span className="text-sm text-muted-foreground w-20">
+                                {entry.name}:
+                            </span>
+                            <span className="text-sm font-bold text-foreground">
+                                {formatCurrency(entry.value)}
+                            </span>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+    }
+    return null;
+};
 
-        if (existing) {
-            existing.budget += (curr.estimatedBudget || 0);
-            existing.caution += (curr.cautionAmount || 0);
-        } else {
-            acc.push({ name: month, budget: curr.estimatedBudget || 0, caution: curr.cautionAmount || 0 });
-        }
-        return acc;
-    }, []).slice(-6);
-
-    const handleDownload = () => {
-        const headers = ["Project", "Date", "Budget", "Caution"];
-        const rows = projects.map(p => [p.title, getCreatedAtFromId(p.id).toLocaleDateString(), p.estimatedBudget, p.cautionAmount]);
-        downloadCSV("Financial_Report", headers, rows);
-    };
-
-    // Professional Colors
-    const COLOR_BUDGET = "#10b981"; // Emerald 500
-    const COLOR_CAUTION = "#f59e0b"; // Amber 500
+export function FinancialAnalytics({ projects, detailed }: { projects: any[], detailed?: boolean }) {
+    const data = projects
+        .filter(p => p.estimatedBudget > 0 || p.marketEstimate > 0)
+        .slice(0, detailed ? 15 : 7)
+        .map(p => ({
+            name: p.projectCode || p.title.substring(0, 8) + '...',
+            fullName: p.title, 
+            Budget: p.estimatedBudget || 0,
+            Estimé: p.marketEstimate || 0,
+        }));
 
     return (
-        <Card className="h-full flex flex-col shadow-sm border-border/50 bg-card/50">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <div className="space-y-1">
-                    <CardTitle className="text-base font-semibold flex items-center gap-2">
-                        Performance Financière
-                        <span className="text-xs font-normal text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full flex items-center">
-                            <IconTrendingUp className="w-3 h-3 mr-1" /> +4.5%
-                        </span>
-                    </CardTitle>
-                    <CardDescription>Comparatif Budget vs Cautions (6 mois)</CardDescription>
-                </div>
-                <Button variant="ghost" size="icon" onClick={handleDownload} className="h-8 w-8">
-                    <IconDownload className="h-4 w-4 text-muted-foreground" />
-                </Button>
+        <Card className="h-full border-border bg-card shadow-sm">
+            <CardHeader>
+                <CardTitle>Performance Financière</CardTitle>
+                <CardDescription>Budget Client vs Estimation Marché</CardDescription>
             </CardHeader>
-            <CardContent className="flex-1 min-h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={chartData} margin={{ top: 20, right: 0, left: -15, bottom: 0 }}>
-                        <defs>
-                            <linearGradient id="colorBudget" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor={COLOR_BUDGET} stopOpacity={0.3} />
-                                <stop offset="95%" stopColor={COLOR_BUDGET} stopOpacity={0} />
-                            </linearGradient>
-                            <linearGradient id="colorCaution" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor={COLOR_CAUTION} stopOpacity={0.3} />
-                                <stop offset="95%" stopColor={COLOR_CAUTION} stopOpacity={0} />
-                            </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" opacity={0.3} />
-                        <XAxis
-                            dataKey="name"
-                            fontSize={12}
-                            tickLine={false}
-                            axisLine={false}
-                            tickMargin={10}
-                            stroke="var(--muted-foreground)"
-                        />
-                        <YAxis
-                            fontSize={12}
-                            tickLine={false}
-                            axisLine={false}
-                            tickFormatter={(v) => `${(v / 1000000).toFixed(1)}M`}
-                            stroke="var(--muted-foreground)"
-                        />
-                        <Tooltip
-                            contentStyle={{ backgroundColor: 'var(--card)', borderColor: 'var(--border)', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' }}
-                            itemStyle={{ fontSize: '13px', fontWeight: 500 }}
-                        />
-                        <Legend verticalAlign="top" align="right" iconType="circle" height={36} />
+            <CardContent>
+                <div className="h-[350px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                            
+                            {/* 3. Grid: Uses --border for subtle lines in both modes */}
+                            <CartesianGrid
+                                strokeDasharray="4 4"
+                                vertical={false}
+                                stroke="hsl(var(--border))" 
+                            />
 
-                        <Area
-                            name="Budget Estimé"
-                            type="monotone"
-                            dataKey="budget"
-                            stroke={COLOR_BUDGET}
-                            strokeWidth={3}
-                            fillOpacity={1}
-                            fill="url(#colorBudget)"
-                        />
-                        <Area
-                            name="Cautions"
-                            type="monotone"
-                            dataKey="caution"
-                            stroke={COLOR_CAUTION}
-                            strokeWidth={3}
-                            fillOpacity={1}
-                            fill="url(#colorCaution)"
-                        />
-                    </AreaChart>
-                </ResponsiveContainer>
+                            {/* 4. Axes: tickLine/axisLine false creates a clean look. 
+                                   Colors use --muted-foreground for accessibility. */}
+                            <XAxis
+                                dataKey="name"
+                                stroke="hsl(var(--muted-foreground))"
+                                fontSize={12}
+                                tickLine={false}
+                                axisLine={false}
+                                tickMargin={10}
+                            />
+
+                            <YAxis
+                                stroke="hsl(var(--muted-foreground))"
+                                fontSize={12}
+                                tickLine={false}
+                                axisLine={false}
+                                tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+                            />
+
+                            {/* 5. Tooltip Cursor: A semi-transparent muted color */}
+                            <Tooltip
+                                cursor={{ fill: 'hsl(var(--muted))', opacity: 0.3 }}
+                                content={<CustomTooltip />}
+                            />
+
+                            <Legend
+                                wrapperStyle={{ paddingTop: '20px' }}
+                                formatter={(value) => (
+                                    <span className="text-sm font-medium text-muted-foreground ml-1">
+                                        {value}
+                                    </span>
+                                )}
+                            />
+
+                            {/* 6. Bars: Using HSL variables allows the theme to control brightness.
+                                   --primary: Usually your brand color (Blue/Black)
+                                   --emerald-500: Tailwind color converted to variable usage, 
+                                   or you can use `fill="#10b981"` which is safe in dark mode too. */}
+                            <Bar
+                                dataKey="Budget"
+                                name="Budget Client"
+                                fill="hsl(var(--primary))" 
+                                radius={[4, 4, 0, 0]}
+                                maxBarSize={50}
+                            />
+                            <Bar
+                                dataKey="Estimé"
+                                name="Estimation Marché"
+                                fill="#10b981" 
+                                radius={[4, 4, 0, 0]}
+                                maxBarSize={50}
+                            />
+                        </BarChart>
+                    </ResponsiveContainer>
+                </div>
             </CardContent>
         </Card>
     );

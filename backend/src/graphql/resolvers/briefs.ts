@@ -1,20 +1,16 @@
 import { ApolloError } from 'apollo-server-errors';
 import ProjectBrief from '../../models/ProjectBrief';
 import Project from '../../models/Project';
-import { IContext } from '../../server'; // Vérifie ton chemin d'import pour IContext
+import { IContext } from '../../server';
 import { logActivity } from '../../utils/logger';
+import ProjectBriefModel from '../../models/ProjectBrief';
 
 export const briefResolvers = {
     Query: {
-        // ✅ QUERY : Récupérer le brief par ID du projet
         getProjectBrief: async (_: unknown, { projectId }: { projectId: string }, context: IContext) => {
-            // Sécurité : Utilisateur connecté requis
             if (!context.user) throw new ApolloError('Not authenticated', 'UNAUTHENTICATED');
-
             try {
-                // Recherche du brief lié à ce projectId
-                const brief = await ProjectBrief.findOne({ project: projectId });
-                return brief; // Peut retourner null si aucun brief n'existe encore, c'est normal
+                return await ProjectBrief.findOne({ project: projectId });
             } catch (error: any) {
                 console.error("Error fetching brief:", error);
                 throw new ApolloError('Error fetching brief', 'INTERNAL_SERVER_ERROR');
@@ -23,7 +19,6 @@ export const briefResolvers = {
     },
 
     Mutation: {
-        // ✅ MUTATION : Créer ou Mettre à jour le brief
         saveProjectBrief: async (_: unknown, { input }: any, context: IContext) => {
             if (!context.user) throw new ApolloError('Not authenticated', 'UNAUTHENTICATED');
 
@@ -33,30 +28,24 @@ export const briefResolvers = {
             const project = await Project.findById(projectId);
             if (!project) throw new ApolloError('Project not found', 'NOT_FOUND');
 
-            // 2. Chercher si un brief existe déjà pour ce projet
+            // 2. Chercher si un brief existe déjà
             let brief = await ProjectBrief.findOne({ project: projectId });
 
             if (brief) {
-                // --- MODE MISE À JOUR ---
+                // UPDATE
                 brief = await ProjectBrief.findOneAndUpdate(
                     { project: projectId },
-                    {
-                        ...briefData,
-                        updatedBy: context.user.id,
-                        updatedAt: new Date()
-                    },
-                    { new: true } // Retourne l'objet mis à jour
+                    { ...briefData, updatedBy: context.user.id, updatedAt: new Date() },
+                    { new: true }
                 );
-
                 await logActivity({
                     userId: context.user.id as any,
                     action: 'UPDATE_BRIEF',
                     project: projectId,
-                    details: 'Mise à jour du Brief / Détails Projet',
+                    details: 'Mise à jour du Brief'
                 });
-
             } else {
-                // --- MODE CRÉATION ---
+                // CREATE
                 brief = await ProjectBrief.create({
                     project: projectId,
                     ...briefData,
@@ -64,19 +53,14 @@ export const briefResolvers = {
                     createdAt: new Date(),
                     updatedAt: new Date()
                 });
-
-                // (Optionnel) Si tu veux stocker l'ID du brief dans le projet, décommente ça :
-                // await Project.findByIdAndUpdate(projectId, { brief: brief._id });
-
                 await logActivity({
                     userId: context.user.id as any,
                     action: 'CREATE_BRIEF',
                     project: projectId,
-                    details: 'Création du Brief initial',
+                    details: 'Création du Brief initial'
                 });
             }
-
             return brief;
         }
-    }
+    },
 };

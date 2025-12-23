@@ -408,7 +408,7 @@ export const tasksColumns: ColumnDef<ProjectFeedItem>[] = [
  * Hada howa L-Component l-Jdid dyal Team Task Tables
  * @param role The role to filter tasks for (e.g., 'CREATIVE', '3D_ARTIST', 'ASSISTANT_PM')
  */
-export function TasksDataTable({ role }: { role: 'CREATIVE' | '3D_ARTIST' | 'ASSISTANT_PM' }) {
+export function TasksDataTable({ role }: { role: 'CREATIVE' | '3D_ARTIST' | 'COORDINATOR' }) {
     const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
     const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
     const [sorting, setSorting] = React.useState<SortingState>([]);
@@ -435,7 +435,7 @@ export function TasksDataTable({ role }: { role: 'CREATIVE' | '3D_ARTIST' | 'ASS
                     return project.team.infographistes.some(u => u.id === currentUserId);
                 case '3D_ARTIST':
                     return project.team.team3D.some(u => u.id === currentUserId);
-                case 'ASSISTANT_PM':
+                case 'COORDINATOR':
                     return project.team.coordinators.some(u => u.id === currentUserId);
                 default:
                     return false;

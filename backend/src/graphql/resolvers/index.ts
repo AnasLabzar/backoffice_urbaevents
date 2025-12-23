@@ -1,5 +1,5 @@
 import { userResolvers } from './users';
-import { projectResolvers } from './projects';
+import { projectResolvers } from './projects'; // Assure-toi que projectResolvers exporte bien 'Project'
 import { taskResolvers } from './tasks';
 import { notificationResolvers } from './notifications';
 import { logsResolvers } from './logs';
@@ -7,7 +7,6 @@ import { aiResolver } from './aiResolver';
 import { supplierResolvers } from './suppliers';
 import { prestationResolvers } from './prestations';
 import { briefResolvers } from './briefs';
-// ✅ Import consolidé
 import { invoiceResolvers } from './invoices';
 
 import { GraphQLUpload } from 'graphql-upload';
@@ -24,7 +23,6 @@ export const resolvers = {
         ...supplierResolvers.Query,
         ...prestationResolvers.Query,
         ...briefResolvers.Query,
-        // ✅ Tout est ici (Invoices + Items)
         ...invoiceResolvers.Query
     },
 
@@ -37,7 +35,6 @@ export const resolvers = {
         ...supplierResolvers.Mutation,
         ...prestationResolvers.Mutation,
         ...briefResolvers.Mutation,
-        // ✅ Tout est ici (Add/Delete Item included)
         ...invoiceResolvers.Mutation
     },
 
@@ -46,9 +43,18 @@ export const resolvers = {
         ...notificationResolvers.Subscription,
     },
 
-    // Types Resolvers
+    // --- TYPES RESOLVERS ---
+
     User: { id: (parent: any) => parent._id ? parent._id.toString() : parent.id },
-    Project: { id: (parent: any) => parent._id ? parent._id.toString() : parent.id },
+
+    // 👇👇👇 C'EST ICI QUE CA CHANGE 👇👇👇
+    // Au lieu de juste mettre l'ID, on utilise tout ce qu'on a défini dans projectResolvers.ts
+    // On ajoute manuellement l'ID au cas où il manquerait, mais on spread (...) le reste
+    Project: {
+        id: (parent: any) => parent._id ? parent._id.toString() : parent.id,
+        ...projectResolvers.Project // ✅ On récupère 'brief', 'invoices', 'prestations'...
+    },
+
     Task: { id: (parent: any) => parent._id ? parent._id.toString() : parent.id },
     Document: { id: (parent: any) => parent._id ? parent._id.toString() : parent.id },
     Notification: { id: (parent: any) => parent._id ? parent._id.toString() : parent.id },
@@ -57,12 +63,9 @@ export const resolvers = {
     Prestation: { id: (parent: any) => parent._id ? parent._id.toString() : parent.id },
     ProjectBrief: { id: (parent: any) => parent._id ? parent._id.toString() : parent.id },
 
-    // ✅ Type Resolver pour Invoice (et Items field link)
     Invoice: {
         id: (parent: any) => parent._id ? parent._id.toString() : parent.id,
-        // Le field resolver 'items' est géré dans invoiceResolvers.ts
         ...invoiceResolvers.Invoice
     },
-    // ✅ Type Resolver pour InvoiceItem
     InvoiceItem: { id: (parent: any) => parent._id ? parent._id.toString() : parent.id }
 };

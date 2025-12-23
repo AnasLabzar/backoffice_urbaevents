@@ -172,11 +172,28 @@ export function BriefForm({ projectId, projectTitle, projectObject, initialData,
         return `${baseUrl}/${filePath}`;
     };
 
-    // Parsing helper
+    // Parsing helper (VERSION AMÉLIORÉE)
     const parseList = (data: any) => {
-        if (Array.isArray(data)) return data;
-        if (typeof data === 'string' && data.includes(',')) return data.split(',').map(s => s.trim());
-        if (data) return [data];
+        if (!data) return [];
+
+        // 1. Ila kan deja Array
+        if (Array.isArray(data)) {
+            // N-verifier wach wst l-array kayn chi string fih virgule (Ex: ["A, B"])
+            // Ila kan, n-ferqohom
+            return data.flatMap(item =>
+                typeof item === 'string' && item.includes(',')
+                    ? item.split(',').map(s => s.trim())
+                    : item
+            ).filter(Boolean); // Supprime les chaines vides
+        }
+
+        // 2. Ila kan String fih virgules
+        if (typeof data === 'string') {
+            return data.includes(',')
+                ? data.split(',').map(s => s.trim())
+                : [data];
+        }
+
         return [];
     };
 
@@ -196,6 +213,7 @@ export function BriefForm({ projectId, projectTitle, projectObject, initialData,
         mainObjective: "",
         history: "",
         constraints: "",
+        requirements: { logistics: "", audiovisual: "", accommodation: "", catering: "", transport: "", digital: "", hr: "", animation: "" }
     });
 
     // Cost State
@@ -213,9 +231,27 @@ export function BriefForm({ projectId, projectTitle, projectObject, initialData,
         onError: (error) => toast.error(error.message)
     });
 
+    // ✅ Ajoute cette fonction helper juste avant le composant BriefForm ou à l'intérieur
+    const safeDate = (dateVal: any) => {
+        if (!dateVal) return "";
+        const d = new Date(dateVal);
+        return isNaN(d.getTime()) ? "" : d.toISOString().split('T')[0];
+    };
+
     // ✅ FIX IMPORTANTE : UseEffect pour synchroniser initialData avec le state quand il arrive
     useEffect(() => {
         if (initialData) {
+            // Création sécurisée de l'objet requirements par défaut
+            const defaultReqs = {
+                logistics: "", audiovisual: "", accommodation: "", catering: "",
+                transport: "", digital: "", hr: "", animation: ""
+            };
+
+            // Fusion sécurisée
+            const safeReqs = initialData.requirements
+                ? { ...defaultReqs, ...initialData.requirements }
+                : defaultReqs;
+
             setFormData({
                 clientNature: initialData.clientNature || "",
                 eventFormat: initialData.eventFormat || "PHYSIQUE",
@@ -224,13 +260,19 @@ export function BriefForm({ projectId, projectTitle, projectObject, initialData,
                 locationType: initialData.locationType || "INDOOR",
                 visitorsCount: initialData.visitorsCount || 0,
                 estimatedBudget: initialData.estimatedBudget || 0,
-                startDate: initialData.startDate ? new Date(initialData.startDate).toISOString().split('T')[0] : "",
-                endDate: initialData.endDate ? new Date(initialData.endDate).toISOString().split('T')[0] : "",
+
+                // 👇 UTILISATION DE safeDate() ICI 👇
+                // ✅ Utilisation de safeDate pour éviter le RangeError
+                startDate: safeDate(initialData.startDate),
+                endDate: safeDate(initialData.endDate),
+
+                // ✅ Utilisation du parser pour s'assurer que c'est un tableau
                 targetAudience: parseList(initialData.targetAudience),
                 eventGoal: parseList(initialData.eventGoal),
                 mainObjective: initialData.mainObjective || "",
                 history: initialData.history || "",
-                constraints: initialData.constraints || "", // <-- HNA KAN LMOCHKIL
+                constraints: initialData.constraints || "",
+                requirements: safeReqs
             });
         }
     }, [initialData]);
@@ -249,7 +291,7 @@ export function BriefForm({ projectId, projectTitle, projectObject, initialData,
         const input = {
             projectId,
             ...formData,
-            requirements: { logistics: "", audiovisual: "", accommodation: "", catering: "", transport: "", digital: "", hr: "", animation: "" },
+            requirements: formData.requirements,
             visitorsCount: parseInt(formData.visitorsCount.toString()) || 0,
             estimatedBudget: parseFloat(formData.estimatedBudget.toString()) || 0,
             // Keep arrays as arrays if backend supports [String], otherwise join them
@@ -278,7 +320,7 @@ export function BriefForm({ projectId, projectTitle, projectObject, initialData,
         <div className="space-y-8 pb-20 max-w-[1600px] mx-auto animate-in fade-in duration-500">
 
             {/* --- 1. TOP HEADER --- */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 p-6 rounded-xl border bg-card shadow-sm dark:bg-card/50 backdrop-blur-sm">
+            <div className="sticky top-16 z-30 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 p-4 md:p-6 rounded-xl border bg-background/95 backdrop-blur-md shadow-sm border-primary/10 transition-all">
                 <div className="space-y-1.5">
                     <div className="flex items-center gap-2 text-primary text-xs uppercase tracking-wider font-bold">
                         <IconBriefcase className="w-3.5 h-3.5" /> Espace Production
@@ -289,20 +331,12 @@ export function BriefForm({ projectId, projectTitle, projectObject, initialData,
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
-                    {/* ✅ DYNAMIC BUTTON TEXT & ICON */}
                     <Button onClick={handleSubmit} disabled={isSaving} size="lg" className="shadow-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-all active:scale-95">
-                        {isSaving ? (
-                            <IconLoader className="w-4 h-4 mr-2 animate-spin" />
-                        ) : isUpdate ? (
-                            <IconRefresh className="w-4 h-4 mr-2" />
-                        ) : (
-                            <IconDeviceFloppy className="w-4 h-4 mr-2" />
-                        )}
+                        {isSaving ? <IconLoader className="w-4 h-4 mr-2 animate-spin" /> : isUpdate ? <IconRefresh className="w-4 h-4 mr-2" /> : <IconDeviceFloppy className="w-4 h-4 mr-2" />}
                         {isSaving ? "Sauvegarde..." : isUpdate ? "Mettre à jour" : "Enregistrer"}
                     </Button>
                 </div>
             </div>
-
             {/* --- DIAGNOSTIC ALERT --- */}
             <Alert className="bg-blue-50/50 border-blue-100 dark:bg-blue-900/10 dark:border-blue-900 shadow-sm">
                 <IconInfoCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />

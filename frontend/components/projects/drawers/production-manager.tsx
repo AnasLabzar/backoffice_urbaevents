@@ -323,25 +323,20 @@ export function ProductionManager({ projectId, initialTeam, onSave }: Production
 
             {/* --- FIXED FOOTER (BOTTOM) --- */}
             {/* Added "Voir le Brief" button here */}
-            <div className="flex-none p-4 border-t bg-background mt-auto flex justify-between items-center">
+            <div className="flex-none p-4 md:p-6 border-t bg-background/95 backdrop-blur-sm mt-auto">
                 <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-2 text-muted-foreground hover:text-foreground"
+                    size="lg"
+                    className="w-full group relative overflow-hidden bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg hover:shadow-xl transition-all duration-300"
                     onClick={() => router.push(`/dashboard/projects/${projectId}/brief`)}
                 >
-                    <IconFileDescription className="w-4 h-4" />
-                    Voir le Brief
-                </Button>
+                    {/* Subtle gradient effect overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
 
-                {/* Note: In a Drawer context, usually the parent controls the "Close/Cancel" button via DrawerClose. 
-                    If this component is used standalone, you might want a Cancel button here. 
-                    Since it's likely inside a Drawer, we rely on the parent's DrawerFooter or DrawerClose. 
-                    However, if you want a visual cancel button inside this component that acts as a close:
-                */}
-                {/* <DrawerClose asChild>
-                    <Button variant="ghost" size="sm">Fermer</Button>
-                </DrawerClose> */}
+                    <span className="flex items-center gap-3 font-semibold tracking-wide">
+                        <IconFileDescription className="w-5 h-5 transition-transform group-hover:scale-110 group-hover:-rotate-12" />
+                        CONSULTER LE BRIEF & STRATÉGIE
+                    </span>
+                </Button>
             </div>
         </div>
     );

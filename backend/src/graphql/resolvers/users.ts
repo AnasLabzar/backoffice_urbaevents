@@ -17,102 +17,78 @@ export const userResolvers = {
         },
 
         users: async (_: unknown, { role, roles }: { role?: string, roles?: string[] }, context: IContext) => {
+            // 1. Check Auth (Darouri)
             if (!context.user) throw new ApolloError('Not authenticated', 'UNAUTHENTICATED');
-            const userRole = await Role.findById(context.user.role);
-            if (!userRole || !userRole.permissions) {
-                throw new ApolloError('User role or permissions not found', 'NOT_FOUND');
-            }
-            if (
-                !userRole.permissions.includes('manage_users' as any) &&
-                !userRole.permissions.includes('assign_creative_tasks' as any)
-            ) {
-                throw new ApolloError('Forbidden: Not authorized to view user lists.', 'FORBIDDEN');
-            }
+
+            // ❌ SUPPRIMÉ: Check Permissions strict
+            // Hna 7iyydna l-blockage bach ay user (Coordinator, User...) yqder ychouf l-listes dyal l-assignation
 
             let findQuery: any = {};
 
             if (role) {
                 const roleDoc = await Role.findOne({ name: role });
-                if (!roleDoc) throw new ApolloError('Role not found', 'NOT_FOUND');
-                findQuery.role = roleDoc._id;
+                if (roleDoc) { // Ila lqah, filter bih. Ila malqahch, ignori (awla rdd empty, walakin hna n-ignoréw ahsan)
+                    findQuery.role = roleDoc._id;
+                }
             } else if (roles && roles.length > 0) {
                 const roleDocs = await Role.find({ name: { $in: roles } });
                 const roleIds = roleDocs.map(doc => doc._id);
                 findQuery.role = { $in: roleIds };
             }
 
+            // Return result (Sans Password)
             if (Object.keys(findQuery).length > 0) {
-                return User.find(findQuery).populate('role');
+                return User.find(findQuery).select('-password').populate('role');
             }
 
-            return User.find().populate('role');
+            return User.find().select('-password').populate('role');
         },
     },
 
     Mutation: {
-        // 👇 HNA L-DEBUG FIX 👇
         register: async (_: unknown, { name, email, password }: any) => {
             console.log("🚀 Starting Register Mutation...");
-            console.log("📥 Data:", { name, email, password });
 
             try {
-                // 1. Check existing user
                 const existingUser = await User.findOne({ email });
                 if (existingUser) {
-                    console.log("❌ User already exists");
                     throw new ApolloError('User with this email already exists', 'USER_ALREADY_EXISTS');
                 }
 
-                // 2. Determine Role
                 let defaultRoleName = 'PROPOSAL_MANAGER';
                 const userCount = await User.countDocuments();
                 if (userCount === 0) {
-                    console.log("👑 First User detected! Assigning ADMIN role.");
                     defaultRoleName = 'ADMIN';
                 }
 
-                // 3. Find or Create Role
                 let role = await Role.findOne({ name: defaultRoleName });
                 if (!role) {
-                    console.log(`⚠️ Role ${defaultRoleName} not found. Creating it...`);
                     const permissions: string[] = defaultRoleName === 'ADMIN'
                         ? [
                             'configure_roles', 'manage_users', 'assign_project_managers', 'assign_teams',
                             'set_project_status', 'view_all_logs', 'view_all_analytics', 'create_project_proposal',
                             'manage_assigned_projects', 'assign_creative_tasks', 'update_workflow_stage',
                             'manage_cautions', 'manage_own_tasks', 'upload_methodology',
-                            'assign_dynamic_pm', 'view_team_logs' // Zedt hado l-htiyat
+                            'assign_dynamic_pm', 'view_team_logs'
                         ]
                         : ['create_project_proposal'];
 
                     role = await Role.create({ name: defaultRoleName, permissions });
-                    console.log("✅ Role Created:", role);
                 }
-
-                // 4. Create User
-                console.log("🛠️ Creating User linked to Role ID:", role._id);
-                // Hash password is handled in User Model pre-save, but let's confirm User model exists
 
                 const user = await User.create({
                     name,
                     email,
-                    password, // Mongoose pre-save hook should hash this
+                    password,
                     role: role._id
                 });
 
-                console.log("✅ User Created ID:", user._id);
-
-                // 5. Generate Token
                 const token = generateToken(user);
-                console.log("🔑 Token Generated");
-
-                // 6. Return Payload
                 const populatedUser = await user.populate('role');
                 return { token, user: populatedUser };
 
             } catch (error: any) {
-                console.error("🔥 CRITICAL ERROR IN REGISTER:", error);
-                // Hada howa l-error li kynfe3na
+                console.error("🔥 REGISTRATION ERROR:", error);
                 throw new ApolloError(error.message || "Registration Failed", "INTERNAL_ERROR");
             }
         },

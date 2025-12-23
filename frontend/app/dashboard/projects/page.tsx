@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useQuery } from "@apollo/client";
-import { IconSearch, IconFolderOff, IconArchive } from "@tabler/icons-react";
+import { IconSearch, IconFolderOff, IconArchive, IconLayoutGrid, IconList } from "@tabler/icons-react";
 
 // Layout & UI Imports
 import { AppSidebar } from "@/components/app-sidebar";
@@ -12,35 +12,34 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CreateProjectDrawer } from "@/components/create-project-drawer";
 
 // Data & Logic Imports
 import { GET_PROJECTS_FEED } from "@/lib/graphql/projects";
 import { calculateRemainingDays } from "@/components/projects/utils";
 
-// Refactored Components Imports
+// Components Imports
 import { ProjectMetrics } from "@/components/projects/project-metrics";
-import { ProjectList } from "@/components/projects/project-list"; // Wraps DataTable
+import { ProjectList } from "@/components/projects/project-list";
 import { ProjectCard } from "@/components/projects/project-card";
 
 export default function ProjectsPage() {
-    // 1. Data Fetching
     const { data, loading, error } = useQuery(GET_PROJECTS_FEED, {
         fetchPolicy: "cache-and-network"
     });
 
-    // 2. Local State
     const [searchQuery, setSearchQuery] = useState("");
 
-    // 3. Data Processing
-    // We flatten the feed to get the project objects for the cards/metrics
+    // Default view mode (optional, if you want tabs to switch between cards/list)
+    const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+
     const rawFeed = data?.projects_feed || [];
     const projectsOnly = rawFeed.map((item: any) => ({
         ...item.project,
-        latestTask: item.latestTask // We attach the task to the project object for the card to use
+        latestTask: item.latestTask
     }));
 
-    // 4. Filtering Logic
     const filteredProjects = searchQuery
         ? projectsOnly.filter((p: any) =>
             p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -49,7 +48,6 @@ export default function ProjectsPage() {
         )
         : projectsOnly;
 
-    // Split Active vs Archived (Deadline passed or Status DONE)
     const activeProjects = filteredProjects.filter((p: any) =>
         p.preparationStatus !== 'DONE' &&
         p.preparationStatus !== 'NO' &&
@@ -70,90 +68,140 @@ export default function ProjectsPage() {
             } as React.CSSProperties}
         >
             <AppSidebar variant="inset" />
-            <SidebarInset>
+            <SidebarInset className="overflow-x-hidden">
                 <SiteHeader />
-                <div className="flex flex-1 flex-col bg-muted/10 min-h-screen">
-                    <div className="@container/main flex flex-1 flex-col gap-2">
-                        <div className="flex flex-col gap-8 py-6 px-4 lg:px-8">
 
-                            {/* --- SECTION 1: METRICS & KPIS --- */}
-                            {/* This replaces ChartAreaInteractive with a cleaner wrapper */}
-                            <ProjectMetrics
-                                projects={projectsOnly}
-                                loading={loading}
+                {/* FIX: Removed unnecessary nested flex containers. 
+                   Used 'w-full' and 'max-w-[1920px]' to handle large screens gracefully.
+                   Added 'mx-auto' to center content on ultra-wide monitors.
+                */}
+                <main className="flex-1 w-full max-w-[1920px] mx-auto p-4 md:p-6 lg:p-8 space-y-8 bg-muted/5 dark:bg-background min-h-screen">
+
+                    {/* --- SECTION 1: METRICS & KPIS --- */}
+                    <div className="w-full animate-in fade-in slide-in-from-top-4 duration-500">
+                        <ProjectMetrics
+                            projects={projectsOnly}
+                            loading={loading}
+                        />
+                    </div>
+
+                    {/* --- SECTION 2: TOOLBAR --- */}
+                    <div className="flex mt-[12em] flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sticky top-0 z-10 bg-background/80 backdrop-blur-md py-4 -my-4 px-2 -mx-2 rounded-lg border-b border-transparent data-[stuck=true]:border-border/40 transition-all">
+                        <div className="relative w-full sm:w-80 md:w-96">
+                            <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Rechercher un projet..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="pl-9 h-10 bg-background shadow-sm border-muted-foreground/20 focus-visible:ring-primary/20"
                             />
+                        </div>
 
-                            {/* --- SECTION 2: TOOLBAR --- */}
-                            <div className="flex flex-col md:flex-row items-center justify-between gap-4 mt-4">
-                                <div className="relative w-full md:w-96">
-                                    <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                    <Input
-                                        placeholder="Rechercher par titre, client ou code..."
-                                        value={searchQuery}
-                                        onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="pl-9 bg-background shadow-sm"
-                                    />
-                                </div>
-                                <CreateProjectDrawer />
+                        <div className="flex items-center gap-2 w-full sm:w-auto">
+                            <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as any)} className="hidden sm:block">
+                                <TabsList className="h-10 bg-muted/50 p-1">
+                                    <TabsTrigger value="grid" className="h-8 px-3"><IconLayoutGrid className="w-4 h-4 mr-2" /> Grille</TabsTrigger>
+                                    <TabsTrigger value="list" className="h-8 px-3"><IconList className="w-4 h-4 mr-2" /> Liste</TabsTrigger>
+                                </TabsList>
+                            </Tabs>
+                            <CreateProjectDrawer />
+                        </div>
+                    </div>
+
+                    {/* --- SECTION 3: CONTENT AREA --- */}
+                    <div className="space-y-10 mt-6">
+
+                        {/* A. ACTIVE PROJECTS */}
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                                <h2 className="text-lg font-semibold tracking-tight flex items-center gap-2">
+                                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                    En Cours
+                                    <Badge variant="secondary" className="ml-2 rounded-full px-2.5 py-0.5 text-xs font-normal">
+                                        {activeProjects.length}
+                                    </Badge>
+                                </h2>
                             </div>
 
-                            {/* --- SECTION 3: ACTIVE PROJECTS (CARDS) --- */}
-                            <div className="space-y-4">
-                                <h2 className="text-lg font-semibold tracking-tight">En Cours</h2>
-                                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                                    {loading && Array.from({ length: 4 }).map((_, i) => (
-                                        <Skeleton key={i} className="h-[280px] rounded-xl" />
+                            {/* LOADING STATE */}
+                            {loading && (
+                                <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+                                    {Array.from({ length: 4 }).map((_, i) => (
+                                        <Skeleton key={i} className="h-[320px] rounded-xl" />
                                     ))}
+                                </div>
+                            )}
 
-                                    {!loading && !error && activeProjects.length === 0 && (
-                                        <div className="col-span-full py-12 text-center text-muted-foreground border-2 border-dashed rounded-xl">
-                                            <IconFolderOff className="w-10 h-10 mx-auto mb-2 opacity-50" />
-                                            <p>Aucun projet actif trouvé.</p>
-                                        </div>
-                                    )}
+                            {/* EMPTY STATE */}
+                            {!loading && !error && activeProjects.length === 0 && (
+                                <div className="flex flex-col items-center justify-center py-16 text-center border-2 border-dashed rounded-xl bg-muted/5">
+                                    <div className="bg-muted p-4 rounded-full mb-4">
+                                        <IconFolderOff className="w-8 h-8 text-muted-foreground" />
+                                    </div>
+                                    <h3 className="text-lg font-medium text-foreground">Aucun projet trouvé</h3>
+                                    <p className="text-sm text-muted-foreground max-w-xs mx-auto mt-2">
+                                        Aucun projet ne correspond à votre recherche ou il n'y a pas de projet actif pour le moment.
+                                    </p>
+                                </div>
+                            )}
 
-                                    {!loading && !error && activeProjects.map((project: any) => (
+                            {/* GRID VIEW */}
+                            {!loading && !error && viewMode === 'grid' && (
+                                <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 animate-in fade-in duration-500">
+                                    {activeProjects.map((project: any) => (
+                                        <ProjectCard key={project.id} project={project} />
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* LIST VIEW (Optional if you implemented list toggle) */}
+                            {!loading && !error && viewMode === 'list' && (
+                                <div className="border rounded-xl overflow-hidden shadow-sm animate-in fade-in duration-500 bg-background">
+                                    <ProjectList
+                                        data={activeProjects.map((p: any) => ({ project: p, latestTask: p.latestTask }))}
+                                        loading={false}
+                                        error={undefined}
+                                    />
+                                </div>
+                            )}
+                        </div>
+
+                        {/* B. ARCHIVED PROJECTS */}
+                        {!loading && archivedProjects.length > 0 && (
+                            <div className="space-y-6 pt-8">
+                                <div className="flex items-center gap-4">
+                                    <Separator className="flex-1" />
+                                    <Badge variant="outline" className="gap-2 py-1.5 px-3 text-muted-foreground bg-background/50 backdrop-blur-sm">
+                                        <IconArchive className="w-3.5 h-3.5" />
+                                        Archives ({archivedProjects.length})
+                                    </Badge>
+                                    <Separator className="flex-1" />
+                                </div>
+
+                                <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 opacity-75 hover:opacity-100 transition-opacity duration-300">
+                                    {archivedProjects.map((project: any) => (
                                         <ProjectCard key={project.id} project={project} />
                                     ))}
                                 </div>
                             </div>
+                        )}
 
-                            {/* --- SECTION 4: ARCHIVED / OVERDUE (OPTIONAL) --- */}
-                            {!loading && archivedProjects.length > 0 && (
-                                <div className="space-y-4 opacity-80 hover:opacity-100 transition-opacity">
-                                    <div className="flex items-center gap-4">
-                                        <Separator className="flex-1" />
-                                        <Badge variant="outline" className="gap-2 text-muted-foreground">
-                                            <IconArchive className="w-3 h-3" />
-                                            Archives / Terminés
-                                        </Badge>
-                                        <Separator className="flex-1" />
-                                    </div>
-
-                                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 grayscale hover:grayscale-0 transition-all duration-500">
-                                        {archivedProjects.map((project: any) => (
-                                            <ProjectCard key={project.id} project={project} />
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            <div className="h-4" />
-
-                            {/* --- SECTION 5: DETAILED TABLE --- */}
-                            <div className="space-y-4">
-                                <h2 className="text-lg font-semibold tracking-tight">Vue Détaillée</h2>
-                                {/* ProjectList handles the DataTable and Columns internally */}
+                        {/* C. FULL TABLE VIEW (Always visible at bottom for detailed analysis) */}
+                        <div className="space-y-4 pt-8">
+                            <div className="flex items-center justify-between">
+                                <h2 className="text-lg font-semibold tracking-tight">Vue Détaillée (Tous)</h2>
+                            </div>
+                            <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
                                 <ProjectList
-                                    data={rawFeed} // Passes the raw {project, latestTask} structure
+                                    data={rawFeed}
                                     loading={loading}
                                     error={error}
                                 />
                             </div>
-
                         </div>
+
                     </div>
-                </div>
+                </main>
             </SidebarInset>
         </SidebarProvider>
     );

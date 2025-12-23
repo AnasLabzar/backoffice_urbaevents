@@ -3,7 +3,7 @@ export interface Task {
     id: string;
     description: string;
     status: "TODO" | "IN_PROGRESS" | "DONE";
-    department: "CREATIVE" | "3D_ARTIST" | "ASSISTANT_PM" | "PROJECT_MANAGEMENT" | "TECHNICAL_OFFICE" | "WORKSHOP" | "FIELD" | "LOGISTICS";
+    department: "CREATIVE" | "3D_ARTIST" | "COORDINATOR" | "PROJECT_MANAGEMENT" | "TECHNICAL_OFFICE" | "WORKSHOP" | "FIELD" | "LOGISTICS";
     dueDate: string | null;
     createdAt: string;
     updatedAt?: string;

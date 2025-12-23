@@ -111,7 +111,7 @@ export const GET_TEAM_MEMBERS = gql`
   query GetTeamMembers {
     infographistes: users(role: "CREATIVE") { id name }
     team3D: users(role: "3D_ARTIST") { id name }
-    coordinators: users(role: "ASSISTANT_PM") { id name }
+    coordinators: users(role: "COORDINATOR") { id name }
   }
 `;
 

@@ -79,7 +79,7 @@ const GET_PROJECT_FULL_DETAILS = gql`
     }
     allInfographistes: users(role: "CREATIVE") { id name }
     allTeam3D: users(role: "3D_ARTIST") { id name }
-    allCoordinators: users(role: "ASSISTANT_PM") { id name } 
+    allCoordinators: users(role: "COORDINATOR") { id name } 
   }
 `;
 
@@ -207,6 +207,8 @@ export default function ProductionPage({ params }: { params: Promise<{ id: strin
         variables: { projectId },
         fetchPolicy: "network-only"
     });
+
+    const canManageTeam = !!data?.allInfographistes && !!data?.allTeam3D;
 
     const projectTeamForTasks = useMemo(() => {
         if (!data?.project?.team) return [];
@@ -390,11 +392,14 @@ export default function ProductionPage({ params }: { params: Promise<{ id: strin
                                     projectId={projectId}
                                     currentTeam={project.team}
                                     tasks={tasksByProject}
+                                    // ✅ Passina l-data wakha tkoun null
                                     allUsers={{
-                                        infographistes: data.allInfographistes,
-                                        team3D: data.allTeam3D,
-                                        coordinators: data.allCoordinators
+                                        infographistes: data.allInfographistes || [],
+                                        team3D: data.allTeam3D || [],
+                                        coordinators: data.allCoordinators || []
                                     }}
+                                    // ✅ Passina l-flag bach n-wriw view differente
+                                    isReadOnly={!canManageTeam}
                                     onUpdate={refetch}
                                 />
                             </TabsContent>
@@ -614,7 +619,7 @@ function AssetsManager({ projectId, files, onUploadSuccess }: any) {
 // ------------------------------------------------------------------
 // COMPONENT 3: TEAM MANAGER
 // ------------------------------------------------------------------
-function TeamManager({ projectId, currentTeam, allUsers, tasks, onUpdate }: any) {
+function TeamManager({ projectId, currentTeam, allUsers, tasks, onUpdate, isReadOnly }: any) {
     const [teamData, setTeamData] = useState({
         infographisteIds: currentTeam?.infographistes?.map((u: any) => u.id) || [],
         team3DIds: currentTeam?.team3D?.map((u: any) => u.id) || [],
@@ -641,26 +646,27 @@ function TeamManager({ projectId, currentTeam, allUsers, tasks, onUpdate }: any)
         setTeamData((prev: any) => ({ ...prev, [key]: checked ? [...prev[key], id] : prev[key].filter((x: string) => x !== id) }));
     };
 
-    return (
-        <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row justify-between gap-4 border-b pb-4 items-center">
-                <div className="space-y-1">
-                    <h3 className="font-bold text-lg">Membres du Projet</h3>
+    // ✅ MODE LECTURE SEULE (Pour les users li ma 3ndhomch droit)
+    if (isReadOnly) {
+        return (
+            <div className="space-y-6">
+                <div className="flex flex-col gap-1 border-b pb-4">
+                    <h3 className="font-bold text-lg flex items-center gap-2">
+                        <IconUsers className="w-5 h-5 text-primary" /> Équipe du Projet
+                    </h3>
                     <p className="text-xs text-muted-foreground">
-                        Les membres marqués d'un <IconLock className="inline w-3 h-3 text-amber-600" /> sont verrouillés car ils ont des tâches.
+                        Vous visualisez l'équipe actuelle. Seuls les administrateurs peuvent modifier l'assignation.
                     </p>
                 </div>
-                <Button onClick={() => assignTeam({ variables: { input: { projectId, ...teamData } } })} disabled={loading} size="sm" className="w-full sm:w-auto">
-                    {loading ? <IconLoader className="animate-spin mr-2 w-4 h-4" /> : <IconCheck className="mr-2 w-4 h-4" />} Enregistrer
-                </Button>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <ReadOnlyTeamColumn title="Création" users={currentTeam?.infographistes} />
+                    <ReadOnlyTeamColumn title="3D / Archi" users={currentTeam?.team3D} />
+                    <ReadOnlyTeamColumn title="Coordination" users={currentTeam?.coordinators} />
+                </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <TeamCard title="Création" role="infographisteIds" users={allUsers.infographistes} selected={teamData.infographisteIds} locks={lockedUserIds} onChange={handleTeamChange} />
-                <TeamCard title="3D / Archi" role="team3DIds" users={allUsers.team3D} selected={teamData.team3DIds} locks={lockedUserIds} onChange={handleTeamChange} />
-                <TeamCard title="Coordination" role="coordinatorIds" users={allUsers.coordinators} selected={teamData.coordinatorIds} locks={lockedUserIds} onChange={handleTeamChange} />
-            </div>
-        </div>
-    );
+        );
+    }
 }
 
 function TeamCard({ title, role, users, selected, locks, onChange }: any) {
@@ -724,6 +730,41 @@ function TaskBoard({ tasks }: { tasks: any[] }) {
                 </div>
             ))}
         </div>
+    );
+}
+
+// ------------------------------------------------------------------
+// COMPONENT 5: READ ONLY TEAM COLUMN (Zid hadi f l-kher)
+// ------------------------------------------------------------------
+function ReadOnlyTeamColumn({ title, users }: any) {
+    return (
+        <Card className="h-full shadow-sm bg-muted/10 border-dashed">
+            <CardHeader className="py-3 border-b">
+                <CardTitle className="text-xs uppercase font-bold text-muted-foreground tracking-wider">
+                    {title}
+                </CardTitle>
+            </CardHeader>
+            <CardContent className="p-3">
+                {users && users.length > 0 ? (
+                    <div className="space-y-2">
+                        {users.map((u: any) => (
+                            <div key={u.id} className="flex items-center gap-3 p-2 rounded-md bg-background border">
+                                <Avatar className="w-8 h-8 border">
+                                    <AvatarFallback className="bg-primary/10 text-primary text-[10px]">
+                                        {u.name.substring(0, 2).toUpperCase()}
+                                    </AvatarFallback>
+                                </Avatar>
+                                <span className="text-sm font-medium">{u.name}</span>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="text-xs text-muted-foreground italic py-4 text-center">
+                        Aucun membre assigné
+                    </div>
+                )}
+            </CardContent>
+        </Card>
     );
 }
 

@@ -18,6 +18,7 @@ import {
 } from './helpers';
 import { aiService } from '../../../services/aiService';
 import Role from '../../models/Role';
+import ProjectBriefModel from '../../models/ProjectBrief';
 
 // --- HELPER: CHECK PM ACCESS ---
 const checkPMAccess = async (context: IContext, project: any, requiredPermission: string) => {
@@ -160,6 +161,7 @@ export const projectResolvers = {
             return feed;
         },
 
+        // 👇👇👇 LE FIX EST ICI DANS LA QUERY PROJECT 👇👇👇
         project: async (_: unknown, { id }: { id: string }, context: IContext) => {
             if (!context.user) throw new ApolloError('Not authenticated', 'UNAUTHENTICATED');
 
@@ -172,13 +174,20 @@ export const projectResolvers = {
             for (const p of stagePopulates) q = (q as any).populate(p);
             for (const p of teamPopulates) q = (q as any).populate(p);
 
-            const project: any = await q.exec();
+            const projectDoc: any = await q.exec();
 
-            if (!project) throw new ApolloError('Project not found', 'NOT_FOUND');
+            if (!projectDoc) throw new ApolloError('Project not found', 'NOT_FOUND');
 
-            patchProjectUsers(project);
+            // 🛠️ HACK ULTIME : Conversion en Objet JS pur et nettoyage
+            const projectObj = projectDoc.toObject({ virtuals: true });
 
-            return project;
+            // 🛑 ON SUPPRIME LE CHAMP BRIEF S'IL EXISTE DANS L'OBJET
+            // Cela oblige GraphQL à appeler le Resolver "brief" défini plus bas
+            delete projectObj.brief;
+
+            patchProjectUsers(projectObj);
+
+            return projectObj;
         },
     },
 
@@ -278,7 +287,7 @@ export const projectResolvers = {
                 currentStage: initialStage,
                 stages: {
                     administrative: { responsible: ['PROPOSAL_MANAGER', 'ADMIN'], documents: [] },
-                    technical: { responsible: ['PROPOSAL_MANAGER', 'PROJECT_MANAGER', 'ASSISTANT_PM', 'COORDINATOR'], documents: [] },
+                    technical: { responsible: ['PROPOSAL_MANAGER', 'PROJECT_MANAGER', 'COORDINATOR'], documents: [] },
                     technicalOffer: { responsible: ['PROJECT_MANAGER', 'COORDINATOR'], documents: [] },
                     financialOffer: { responsible: ['PROPOSAL_MANAGER', 'PROJECT_MANAGER', 'COORDINATOR'], documents: [] },
                     printing: { responsible: [], documents: [] },
@@ -903,18 +912,38 @@ export const projectResolvers = {
     },
 
     // ✅ Field Resolvers
+    // 👇👇👇 FIELD RESOLVERS (C'est ici que la magie opère) 👇👇👇
     Project: {
         prestations: async (parent: any) => {
             const PrestationModel = require('../../models/Prestation').default;
             return await PrestationModel.find({ project: parent._id || parent.id });
         },
-        brief: async (parent: any) => {
-            const BriefModel = require('../../models/ProjectBrief').default;
-            return await BriefModel.findOne({ project: parent._id || parent.id });
-        },
         invoices: async (parent: any) => {
             const InvoiceModel = require('../../models/Invoice').default;
             return await InvoiceModel.find({ project: parent._id || parent.id }).sort({ createdAt: -1 });
-        }
+        },
+
+        // ✅ LE RESOLVER BRIEF
+        brief: async (parent: any) => {
+            try {
+                const projectId = parent._id || parent.id;
+                console.log(`🔍 [RESOLVER] Fetching brief for project ${projectId}`);
+
+                const brief = await ProjectBriefModel.findOne({ project: projectId });
+
+                if (brief) {
+                    console.log("✅ [RESOLVER] Brief Found with ID:", brief._id);
+                    return brief;
+                } else {
+                    console.log("⚠️ [RESOLVER] No brief found in DB");
+                    return null;
+                }
+            } catch (error) {
+                console.error("❌ Error resolving brief:", error);
+                return null;
+            }
+        },
+
+        aiSummary: (parent: any) => parent.aiSummary
     }
 };

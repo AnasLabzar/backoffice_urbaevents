@@ -115,7 +115,7 @@ const ProjectSchema: Schema = new Schema(
 
     stages: {
       administrative: { ...StageSchema.obj, responsible: { type: [String], default: ['PROPOSAL_MANAGER'] } },
-      technical: { ...StageSchema.obj, responsible: { type: [String], default: ['PROPOSAL_MANAGER', 'PROJECT_MANAGER', 'ASSISTANT_PM', 'COORDINATOR', 'DIRECTOR_EVENT', 'IT_MANAGER'] } },
+      technical: { ...StageSchema.obj, responsible: { type: [String], default: ['PROPOSAL_MANAGER', 'PROJECT_MANAGER', 'COORDINATOR', 'DIRECTOR_EVENT', 'IT_MANAGER'] } },
       technicalOffer: { ...StageSchema.obj, responsible: { type: [String], default: ['PROJECT_MANAGER', 'COORDINATOR', 'DIRECTOR_EVENT', 'IT_MANAGER'] } },
       financialOffer: { ...StageSchema.obj, responsible: { type: [String], default: ['PROPOSAL_MANAGER', 'PROJECT_MANAGER', 'COORDINATOR'] } },
       printing: StageSchema,
