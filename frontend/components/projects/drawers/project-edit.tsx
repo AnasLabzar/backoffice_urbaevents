@@ -24,7 +24,6 @@ import {
     IconX, IconPlus, IconTrash, IconFileSpreadsheet
 } from "@tabler/icons-react";
 
-import { ProductionManager } from "./production-manager";
 
 import {
     ME_QUERY, GET_PROJECT_MANAGERS, GET_TEAM_MEMBERS, GET_TASKS_BY_PROJECT_QUERY, GET_PROJECTS_FEED,
@@ -36,6 +35,7 @@ import {
     GET_ALL_USERS,
     GET_ESTIMATION
 } from "@/lib/graphql/projects";
+import { ProductionManager } from "./production-manager";
 
 // --- HELPERS ---
 
@@ -87,7 +87,6 @@ const getFileUrl = (filePath: string) => {
 function DocumentRow({ label, type, existingDocs, files, setFiles, progress, isOptional = false, maxFiles = 10 }: any) {
     const isUploading = progress > 0 && progress < 100;
 
-    // Filter existing docs
     const relevantDocs = Array.isArray(existingDocs)
         ? existingDocs.filter((d: any) => d.fileName === type || d.originalFileName?.includes(type))
         : [];
@@ -196,11 +195,8 @@ function MarginCalculator({
     const margin = market - cost;
     const marginPercent = market > 0 ? (margin / market) * 100 : 0;
 
-    // Local state for target margin input
-    // Initial value based on current data
     const [targetMargin, setTargetMargin] = React.useState(0);
 
-    // Sync local state when props change (optional, depends on UX preference)
     React.useEffect(() => {
         if (market > 0) {
             setTargetMargin(parseFloat(((market - cost) / market * 100).toFixed(2)));
@@ -267,7 +263,6 @@ function MarginCalculator({
 
             <div className="flex justify-between items-center bg-muted/30 p-2 rounded">
                 <span className="text-xs font-semibold">Budget Cible (Interne)</span>
-                {/* Calculated based on inputs: Market * (1 - Margin%) */}
                 <span className="text-sm font-mono font-bold">
                     {(market * (1 - (targetMargin / 100))).toLocaleString('fr-FR', { maximumFractionDigits: 0 })} MAD
                 </span>
@@ -280,11 +275,11 @@ function MarginCalculator({
                         {cost.toLocaleString('fr-FR', { style: 'currency', currency: 'MAD' })}
                     </span>
                 </div>
-                {/* Progress bar logic... */}
             </div>
         </div>
     );
 }
+
 // --- MAIN COMPONENT ---
 export function ProjectEditDrawer({ item }: { item: any }) {
     const isMobile = useIsMobile();
@@ -346,42 +341,37 @@ export function ProjectEditDrawer({ item }: { item: any }) {
     const existingDocs = item.stages?.administrative?.documents || [];
     const existingTechDocs = item.stages?.technical?.documents || [];
 
-
-    const handleMarketPriceChange = (val: number) => {
-        setFormData(prev => ({ ...prev, marketEstimate: val }));
-        // Optional: Recalculate estimatedBudget based on current margin if needed
-    };
-
-    // Handler for Target Margin change
-    const handleTargetMarginChange = (marginPercent: number) => {
-        // Calculate new estimated budget (Budget Cible)
-        const market = Number(formData.marketEstimate) || 0;
-        const newEstimatedBudget = market * (1 - (marginPercent / 100));
-
-        setFormData(prev => ({ ...prev, estimatedBudget: newEstimatedBudget }));
-    };
-
-    // ✅ FIX : Recherche plus souple pour le document technique
     const getTechDoc = (type: string) => {
         return existingTechDocs.find((d: any) => d.fileName === type || d.originalFileName?.includes(type));
     };
 
-
-    // ✅ AJOUT : Récupérer le montant total de l'estimation liée
+    // --- FINANCIAL DATA FETCHING ---
     const { data: estimationData } = useQuery(GET_ESTIMATION, {
         variables: { projectId: item.id },
-        fetchPolicy: "cache-and-network" // Pour avoir toujours la dernière version
+        fetchPolicy: "cache-and-network"
     });
 
-    // Calculer le coût réel (Cost Price)
-    // Si on a une estimation validée, on prend son total. Sinon on prend la valeur par défaut du projet.
     const realCostPrice = estimationData?.getProjectEstimation?.totalAmount || item.estimatedBudget || 0;
 
+    // --- HANDLERS FOR MARGIN CALCULATOR ---
+    const handleMarketPriceChange = (val: number) => {
+        // ✅ FIX: Explicit typing for prev
+        setFormData((prev: any) => ({ ...prev, marketEstimate: val }));
+    };
+
+    const handleTargetMarginChange = (marginPercent: number) => {
+        const market = Number(formData.marketEstimate) || 0;
+        const newEstimatedBudget = market * (1 - (marginPercent / 100));
+        // ✅ FIX: Explicit typing for prev
+        setFormData((prev: any) => ({ ...prev, estimatedBudget: newEstimatedBudget }));
+    };
 
     // Pour les documents administratifs standards
     const getDoc = (type: string) => existingDocs.find((d: any) => d.fileName === type);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => { setFormData({ ...formData, [e.target.id]: e.target.value }); };
+
+    // Updated handleSubmit to send financial data to backend on save
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         updateProject({
@@ -581,7 +571,7 @@ export function ProjectEditDrawer({ item }: { item: any }) {
                         {/* ✅ MODIFICATION ICI AUSSI */}
                         <MarginCalculator
                             marketPrice={Number(formData.marketEstimate) || 0}
-                            costPrice={realCostPrice} // From GET_ESTIMATION query
+                            costPrice={realCostPrice}
                             onMarketPriceChange={handleMarketPriceChange}
                             onTargetMarginChange={handleTargetMarginChange}
                         />
