@@ -33,7 +33,8 @@ import {
     ADMIN_LAUNCH_PROJECT_MUTATION, FINANCE_REQUEST_CAUTION_MUTATION, CP_ASSIGN_TEAM_MUTATION,
     PM_CREATE_TASK_MUTATION, PM_UPDATE_TASK_STATUS_MUTATION, CP_UPLOAD_ASSET_MUTATION,
     GIVE_PROPOSAL_AVIS_MUTATION,
-    GET_ALL_USERS
+    GET_ALL_USERS,
+    GET_ESTIMATION
 } from "@/lib/graphql/projects";
 
 // --- HELPERS ---
@@ -178,20 +179,112 @@ function DocumentRow({ label, type, existingDocs, files, setFiles, progress, isO
     );
 }
 
-function MarginCalculator({ marketPrice, costPrice }: { marketPrice: number, costPrice: number }) {
-    const market = Number(marketPrice) || 0; const cost = Number(costPrice) || 0; const margin = market - cost;
+// Updated MarginCalculator Component to support inputs
+function MarginCalculator({
+    marketPrice,
+    costPrice,
+    onMarketPriceChange,
+    onTargetMarginChange
+}: {
+    marketPrice: number,
+    costPrice: number,
+    onMarketPriceChange?: (val: number) => void,
+    onTargetMarginChange?: (val: number) => void
+}) {
+    const market = Number(marketPrice) || 0;
+    const cost = Number(costPrice) || 0;
+    const margin = market - cost;
     const marginPercent = market > 0 ? (margin / market) * 100 : 0;
+
+    // Local state for target margin input
+    // Initial value based on current data
+    const [targetMargin, setTargetMargin] = React.useState(0);
+
+    // Sync local state when props change (optional, depends on UX preference)
+    React.useEffect(() => {
+        if (market > 0) {
+            setTargetMargin(parseFloat(((market - cost) / market * 100).toFixed(2)));
+        }
+    }, [market, cost]);
+
+    const handleMarginChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const newMargin = parseFloat(e.target.value) || 0;
+        setTargetMargin(newMargin);
+        if (onTargetMarginChange) onTargetMarginChange(newMargin);
+    };
+
     let colorClass = "bg-red-500"; let textClass = "text-red-600";
-    if (marginPercent >= 20) { colorClass = "bg-green-500"; textClass = "text-green-600"; } else if (marginPercent >= 10) { colorClass = "bg-yellow-500"; textClass = "text-yellow-600"; }
+    if (marginPercent >= 20) { colorClass = "bg-green-500"; textClass = "text-green-600"; }
+    else if (marginPercent >= 10) { colorClass = "bg-yellow-500"; textClass = "text-yellow-600"; }
+
     return (
         <div className="p-4 rounded-lg bg-card border border-border space-y-4 shadow-sm">
-            <div className="flex items-center justify-between"><div className="flex items-center gap-2"><div className="p-2 bg-primary/10 rounded-md text-primary"><IconCalculator size={18} /></div><span className="text-sm font-semibold">Analyse Financière</span></div><div className={cn("flex items-center gap-1 text-sm font-bold", textClass)}>{marginPercent > 0 ? <IconTrendingUp size={16} /> : <IconTrendingDown size={16} />}{marginPercent.toFixed(1)}%</div></div>
-            <div className="grid grid-cols-2 gap-4 py-2"><div><span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Marché</span><div className="text-sm font-mono font-medium">{market.toLocaleString('fr-FR')} MAD</div></div><div className="text-right"><span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Coût Est.</span><div className="text-sm font-mono font-medium">{cost.toLocaleString('fr-FR')} MAD</div></div></div>
-            <div className="space-y-1.5"><div className="flex justify-between text-xs text-muted-foreground"><span>Marge Nette</span><span className={cn("font-bold", textClass)}>{margin.toLocaleString('fr-FR', { style: 'currency', currency: 'MAD' })}</span></div><div className="h-2 w-full bg-secondary rounded-full overflow-hidden"><div className={cn("h-full transition-all duration-500 ease-out rounded-full", colorClass)} style={{ width: `${Math.max(0, Math.min(100, marginPercent))}%` }} /></div></div>
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <div className="p-2 bg-primary/10 rounded-md text-primary"><IconCalculator size={18} /></div>
+                    <span className="text-sm font-semibold">Analyse Financière</span>
+                </div>
+                <div className={cn("flex items-center gap-1 text-sm font-bold", textClass)}>
+                    {marginPercent > 0 ? <IconTrendingUp size={16} /> : <IconTrendingDown size={16} />}
+                    {marginPercent.toFixed(1)}%
+                </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 py-2">
+                <div>
+                    <Label className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Marché (Vente)</Label>
+                    {onMarketPriceChange ? (
+                        <div className="relative">
+                            <Input
+                                type="number"
+                                value={market}
+                                onChange={(e) => onMarketPriceChange(parseFloat(e.target.value))}
+                                className="h-8 text-sm font-mono mt-1"
+                            />
+                            <span className="absolute right-2 top-2 text-xs text-muted-foreground">DH</span>
+                        </div>
+                    ) : (
+                        <div className="text-sm font-mono font-medium mt-1">{market.toLocaleString('fr-FR')} MAD</div>
+                    )}
+                </div>
+                <div>
+                    <Label className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Marge Cible (%)</Label>
+                    {onTargetMarginChange ? (
+                        <div className="relative">
+                            <Input
+                                type="number"
+                                value={targetMargin}
+                                onChange={handleMarginChange}
+                                className="h-8 text-sm font-mono mt-1"
+                            />
+                            <span className="absolute right-2 top-2 text-xs text-muted-foreground">%</span>
+                        </div>
+                    ) : (
+                        <div className="text-sm font-mono font-medium text-right mt-1">{marginPercent.toFixed(1)}%</div>
+                    )}
+                </div>
+            </div>
+
+            <div className="flex justify-between items-center bg-muted/30 p-2 rounded">
+                <span className="text-xs font-semibold">Budget Cible (Interne)</span>
+                {/* Calculated based on inputs: Market * (1 - Margin%) */}
+                <span className="text-sm font-mono font-bold">
+                    {(market * (1 - (targetMargin / 100))).toLocaleString('fr-FR', { maximumFractionDigits: 0 })} MAD
+                </span>
+            </div>
+
+            <div className="space-y-1.5 pt-2 border-t">
+                <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Coût Réel (Technique)</span>
+                    <span className={cn("font-bold", cost > (market * (1 - (targetMargin / 100))) ? "text-red-500" : "text-foreground")}>
+                        {cost.toLocaleString('fr-FR', { style: 'currency', currency: 'MAD' })}
+                    </span>
+                </div>
+                {/* Progress bar logic... */}
+            </div>
         </div>
     );
 }
-
 // --- MAIN COMPONENT ---
 export function ProjectEditDrawer({ item }: { item: any }) {
     const isMobile = useIsMobile();
@@ -253,10 +346,37 @@ export function ProjectEditDrawer({ item }: { item: any }) {
     const existingDocs = item.stages?.administrative?.documents || [];
     const existingTechDocs = item.stages?.technical?.documents || [];
 
+
+    const handleMarketPriceChange = (val: number) => {
+        setFormData(prev => ({ ...prev, marketEstimate: val }));
+        // Optional: Recalculate estimatedBudget based on current margin if needed
+    };
+
+    // Handler for Target Margin change
+    const handleTargetMarginChange = (marginPercent: number) => {
+        // Calculate new estimated budget (Budget Cible)
+        const market = Number(formData.marketEstimate) || 0;
+        const newEstimatedBudget = market * (1 - (marginPercent / 100));
+
+        setFormData(prev => ({ ...prev, estimatedBudget: newEstimatedBudget }));
+    };
+
     // ✅ FIX : Recherche plus souple pour le document technique
     const getTechDoc = (type: string) => {
         return existingTechDocs.find((d: any) => d.fileName === type || d.originalFileName?.includes(type));
     };
+
+
+    // ✅ AJOUT : Récupérer le montant total de l'estimation liée
+    const { data: estimationData } = useQuery(GET_ESTIMATION, {
+        variables: { projectId: item.id },
+        fetchPolicy: "cache-and-network" // Pour avoir toujours la dernière version
+    });
+
+    // Calculer le coût réel (Cost Price)
+    // Si on a une estimation validée, on prend son total. Sinon on prend la valeur par défaut du projet.
+    const realCostPrice = estimationData?.getProjectEstimation?.totalAmount || item.estimatedBudget || 0;
+
 
     // Pour les documents administratifs standards
     const getDoc = (type: string) => existingDocs.find((d: any) => d.fileName === type);
@@ -458,7 +578,13 @@ export function ProjectEditDrawer({ item }: { item: any }) {
 
                     <div className="space-y-3">
                         <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Calcul Financier (Live)</h4>
-                        <MarginCalculator marketPrice={Number(item.marketEstimate) || 0} costPrice={Number(item.estimatedBudget) || 0} />
+                        {/* ✅ MODIFICATION ICI AUSSI */}
+                        <MarginCalculator
+                            marketPrice={Number(formData.marketEstimate) || 0}
+                            costPrice={realCostPrice} // From GET_ESTIMATION query
+                            onMarketPriceChange={handleMarketPriceChange}
+                            onTargetMarginChange={handleTargetMarginChange}
+                        />
                     </div>
 
                     {/* ✅ SECTION ESTIMATION EXCEL REFAITE - PROFESSIONNELLE */}
@@ -535,8 +661,16 @@ export function ProjectEditDrawer({ item }: { item: any }) {
 
             return (
                 <div className="flex flex-col gap-6">
-                    <div className="rounded-lg border bg-card p-4"><h4 className="text-sm font-semibold mb-3 flex items-center gap-2">Analyse Financière</h4><MarginCalculator marketPrice={Number(formData.marketEstimate) || 0} costPrice={Number(formData.estimatedBudget) || 0} /></div>
-
+                    <div className="rounded-lg border bg-card p-4">
+                        <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">Analyse Financière</h4>
+                        {/* ✅ MODIFICATION ICI */}
+                        <MarginCalculator
+                            marketPrice={Number(formData.marketEstimate) || 0}
+                            costPrice={realCostPrice} // From GET_ESTIMATION query
+                            onMarketPriceChange={handleMarketPriceChange}
+                            onTargetMarginChange={handleTargetMarginChange}
+                        />
+                    </div>
                     {/* ✅ SECTION DOCUMENT REFERENCE AJOUTEE ICI */}
                     <div className="space-y-3">
                         <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Documents de Référence</h4>

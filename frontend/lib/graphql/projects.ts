@@ -126,6 +126,15 @@ export const GET_LOGS_QUERY = gql`
   }
 `;
 
+export const GET_ESTIMATION = gql`
+  query GetProjectEstimation($projectId: ID!) {
+    getProjectEstimation(projectId: $projectId) {
+      id
+      totalAmount
+    }
+  }
+`;
+
 export const GET_TASKS_BY_PROJECT_QUERY = gql`
   query GetTasksByProject($projectId: ID!) {
     tasksByProject(projectId: $projectId) {

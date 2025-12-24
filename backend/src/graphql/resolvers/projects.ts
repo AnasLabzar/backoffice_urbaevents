@@ -226,23 +226,40 @@ export const projectResolvers = {
         },
 
         updateProject: async (_: unknown, { id, input }: any, context: IContext) => {
-            const project = await Project.findById(id);
-            if (!project) throw new ApolloError('Project not found');
+            if (!context.user) throw new ApolloError('Not authenticated', 'UNAUTHENTICATED');
 
-            const canEdit = await checkPMAccess(context, project, 'manage_assigned_projects');
-            if (!canEdit) throw new ApolloError('Forbidden', 'FORBIDDEN');
+            // 👇👇👇 FIX COMMENCE ICI 👇👇👇
 
-            const updatedProject = await Project.findByIdAndUpdate(id, { $set: input }, { new: true });
-            await logActivity({
-                userId: context.user!.id as any,
-                action: 'PROJECT_UPDATE',
-                project: updatedProject!._id,
-                details: `Project details updated`,
-            });
-            return updatedProject;
+            // 1. On récupère le vrai NOM du rôle depuis la base de données
+            // Car context.user.role contient seulement l'ID (ex: "6943...")
+            const roleData = await Role.findById(context.user.role);
+            const userRoleName = roleData?.name;
+
+            // console.log("DEBUG ROLE:", userRoleName); // Décommente pour tester
+
+            // 2. Vérification des permissions
+            const isAuthorized = userRoleName === 'ADMIN' || userRoleName === 'PROPOSAL_MANAGER';
+
+            if (!isAuthorized) {
+                // On bloque si le rôle n'est pas dans la liste
+                throw new ApolloError('Access denied', 'FORBIDDEN');
+            }
+
+            // 3. Exécuter la mise à jour
+            try {
+                const updatedProject = await Project.findByIdAndUpdate(
+                    id,
+                    { ...input },
+                    { new: true }
+                );
+
+                return updatedProject;
+            } catch (error) {
+                console.error(error);
+                throw new ApolloError('Error updating project', 'INTERNAL_SERVER_ERROR');
+            }
         },
 
-        // ... imports
 
         proposal_createProject: async (_: unknown, { input }: any, context: IContext) => {
             await checkPermission(context, 'create_project_proposal');
