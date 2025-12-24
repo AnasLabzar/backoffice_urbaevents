@@ -46,6 +46,16 @@ const GET_PROJECT_FULL_DETAILS = gql`
       object
       status: generalStatus
       stages {
+        administrative {
+          documents {
+            id
+            fileName
+            fileUrl
+            originalFileName
+            createdAt
+            uploadedBy { id name }
+          }
+        }
         technical {
           documents {
             id
@@ -53,13 +63,10 @@ const GET_PROJECT_FULL_DETAILS = gql`
             fileUrl
             originalFileName
             createdAt
-            uploadedBy {
-              id
-              name
-            }
+            uploadedBy { id name }
           }
         }
-      }
+    }
       team {
         infographistes { id name }
         team3D { id name }
@@ -242,7 +249,35 @@ export default function ProductionPage({ params }: { params: Promise<{ id: strin
     }, [data]);
 
     const projectFiles = useMemo(() => {
-        return data?.project?.stages?.technical?.documents || [];
+        if (!data?.project?.stages) return [];
+
+        const technicalDocs = data.project.stages.technical?.documents || [];
+        const adminDocs = data.project.stages.administrative?.documents || [];
+
+        // On combine tout pour le moment pour tester
+        const allDocs = [...technicalDocs, ...adminDocs];
+
+        // 👇 DEBUG : Regarde ça dans la console pour voir la catégorie du nouveau fichier
+        console.log("--- DEBUG ASSETS ---");
+        allDocs.forEach(d => console.log(`Fichier: ${d.originalFileName} -> Catégorie: "${d.fileName}"`));
+
+        // 👇 FILTRE INTELLIGENT
+        // On affiche si c'est explicitement un ASSET OU si c'est un doc technique (souvent les assets sont là)
+        const assetsOnly = allDocs.filter((doc: any) => {
+            const cat = (doc.fileName || "").toUpperCase();
+
+            // On accepte ASSET, ASSETS, ou si le fichier est une image/video (souvent technique)
+            const isAssetCategory = cat.includes('ASSET');
+
+            // Astuce: Si tu veux voir ce que tu viens d'uploader même si le nom n'est pas "ASSET"
+            // Tu peux temporairement retourner 'true' ici : return true; 
+
+            return isAssetCategory;
+        });
+
+        return assetsOnly.sort((a: any, b: any) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
     }, [data]);
 
     if (loading) return (
@@ -619,6 +654,9 @@ function AssetsManager({ projectId, files, onUploadSuccess }: any) {
 // ------------------------------------------------------------------
 // COMPONENT 3: TEAM MANAGER
 // ------------------------------------------------------------------
+// ------------------------------------------------------------------
+// COMPONENT 3: TEAM MANAGER (CORRIGÉ)
+// ------------------------------------------------------------------
 function TeamManager({ projectId, currentTeam, allUsers, tasks, onUpdate, isReadOnly }: any) {
     const [teamData, setTeamData] = useState({
         infographisteIds: currentTeam?.infographistes?.map((u: any) => u.id) || [],
@@ -627,6 +665,7 @@ function TeamManager({ projectId, currentTeam, allUsers, tasks, onUpdate, isRead
         pmJuniorIds: currentTeam?.pmJuniors?.map((u: any) => u.id) || [],
     });
 
+    // Hada howa li kaydir l "Lock". Kayjme3 ga3 ids li 3ndhom tasks active
     const lockedUserIds = useMemo(() => {
         const ids = new Set<string>();
         tasks?.forEach((task: any) => task.assignedTo?.id && ids.add(task.assignedTo.id));
@@ -646,7 +685,18 @@ function TeamManager({ projectId, currentTeam, allUsers, tasks, onUpdate, isRead
         setTeamData((prev: any) => ({ ...prev, [key]: checked ? [...prev[key], id] : prev[key].filter((x: string) => x !== id) }));
     };
 
-    // ✅ MODE LECTURE SEULE (Pour les users li ma 3ndhomch droit)
+    const handleSave = () => {
+        assignTeam({
+            variables: {
+                input: {
+                    projectId,
+                    ...teamData
+                }
+            }
+        });
+    };
+
+    // 1. MODE LECTURE SEULE
     if (isReadOnly) {
         return (
             <div className="space-y-6">
@@ -658,7 +708,7 @@ function TeamManager({ projectId, currentTeam, allUsers, tasks, onUpdate, isRead
                         Vous visualisez l'équipe actuelle. Seuls les administrateurs peuvent modifier l'assignation.
                     </p>
                 </div>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <ReadOnlyTeamColumn title="Création" users={currentTeam?.infographistes} />
                     <ReadOnlyTeamColumn title="3D / Archi" users={currentTeam?.team3D} />
@@ -667,6 +717,60 @@ function TeamManager({ projectId, currentTeam, allUsers, tasks, onUpdate, isRead
             </div>
         );
     }
+
+    // 2. MODE ÉDITION (Hada li kan na9es)
+    return (
+        <div className="space-y-6 animate-in fade-in">
+            <div className="flex flex-col gap-1 border-b pb-4">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h3 className="font-bold text-lg flex items-center gap-2">
+                            <IconUsers className="w-5 h-5 text-primary" /> Gestion de l'Équipe
+                        </h3>
+                        <p className="text-xs text-muted-foreground">
+                            Cochez les membres pour les assigner au projet. <IconLock className="w-3 h-3 inline mb-0.5" /> indique un verrouillage par tâche active.
+                        </p>
+                    </div>
+                    <Button onClick={handleSave} disabled={loading} size="sm">
+                        {loading ? <IconLoader className="w-4 h-4 animate-spin mr-2" /> : <IconCheck className="w-4 h-4 mr-2" />}
+                        Enregistrer
+                    </Button>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Colonne Création */}
+                <TeamCard
+                    title="🎨 Création"
+                    role="infographisteIds"
+                    users={allUsers.infographistes}
+                    selected={teamData.infographisteIds}
+                    locks={lockedUserIds}
+                    onChange={handleTeamChange}
+                />
+
+                {/* Colonne 3D */}
+                <TeamCard
+                    title="🧊 3D / Archi"
+                    role="team3DIds"
+                    users={allUsers.team3D}
+                    selected={teamData.team3DIds}
+                    locks={lockedUserIds}
+                    onChange={handleTeamChange}
+                />
+
+                {/* Colonne Coordination */}
+                <TeamCard
+                    title="⚡ Coordination"
+                    role="coordinatorIds"
+                    users={allUsers.coordinators}
+                    selected={teamData.coordinatorIds}
+                    locks={lockedUserIds}
+                    onChange={handleTeamChange}
+                />
+            </div>
+        </div>
+    );
 }
 
 function TeamCard({ title, role, users, selected, locks, onChange }: any) {

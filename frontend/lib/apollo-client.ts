@@ -3,7 +3,6 @@
 import { ApolloClient, InMemoryCache, createHttpLink } from "@apollo/client";
 import { setContext } from "@apollo/client/link/context";
 
-// --- HNA L-CHANGE ---
 // Kan-golo lih: Ila kayn variable f .env st3mlha, sinu st3ml localhost par défaut
 const httpLink = createHttpLink({
   uri: process.env.NEXT_PUBLIC_GRAPHQL_URI ||
@@ -11,7 +10,6 @@ const httpLink = createHttpLink({
       ? "http://localhost:5002/graphql"
       : "https://backoffice.urbagroupe.ma/graphql"),
 });
-// --------------------
 
 const authLink = setContext((_, { headers }) => {
   // Check sur wach code khdam f browser (localStorage makaynch f server side)
@@ -27,7 +25,20 @@ const authLink = setContext((_, { headers }) => {
 
 const client = new ApolloClient({
   link: authLink.concat(httpLink),
-  cache: new InMemoryCache(),
+  // 👇 HNA FIN ZEDNA L-FIX DYAL CACHE 👇
+  cache: new InMemoryCache({
+    typePolicies: {
+      // Hado homa les types li kano kay-crashiw hit ma3ndhomch ID
+      Stages: {
+        keyFields: false, // Ma3ndoch ID unique, Apollo khasso y-ignorer l-check
+        merge: true,      // Y9bel y-fusionner les données jdida m3a lqdima
+      },
+      Stage: {
+        keyFields: false,
+        merge: true,
+      }
+    }
+  }),
 });
 
 export default client;
