@@ -1,6 +1,13 @@
 import mongoose, { Document, Schema } from 'mongoose';
 import { IProject } from './Project';
 
+interface ISpace {
+    name: string;
+    surface: number;
+    capacity: number;
+    type: string;
+}
+
 export interface IProjectBrief extends Document {
     project: IProject['_id'];
     clientName: string;
@@ -19,6 +26,7 @@ export interface IProjectBrief extends Document {
     targetAudience: string[];
     mainObjective: string;
     subObjectives: string[];
+    spaces: ISpace[];
     history: string;
     themeConcept: string;
     themeDeclination: string;
@@ -33,11 +41,19 @@ export interface IProjectBrief extends Document {
         hr?: string;
         animation?: string;
     };
-    spaces: string[];
     updatedBy: string;
     createdAt: Date;
     updatedAt: Date;
 }
+
+
+const SpaceSchema = new Schema({
+    name: { type: String },
+    surface: { type: Number },
+    capacity: { type: Number },
+    type: { type: String, default: 'RECEPTION' } 
+}, { _id: false }); // _id: false est optionnel, mettez true si vous voulez un ID par zone
+
 
 const ProjectBriefSchema: Schema = new Schema(
     {
@@ -61,6 +77,7 @@ const ProjectBriefSchema: Schema = new Schema(
         history: { type: String },
         themeConcept: { type: String },
         themeDeclination: { type: String },
+        spaces: [SpaceSchema],
         constraints: { type: String },
         requirements: {
             logistics: String,
@@ -72,7 +89,6 @@ const ProjectBriefSchema: Schema = new Schema(
             hr: String,
             animation: String
         },
-        spaces: [{ type: String }],
         updatedBy: { type: Schema.Types.ObjectId, ref: 'User' }
     },
     { timestamps: true }

@@ -59,9 +59,22 @@ const GET_PROJECT_BRIEF_PAGE = gql`
           hr
           animation
         }
+
+        spaces {
+            name
+            surface
+            capacity
+            type
+        }
         updatedAt
       }
     }
+  }
+`;
+
+const SAVE_BRIEF_MUTATION = gql`
+  mutation SaveProjectBrief($input: ProjectBriefInput!) {
+    saveProjectBrief(input: $input) { id updatedAt }
   }
 `;
 

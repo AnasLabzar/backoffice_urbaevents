@@ -112,6 +112,13 @@ export const typeDefs = gql`
     updatedAt: String
   }
 
+  type Space {
+    name: String
+    surface: Float
+    capacity: Int
+    type: String
+  }
+
   # ✅ MODIFIED: Prestation is now just a Catalog Item
   type Prestation {
     id: ID!
@@ -211,8 +218,15 @@ export const typeDefs = gql`
     themeDeclination: String
     constraints: String
     requirements: BriefRequirements
-    spaces: [String]
+    spaces: [Space]
     updatedAt: String
+  }
+
+  input SpaceInput {
+    name: String
+    surface: Float
+    capacity: Int
+    type: String
   }
 
   type Task {
@@ -359,7 +373,7 @@ export const typeDefs = gql`
     # ✅ FIX: Use the Input type here, not the Object type
     requirements: BriefRequirementsInput 
     
-    spaces: [String]
+    spaces: [SpaceInput]
   }
 
 input CreateProjectInput {

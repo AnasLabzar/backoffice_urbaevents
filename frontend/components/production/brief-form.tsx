@@ -26,6 +26,7 @@ import { Progress } from "@/components/ui/progress";
 
 // Import du Manager
 import { PrestationManager } from "./prestation-manager";
+import { SpacesManager, Space } from "./spaces-manager";
 
 // --- GRAPHQL ---
 const SAVE_BRIEF_MUTATION = gql`
@@ -213,7 +214,10 @@ export function BriefForm({ projectId, projectTitle, projectObject, initialData,
         mainObjective: "",
         history: "",
         constraints: "",
-        requirements: { logistics: "", audiovisual: "", accommodation: "", catering: "", transport: "", digital: "", hr: "", animation: "" }
+        requirements: { logistics: "", audiovisual: "", accommodation: "", catering: "", transport: "", digital: "", hr: "", animation: "" },
+
+        // 👇 AJOUTE CETTE LIGNE 👇
+        spaces: [] as Space[]
     });
 
     // Cost State
@@ -272,7 +276,8 @@ export function BriefForm({ projectId, projectTitle, projectObject, initialData,
                 mainObjective: initialData.mainObjective || "",
                 history: initialData.history || "",
                 constraints: initialData.constraints || "",
-                requirements: safeReqs
+                requirements: safeReqs,
+                spaces: initialData.spaces || []
             });
         }
     }, [initialData]);
@@ -281,24 +286,44 @@ export function BriefForm({ projectId, projectTitle, projectObject, initialData,
     const handleChange = (field: string, value: any) => setFormData(prev => ({ ...prev, [field]: value }));
 
     const handleSubmit = async () => {
-        // Safe conversion of arrays to strings if needed by backend, or keep as array if schema allows
-        // Here we assume backend accepts Arrays for targetAudience/eventGoal based on your schema info, 
-        // OR we join them if your schema requires String. 
-        // Based on previous JSON, they are Arrays in frontend, but check your schema.
-        // If schema is String, do .join(', '). If [String], keep as is.
-        // Assuming [String] based on "Array (1)" in your JSON dump.
+        // Validation simple
+        if (!projectId) return toast.error("Erreur projet ID");
+        
+        // --- Validation des zones ---
+        if (formData.spaces.length === 0) {
+            toast.warning("Astuce : Pensez à ajouter des zones pour le calcul technique.");
+        }
+        
+        const invalidSpace = formData.spaces.find((s: Space) => !s.name || s.surface <= 0);
+        
+        if (invalidSpace) {
+            toast.error(`La zone "${invalidSpace.name || 'Sans nom'}" est incomplète (Surface manquante).`);
+            return; 
+        }
+        // -----------------------------
+
+        // 👇 CORRECTION ICI : On nettoie requirements pour enlever __typename
+        // On utilise la déstructuration pour séparer __typename du reste
+        const { __typename, ...cleanRequirements } = (formData.requirements as any);
 
         const input = {
             projectId,
             ...formData,
-            requirements: formData.requirements,
+            // 👇 On envoie la version nettoyée
+            requirements: cleanRequirements, 
+            
             visitorsCount: parseInt(formData.visitorsCount.toString()) || 0,
             estimatedBudget: parseFloat(formData.estimatedBudget.toString()) || 0,
-            // Keep arrays as arrays if backend supports [String], otherwise join them
-            targetAudience: formData.targetAudience,
-            eventGoal: formData.eventGoal,
-            constraints: formData.constraints
+            
+            // On s'assure aussi de ne pas envoyer de __typename caché dans spaces si jamais
+            spaces: formData.spaces.map((s: Space) => ({
+                name: s.name,
+                surface: Number(s.surface),
+                capacity: Number(s.capacity),
+                type: s.type
+            }))
         };
+        
         await saveBrief({ variables: { input } });
     };
 
@@ -667,6 +692,19 @@ export function BriefForm({ projectId, projectTitle, projectObject, initialData,
                                     Tout télécharger
                                 </Button>
                             )}
+                        </CardContent>
+                    </Card>
+
+                    {/* --- NOUVEAU : GESTION DES ESPACES (GRID ZONES) --- */}
+                    <Card className="border shadow-sm overflow-hidden border-t-4 border-t-primary/50">
+                        <CardHeader className="bg-muted/10 border-b py-4">
+                            {/* Titre optionnel ici, mais SpacesManager a déjà son header */}
+                        </CardHeader>
+                        <CardContent className="p-6 bg-slate-50/50 dark:bg-slate-950/20">
+                            <SpacesManager
+                                spaces={formData.spaces}
+                                onChange={(newSpaces) => handleChange('spaces', newSpaces)}
+                            />
                         </CardContent>
                     </Card>
 
