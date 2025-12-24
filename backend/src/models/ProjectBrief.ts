@@ -1,12 +1,20 @@
 import mongoose, { Document, Schema } from 'mongoose';
 import { IProject } from './Project';
 
+// 1. Mise à jour de l'interface TS
 interface ISpace {
     name: string;
     surface: number;
     capacity: number;
     type: string;
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    rotation: number;
+    badge?: string; // New field for the badge text (e.g., "1:1")
 }
+
 
 export interface IProjectBrief extends Document {
     project: IProject['_id'];
@@ -47,13 +55,20 @@ export interface IProjectBrief extends Document {
 }
 
 
+// 2. Update Mongoose Schema
 const SpaceSchema = new Schema({
     name: { type: String },
     surface: { type: Number },
     capacity: { type: Number },
-    type: { type: String, default: 'RECEPTION' } 
-}, { _id: false }); // _id: false est optionnel, mettez true si vous voulez un ID par zone
-
+    type: { type: String, default: 'AUTRE' },
+    x: { type: Number, default: 0 },
+    y: { type: Number, default: 0 },
+    w: { type: Number, default: 1 },
+    h: { type: Number, default: 1 },
+    rotation: { type: Number, default: 0 },
+    badge: { type: String }, // New field in schema
+    features: { type: [String], default: [] }
+});
 
 const ProjectBriefSchema: Schema = new Schema(
     {

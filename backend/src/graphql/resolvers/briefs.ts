@@ -32,7 +32,6 @@ export const briefResolvers = {
             let brief = await ProjectBrief.findOne({ project: projectId });
 
             if (brief) {
-                // UPDATE
                 brief = await ProjectBrief.findOneAndUpdate(
                     { project: projectId },
                     { ...briefData, updatedBy: context.user.id, updatedAt: new Date() },
@@ -45,7 +44,6 @@ export const briefResolvers = {
                     details: 'Mise à jour du Brief'
                 });
             } else {
-                // CREATE
                 brief = await ProjectBrief.create({
                     project: projectId,
                     ...briefData,

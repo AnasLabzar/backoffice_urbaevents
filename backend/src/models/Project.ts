@@ -2,6 +2,7 @@ import mongoose, { Document, Schema } from 'mongoose';
 import { IUser } from './User';
 import DocumentModel, { IDocument } from './Document';
 
+
 // --- SUB-SCHEMAS ---
 const ProposalAvisSchema: Schema = new Schema({
   status: { type: String, enum: ['ACCEPTED', 'NOT_ACCEPTED'], required: true },

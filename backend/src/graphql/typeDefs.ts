@@ -112,12 +112,20 @@ export const typeDefs = gql`
     updatedAt: String
   }
 
-  type Space {
-    name: String
-    surface: Float
-    capacity: Int
-    type: String
-  }
+type Space {
+  id: ID
+  name: String
+  surface: Float
+  capacity: Int
+  type: String
+  x: Int
+  y: Int
+  w: Int
+  h: Int
+  rotation: Int     # ✅ Must be present
+  badge: String     # ✅ Must be present
+  features: [String]  # 👈 ZID HADI
+}
 
   # ✅ MODIFIED: Prestation is now just a Catalog Item
   type Prestation {
@@ -227,6 +235,13 @@ export const typeDefs = gql`
     surface: Float
     capacity: Int
     type: String
+    x: Int
+    y: Int
+    w: Int
+    h: Int
+    rotation: Int
+    badge: String # New field
+    features: [String]  # 👈 ZID HADI
   }
 
   type Task {

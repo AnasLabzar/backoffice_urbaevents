@@ -256,6 +256,23 @@ export function BriefForm({ projectId, projectTitle, projectObject, initialData,
                 ? { ...defaultReqs, ...initialData.requirements }
                 : defaultReqs;
 
+
+            const loadedSpaces = (initialData.spaces || []).map((s: any) => ({
+                ...s,
+                id: s.id || s._id || `temp-${Date.now()}`,
+                x: Number(s.x) || 0,
+                y: Number(s.y) || 0,
+                w: Number(s.w) || 2,
+                h: Number(s.h) || 2,
+                surface: Number(s.surface) || 0,
+                capacity: Number(s.capacity) || 0,
+                rotation: Number(s.rotation) || 0,
+                badge: s.badge || "",
+                
+                // 👇 ZID HADI: Assurer que features est un tableau
+                features: Array.isArray(s.features) ? s.features : [] 
+            }));
+
             setFormData({
                 clientNature: initialData.clientNature || "",
                 eventFormat: initialData.eventFormat || "PHYSIQUE",
@@ -277,7 +294,7 @@ export function BriefForm({ projectId, projectTitle, projectObject, initialData,
                 history: initialData.history || "",
                 constraints: initialData.constraints || "",
                 requirements: safeReqs,
-                spaces: initialData.spaces || []
+                spaces: loadedSpaces
             });
         }
     }, [initialData]);
@@ -288,17 +305,17 @@ export function BriefForm({ projectId, projectTitle, projectObject, initialData,
     const handleSubmit = async () => {
         // Validation simple
         if (!projectId) return toast.error("Erreur projet ID");
-        
+
         // --- Validation des zones ---
         if (formData.spaces.length === 0) {
             toast.warning("Astuce : Pensez à ajouter des zones pour le calcul technique.");
         }
-        
+
         const invalidSpace = formData.spaces.find((s: Space) => !s.name || s.surface <= 0);
-        
+
         if (invalidSpace) {
             toast.error(`La zone "${invalidSpace.name || 'Sans nom'}" est incomplète (Surface manquante).`);
-            return; 
+            return;
         }
         // -----------------------------
 
@@ -310,20 +327,29 @@ export function BriefForm({ projectId, projectTitle, projectObject, initialData,
             projectId,
             ...formData,
             // 👇 On envoie la version nettoyée
-            requirements: cleanRequirements, 
-            
+            requirements: cleanRequirements,
+
             visitorsCount: parseInt(formData.visitorsCount.toString()) || 0,
             estimatedBudget: parseFloat(formData.estimatedBudget.toString()) || 0,
-            
+
             // On s'assure aussi de ne pas envoyer de __typename caché dans spaces si jamais
             spaces: formData.spaces.map((s: Space) => ({
                 name: s.name,
                 surface: Number(s.surface),
                 capacity: Number(s.capacity),
-                type: s.type
-            }))
+                type: s.type,
+                x: Number(s.x),
+                y: Number(s.y),
+                w: Number(s.w),
+                h: Number(s.h),
+                rotation: Number(s.rotation) || 0,
+                badge: s.badge || "",
+                
+                // 👇 ZID HADI: Envoyer les features au backend
+                features: s.features || []
+             }))
         };
-        
+
         await saveBrief({ variables: { input } });
     };
 
@@ -568,6 +594,18 @@ export function BriefForm({ projectId, projectTitle, projectObject, initialData,
 
                         {loadingInvoice ? (
                             <div className="py-12 text-center text-muted-foreground flex flex-col items-center">
+                                {/* --- NOUVEAU : GESTION DES ESPACES (GRID ZONES) --- */}
+                                <Card className="border shadow-sm overflow-hidden border-t-4 border-t-primary/50">
+                                    <CardHeader className="bg-muted/10 border-b py-4">
+                                        Spaces Manager
+                                    </CardHeader>
+                                    <CardContent className="p-6 bg-slate-50/50 dark:bg-slate-950/20">
+                                        <SpacesManager
+                                            spaces={formData.spaces}
+                                            onChange={(newSpaces) => handleChange('spaces', newSpaces)}
+                                        />
+                                    </CardContent>
+                                </Card>
                                 <IconLoader className="animate-spin w-8 h-8 mb-3 text-primary/50" />
                                 <span className="text-sm">Initialisation du module de chiffrage...</span>
                             </div>
@@ -584,6 +622,20 @@ export function BriefForm({ projectId, projectTitle, projectObject, initialData,
                             </Alert>
                         )}
                     </div>
+
+                    {/* --- NOUVEAU : GESTION DES ESPACES (GRID ZONES) --- */}
+                    <Card className="border shadow-sm overflow-hidden border-t-4 border-t-primary/50">
+                        <CardHeader className="bg-muted/10 border-b py-4">
+                            Spaces Manager
+                        </CardHeader>
+                        <CardContent className="p-6 bg-slate-50/50 dark:bg-slate-950/20">
+                            <SpacesManager
+                                spaces={formData.spaces}
+                                onChange={(newSpaces) => handleChange('spaces', newSpaces)}
+                            />
+                        </CardContent>
+                    </Card>
+
                 </div>
 
                 {/* --- RIGHT COLUMN (SIDEBAR) --- */}
@@ -694,20 +746,6 @@ export function BriefForm({ projectId, projectTitle, projectObject, initialData,
                             )}
                         </CardContent>
                     </Card>
-
-                    {/* --- NOUVEAU : GESTION DES ESPACES (GRID ZONES) --- */}
-                    <Card className="border shadow-sm overflow-hidden border-t-4 border-t-primary/50">
-                        <CardHeader className="bg-muted/10 border-b py-4">
-                            {/* Titre optionnel ici, mais SpacesManager a déjà son header */}
-                        </CardHeader>
-                        <CardContent className="p-6 bg-slate-50/50 dark:bg-slate-950/20">
-                            <SpacesManager
-                                spaces={formData.spaces}
-                                onChange={(newSpaces) => handleChange('spaces', newSpaces)}
-                            />
-                        </CardContent>
-                    </Card>
-
                 </div>
             </div>
         </div>

@@ -61,10 +61,18 @@ const GET_PROJECT_BRIEF_PAGE = gql`
         }
 
         spaces {
+            id          # Important pour React keys
             name
             surface
             capacity
             type
+            x           # Position X
+            y           # Position Y
+            w           # Largeur
+            h           # Hauteur
+            rotation    # Rotation
+            badge       # Texte du badge (ex: "1:1")
+            features  # 👈 ZID HADI HNA (Drori)
         }
         updatedAt
       }
