@@ -170,17 +170,36 @@ export const taskResolvers = {
 
     Mutation: {
         pm_createTask: async (_: unknown, { input }: any, context: IContext) => {
-            await checkPermission(context, 'assign_creative_tasks');
-            // Destructure priority from input
+            if (!context.user) throw new ApolloError('Not authenticated', 'UNAUTHENTICATED');
+
             const { description, projectId, assignedToId, department, dueDate, priority } = input;
 
+            // 1. Vérifier si l'utilisateur est ADMIN ou a la permission globale
+            const userRole = await Role.findById(context.user.role);
+            const hasGlobalPermission = userRole?.permissions.includes('assign_creative_tasks' as any) || userRole?.name === 'ADMIN';
+
+            // 2. Vérifier si l'utilisateur est PM sur CE projet spécifique (Logique Dynamique)
+            let isProjectManagerOnThisProject = false;
+            if (!hasGlobalPermission) {
+                const project = await Project.findById(projectId);
+                if (project && project.projectManagers.includes(context.user.id as any)) {
+                    isProjectManagerOnThisProject = true;
+                }
+            }
+
+            // 3. Bloquer si aucune des deux conditions n'est remplie
+            if (!hasGlobalPermission && !isProjectManagerOnThisProject) {
+                throw new ApolloError('Forbidden: You are not authorized to create tasks for this project.', 'FORBIDDEN');
+            }
+
+            // --- Création de la tâche (Code existant) ---
             const task = await Task.create({
                 description,
                 project: projectId,
                 assignedTo: assignedToId,
                 department,
                 status: 'TODO',
-                priority: priority || 'LOW', // <--- ADD THIS (Default to LOW if null)
+                priority: priority || 'LOW',
                 dueDate: dueDate ? new Date(dueDate) : null,
             });
 
@@ -196,11 +215,10 @@ export const taskResolvers = {
             (populatedTask as any).id = populatedTask._id.toString();
 
             await logActivity({
-                // ✅ FIX: Cast to any
-                userId: context.user!.id as any,
+                userId: context.user.id as any,
                 action: 'PM_CREATE_TASK',
                 project: task.project,
-                details: `Task created: "${task.description}"`,
+                details: `Task created: "${task.description}" by ${isProjectManagerOnThisProject ? 'Dynamic PM' : 'Admin/Manager'}`,
             });
 
             pubsub.publish(NEW_TASK_EVENT, { taskCreated: populatedTask });
