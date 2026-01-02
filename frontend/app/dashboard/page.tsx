@@ -130,133 +130,156 @@ export default function ProjectsPage() {
         <div className="flex flex-1 flex-col bg-muted/10 min-h-screen">
           <div className="@container/main flex flex-1 flex-col gap-2">
             <div className="flex flex-col gap-8 py-6 px-4 lg:px-8">
-
-              {/* --- 📊 SECTION KPI CARDS (CLEAN DESIGN) --- */}
+              {/* --- 📊 SECTION KPI CARDS (PROFESSIONAL & RESPONSIVE) --- */}
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
 
-                {/* CARD 1: GLOBAL (Avec Taux de Complétion) */}
-                <Card>
+                {/* CARD 1: GLOBAL (Total) */}
+                <Card className="hover:shadow-md transition-all duration-200 border-border/60">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Total Projets</CardTitle>
-                    <div className="p-2 bg-primary/10 rounded-full">
+                    <CardTitle className="text-sm font-medium text-muted-foreground truncate">
+                      Total Projets
+                    </CardTitle>
+                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                       <IconBriefcase className="h-4 w-4 text-primary" />
                     </div>
                   </CardHeader>
                   <CardContent>
                     {isLoading ? <Skeleton className="h-8 w-20" /> : (
-                      <>
-                        <div className="text-2xl font-bold">{stats.total}</div>
-                        <div className="flex items-center text-xs text-muted-foreground mt-1">
-                          <IconPercentage className="h-3 w-3 mr-1" />
-                          <span className="text-green-600 font-medium mr-1">{stats.completionRate}%</span>
-                          <span className="text-muted-foreground">taux de complétion</span>
+                      <div className="flex flex-col gap-1">
+                        <div className="text-2xl font-bold tracking-tight truncate">
+                          {stats.total}
                         </div>
-                      </>
+                        <div className="flex items-center text-xs text-muted-foreground truncate">
+                          <IconPercentage className="h-3 w-3 mr-1 shrink-0" />
+                          <span className="text-green-600 font-medium mr-1">{stats.completionRate}%</span>
+                          <span className="truncate">taux de complétion</span>
+                        </div>
+                      </div>
                     )}
                   </CardContent>
                 </Card>
 
                 {/* CARD 2: DYNAMIC (Budget OU Urgences) */}
                 {canSeeFinancials ? (
-                  // VERSION FINANCE : Budget Global + Moyenne
-                  <Card>
+                  // VERSION FINANCE : Budget Global
+                  <Card className="hover:shadow-md transition-all duration-200 border-border/60">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Pipeline Financier</CardTitle>
-                      <div className="p-2 bg-green-100 rounded-full">
+                      <CardTitle className="text-sm font-medium text-muted-foreground truncate">
+                        Pipeline Financier
+                      </CardTitle>
+                      <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center shrink-0">
                         <IconCoin className="h-4 w-4 text-green-600" />
                       </div>
                     </CardHeader>
                     <CardContent>
                       {isLoading ? <Skeleton className="h-8 w-32" /> : (
-                        <>
-                          <div className="text-2xl font-bold">{formatCurrency(stats.totalBudget)}</div>
-                          <div className="text-xs text-muted-foreground mt-1">
-                            Moyenne: <span className="font-medium text-foreground">{formatCurrency(stats.averageBudget)}</span> /projet
+                        <div className="flex flex-col gap-1 min-w-0">
+                          {/* Truncate + Title: Bach ila kan raqm kbir bzaf yban ... o melli t7et souri yban kaml */}
+                          <div className="text-2xl font-bold tracking-tight text-foreground truncate" title={formatCurrency(stats.totalBudget)}>
+                            {formatCurrency(stats.totalBudget)}
                           </div>
-                        </>
+                          <div className="text-xs text-muted-foreground truncate flex items-center">
+                            <span className="shrink-0 mr-1">Moyenne:</span>
+                            <span className="font-medium text-foreground truncate">{formatCurrency(stats.averageBudget)}</span>
+                          </div>
+                        </div>
                       )}
                     </CardContent>
                   </Card>
                 ) : (
-                  // VERSION TECHNIQUE : Urgences + Pourcentage
-                  <Card>
+                  // VERSION TECHNIQUE : Urgences
+                  <Card className="hover:shadow-md transition-all duration-200 border-border/60">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Urgences (J-3)</CardTitle>
-                      <div className="p-2 bg-red-100 rounded-full">
+                      <CardTitle className="text-sm font-medium text-muted-foreground truncate">
+                        Urgences (J-3)
+                      </CardTitle>
+                      <div className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center shrink-0">
                         <IconAlertTriangle className="h-4 w-4 text-red-600" />
                       </div>
                     </CardHeader>
                     <CardContent>
                       {isLoading ? <Skeleton className="h-8 w-20" /> : (
-                        <>
-                          <div className="text-2xl font-bold">{stats.urgentDeadlines}</div>
-                          <div className="flex items-center text-xs text-muted-foreground mt-1">
+                        <div className="flex flex-col gap-1">
+                          <div className="text-2xl font-bold tracking-tight text-foreground truncate">
+                            {stats.urgentDeadlines}
+                          </div>
+                          <div className="flex items-center text-xs text-muted-foreground truncate">
                             <span className={`${stats.urgencyRate > 20 ? 'text-red-600' : 'text-orange-500'} font-medium mr-1`}>
                               {stats.urgencyRate}%
                             </span>
-                            <span>des projets actifs sont urgents</span>
+                            <span className="truncate">du pipeline actif</span>
                           </div>
-                        </>
+                        </div>
                       )}
                     </CardContent>
                   </Card>
                 )}
 
                 {/* CARD 3: PRODUCTION */}
-                <Card>
+                <Card className="hover:shadow-md transition-all duration-200 border-border/60">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">En Production</CardTitle>
-                    <div className="p-2 bg-blue-100 rounded-full">
+                    <CardTitle className="text-sm font-medium text-muted-foreground truncate">
+                      En Production
+                    </CardTitle>
+                    <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
                       <IconActivity className="h-4 w-4 text-blue-600" />
                     </div>
                   </CardHeader>
                   <CardContent>
                     {isLoading ? <Skeleton className="h-8 w-20" /> : (
-                      <>
-                        <div className="text-2xl font-bold">{stats.inProgress}</div>
-                        <div className="flex items-center text-xs text-muted-foreground mt-1">
-                          <IconArrowUpRight className="h-3 w-3 text-blue-500 mr-1" />
-                          <span>Projets actifs en cours</span>
+                      <div className="flex flex-col gap-1">
+                        <div className="text-2xl font-bold tracking-tight truncate">
+                          {stats.inProgress}
                         </div>
-                      </>
+                        <div className="flex items-center text-xs text-muted-foreground truncate">
+                          <IconArrowUpRight className="h-3 w-3 text-blue-500 mr-1 shrink-0" />
+                          <span className="truncate">Projets actifs</span>
+                        </div>
+                      </div>
                     )}
                   </CardContent>
                 </Card>
 
-                {/* CARD 4: DYNAMIC (Action Requise) */}
+                {/* CARD 4: DYNAMIC (Caution / Terminés) */}
                 {userRole === 'FINANCE' ? (
-                  // SPECIALE FINANCE
-                  <Card>
+                  <Card className="hover:shadow-md transition-all duration-200 border-border/60">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Cautions à Valider</CardTitle>
-                      <div className="p-2 bg-purple-100 rounded-full">
+                      <CardTitle className="text-sm font-medium text-muted-foreground truncate">
+                        Cautions à Valider
+                      </CardTitle>
+                      <div className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center shrink-0">
                         <IconChecklist className="h-4 w-4 text-purple-600" />
                       </div>
                     </CardHeader>
                     <CardContent>
                       {isLoading ? <Skeleton className="h-8 w-20" /> : (
-                        <>
-                          <div className="text-2xl font-bold">{stats.pendingCautions}</div>
-                          <p className="text-xs text-muted-foreground mt-1">Demandes en attente</p>
-                        </>
+                        <div className="flex flex-col gap-1">
+                          <div className="text-2xl font-bold tracking-tight text-foreground truncate">
+                            {stats.pendingCautions}
+                          </div>
+                          <p className="text-xs text-muted-foreground truncate">Demandes en attente</p>
+                        </div>
                       )}
                     </CardContent>
                   </Card>
                 ) : (
-                  // DEFAUT
-                  <Card>
+                  <Card className="hover:shadow-md transition-all duration-200 border-border/60">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-sm font-medium">Projets Terminés</CardTitle>
-                      <div className="p-2 bg-slate-100 rounded-full">
+                      <CardTitle className="text-sm font-medium text-muted-foreground truncate">
+                        Projets Terminés
+                      </CardTitle>
+                      <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
                         <IconClock className="h-4 w-4 text-slate-600" />
                       </div>
                     </CardHeader>
                     <CardContent>
                       {isLoading ? <Skeleton className="h-8 w-20" /> : (
-                        <>
-                          <div className="text-2xl font-bold">{stats.completed}</div>
-                          <p className="text-xs text-muted-foreground mt-1">Historique archivé</p>
-                        </>
+                        <div className="flex flex-col gap-1">
+                          <div className="text-2xl font-bold tracking-tight truncate">
+                            {stats.completed}
+                          </div>
+                          <p className="text-xs text-muted-foreground truncate">Historique archivé</p>
+                        </div>
                       )}
                     </CardContent>
                   </Card>
@@ -290,7 +313,7 @@ export default function ProjectsPage() {
                 </div>
               </div>
 
-              <div className="w-full mt-32">
+              <div className="w-full sm:mt-16 md:mt-32 mt-16">
                 <h2 className="text-xl font-semibold mb-4 px-1">Liste des Projets</h2>
                 {isLoading ? (
                   <div className="space-y-3">

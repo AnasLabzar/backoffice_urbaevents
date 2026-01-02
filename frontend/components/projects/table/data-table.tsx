@@ -36,10 +36,10 @@ const DELETE_PROJECT_MUTATION = gql`
   }
 `;
 
-// ✅ NOVAU: Mutation pour Archiver (Update status -> ARCHIVED)
+// Modification dans data-table.tsx
 const ARCHIVE_PROJECT_MUTATION = gql`
   mutation ArchiveProject($id: ID!) {
-    updateProject(id: $id, input: { generalStatus: "ARCHIVED" }) {
+    updateProject(id: $id, input: { status: "ARCHIVED" }) { # Essayez 'status' au lieu de 'generalStatus'
       id
       generalStatus
     }
