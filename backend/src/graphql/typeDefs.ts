@@ -415,6 +415,7 @@ input CreateProjectInput {
     marketEstimate: Float
     estimatedBudget: Float
     cautionAmount: Float
+    generalStatus: String
     
     # 👇 ZID HADO ILA MAKANOCH
     referenceAO: String 
@@ -583,6 +584,8 @@ input CreateProjectInput {
     markNotificationAsRead(notificationId: ID!): Notification
     markAllNotificationsAsRead: Boolean
     admin_deleteProject(projectId: ID!): Boolean
+
+    archiveProject(id: ID!): Project
   }
 
   # --- SUBSCRIPTION ---

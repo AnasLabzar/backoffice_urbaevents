@@ -260,7 +260,6 @@ export const projectResolvers = {
             }
         },
 
-
         proposal_createProject: async (_: unknown, { input }: any, context: IContext) => {
             await checkPermission(context, 'create_project_proposal');
 
@@ -866,6 +865,7 @@ export const projectResolvers = {
 
             return true;
         },
+
         proposal_deleteDocument: async (_: unknown, { projectId, documentId, stageName }: { projectId: string, documentId: string, stageName: string }, context: IContext) => {
             // 1. Check Permissions
             await checkPermission(context, 'create_project_proposal');
@@ -925,6 +925,35 @@ export const projectResolvers = {
             });
 
             return updatedProject;
+        },
+
+        archiveProject: async (_: unknown, { id }: { id: string }, context: IContext) => {
+            // 1. Vérification des permissions (Admin ou Proposal Manager)
+            const userRole = await Role.findById(context.user!.role);
+            const allowedRoles = ['ADMIN', 'PROPOSAL_MANAGER'];
+
+            if (!allowedRoles.includes(userRole?.name || '')) {
+                throw new ApolloError('Permission denied', 'FORBIDDEN');
+            }
+
+            // 2. Mise à jour du statut
+            const project = await Project.findByIdAndUpdate(
+                id,
+                { generalStatus: 'ARCHIVED' },
+                { new: true }
+            );
+
+            if (!project) throw new ApolloError('Project not found', 'NOT_FOUND');
+
+            // 3. Log de l'activité
+            await logActivity({
+                userId: context.user!.id as any,
+                action: 'PROJECT_ARCHIVE',
+                project: project._id,
+                details: `Project archived: "${project.title}"`
+            });
+
+            return project;
         },
     },
 
