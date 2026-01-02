@@ -12,7 +12,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuChe
 import { CreateProjectDrawer } from "@/components/create-project-drawer";
 import {
     IconLayoutColumns, IconChevronDown, IconChevronLeft, IconChevronRight,
-    IconChevronsLeft, IconChevronsRight, IconTrash, IconX, IconLoader
+    IconChevronsLeft, IconChevronsRight, IconTrash, IconLoader, IconArchive, IconActivity
 } from "@tabler/icons-react";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -27,6 +27,7 @@ import {
     AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
+import { differenceInDays, isPast, parseISO, isValid } from "date-fns";
 
 // --- GRAPHQL ---
 const DELETE_PROJECT_MUTATION = gql`
@@ -35,10 +36,23 @@ const DELETE_PROJECT_MUTATION = gql`
   }
 `;
 
+// ✅ FIXED: Removed the comment inside the string which caused the Syntax Error
 const GET_PROJECTS_FEED = gql`
   query GetProjectsFeed {
     projects_feed {
-      project { id }
+      project { 
+        id 
+        title 
+        generalStatus 
+        submissionDeadline 
+        createdAt 
+      }
+      latestTask {
+        id
+        status
+        description
+        updatedAt
+      }
     }
   }
 `;
@@ -46,37 +60,23 @@ const GET_PROJECTS_FEED = gql`
 // --- COMPONENT: BULK ACTIONS BAR ---
 function BulkDeleteFloatingBar({ table, selectedCount, clearSelection }: { table: any, selectedCount: number, clearSelection: () => void }) {
     const [isAlertOpen, setIsAlertOpen] = React.useState(false);
-
-    // Mutation Delete
-    const [deleteProject, { loading: deleting }] = useMutation(DELETE_PROJECT_MUTATION, {
-        // On ne refetch pas ici pour éviter X refetch si on supprime 10 items
-        // On fera un refetch manuel à la fin
-    });
-
+    const [deleteProject, { loading: deleting }] = useMutation(DELETE_PROJECT_MUTATION);
     const { refetch: refetchFeed } = useQuery(GET_PROJECTS_FEED, { skip: true });
 
     const handleBulkDelete = async () => {
         const selectedRows = table.getSelectedRowModel().rows;
         const idsToDelete = selectedRows.map((row: any) => row.original.project.id);
-
         if (idsToDelete.length === 0) return;
 
         try {
-            // Execution en parallèle (Promise.all) car le backend n'a pas de "bulkDelete"
             const promises = idsToDelete.map((id: string) =>
                 deleteProject({ variables: { projectId: id } })
             );
-
             await Promise.all(promises);
-
             toast.success(`${idsToDelete.length} projets supprimés avec succès.`);
             clearSelection();
             setIsAlertOpen(false);
-
-            // Force refresh data
             if (refetchFeed) refetchFeed();
-            // Optionnel: window.location.reload() si le cache Apollo ne se met pas à jour
-
         } catch (error) {
             toast.error("Une erreur est survenue lors de la suppression.");
             console.error(error);
@@ -94,47 +94,24 @@ function BulkDeleteFloatingBar({ table, selectedCount, clearSelection }: { table
                     </span>
                     <span className="text-sm font-medium">Sélectionnés</span>
                 </div>
-
                 <div className="flex items-center gap-2">
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 hover:bg-background/20 hover:text-background text-background/80"
-                        onClick={clearSelection}
-                    >
-                        Annuler
-                    </Button>
-                    <Button
-                        variant="destructive"
-                        size="sm"
-                        className="h-8 gap-2 rounded-full px-4"
-                        onClick={() => setIsAlertOpen(true)}
-                    >
+                    <Button variant="ghost" size="sm" className="h-8 hover:bg-background/20 hover:text-background text-background/80" onClick={clearSelection}>Annuler</Button>
+                    <Button variant="destructive" size="sm" className="h-8 gap-2 rounded-full px-4" onClick={() => setIsAlertOpen(true)}>
                         {deleting ? <IconLoader className="w-4 h-4 animate-spin" /> : <IconTrash className="w-4 h-4" />}
                         Supprimer
                     </Button>
                 </div>
             </div>
-
             <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Supprimer {selectedCount} projets ?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Cette action est irréversible. Ces projets seront définitivement supprimés de la base de données.
-                        </AlertDialogDescription>
+                        <AlertDialogDescription>Cette action est irréversible.</AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel disabled={deleting}>Annuler</AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={(e) => {
-                                e.preventDefault();
-                                handleBulkDelete();
-                            }}
-                            className="bg-red-600 hover:bg-red-700"
-                            disabled={deleting}
-                        >
-                            {deleting ? "Suppression en cours..." : "Confirmer la suppression"}
+                        <AlertDialogAction onClick={(e) => { e.preventDefault(); handleBulkDelete(); }} className="bg-red-600 hover:bg-red-700" disabled={deleting}>
+                            {deleting ? "..." : "Confirmer"}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -143,37 +120,28 @@ function BulkDeleteFloatingBar({ table, selectedCount, clearSelection }: { table
     );
 }
 
-// --- SUBSCRIPTION COMPONENT ---
-function ProjectFeedUpdater({ currentUserId, refetchFeed }: { currentUserId: string; refetchFeed: () => void; }) {
-    useSubscription(TASK_CREATED_SUBSCRIPTION, {
-        variables: { userId: currentUserId },
-        onData: ({ data }) => {
-            const task = data.data?.taskCreated;
-            if (!task) return;
-            console.log("⚡ Socket: New task!", task);
-            toast.info(`Nouvelle tâche assignée: ${task.description}`);
-            refetchFeed();
-        }
-    });
-    useSubscription(TASK_UPDATED_SUBSCRIPTION, { onData: () => refetchFeed() });
-    return null;
-}
-
-// --- MAIN DATATABLE ---
-export function DataTable({ data, columnFilters, onColumnFiltersChange }: {
-    columns: any;
-    data: any[];
-    columnFilters: ColumnFiltersState;
-    onColumnFiltersChange: React.Dispatch<React.SetStateAction<ColumnFiltersState>>;
+// --- NEW COMPONENT: REUSABLE TABLE INSTANCE ---
+function ProjectListTable({
+    data,
+    columns,
+    userRole,
+    title,
+    icon: Icon,
+    defaultSorting = []
+}: {
+    data: any[],
+    columns: any,
+    userRole: string | undefined,
+    title: string,
+    icon: any,
+    defaultSorting?: SortingState
 }) {
+    // Local state for this specific table instance
     const [rowSelection, setRowSelection] = React.useState({});
     const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
-    const [sorting, setSorting] = React.useState<SortingState>([]);
+    const [sorting, setSorting] = React.useState<SortingState>(defaultSorting);
     const [pagination, setPagination] = React.useState({ pageIndex: 0, pageSize: 10 });
-
-    const { data: meData, loading: roleLoading, refetch: refetchFeed } = useQuery(ME_QUERY);
-    const userRole = meData?.me.role.name;
-    const currentUserId = meData?.me.id;
+    const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
 
     const table = useReactTable({
         data,
@@ -183,7 +151,7 @@ export function DataTable({ data, columnFilters, onColumnFiltersChange }: {
         enableRowSelection: true,
         onRowSelectionChange: setRowSelection,
         onSortingChange: setSorting,
-        onColumnFiltersChange: onColumnFiltersChange,
+        onColumnFiltersChange: setColumnFilters,
         onColumnVisibilityChange: setColumnVisibility,
         onPaginationChange: setPagination,
         getCoreRowModel: getCoreRowModel(),
@@ -195,52 +163,31 @@ export function DataTable({ data, columnFilters, onColumnFiltersChange }: {
     });
 
     React.useEffect(() => {
-        if (roleLoading) return;
-
-        // Logic PROPOSAL_MANAGER (Rien à changer ici)
+        if (!userRole) return;
         if (userRole === 'PROPOSAL_MANAGER') {
             table.getColumn('project.preparationStatus')?.toggleVisibility(false);
             table.getColumn('project.projectManagers')?.toggleVisibility(false);
             table.getColumn('remainingTime')?.toggleVisibility(false);
-        }
-        // Logic FINANCE (Rien à changer ici)
-        else if (userRole === 'FINANCE') {
+        } else if (['FINANCE', 'CREATIVE', '3D_ARTIST'].includes(userRole)) {
             ['doc_cps', 'doc_rc', 'doc_avis', 'doc_bpe'].forEach(col => table.getColumn(col)?.toggleVisibility(false));
         }
-
-        // 👇👇 C'EST ICI LA MODIFICATION 👇👇
-        // J'ai supprimé 'ASSISTANT_PM' de cette liste.
-        // Daba, Assistant PM ghadi ybqa yban lih les colonnes b7al Admin.
-        else if (['CREATIVE', '3D_ARTIST'].includes(userRole)) {
-            ['doc_cps', 'doc_rc', 'doc_avis', 'doc_bpe'].forEach(col => table.getColumn(col)?.toggleVisibility(false));
-        }
-
-    }, [userRole, roleLoading, table]);
+    }, [userRole, table]);
 
     return (
-        <Tabs defaultValue="outline" className="w-full flex-col justify-start gap-6 relative">
-            <Toaster position="top-center" richColors />
-            {currentUserId && refetchFeed && <ProjectFeedUpdater currentUserId={currentUserId} refetchFeed={refetchFeed} />}
-
-            {/* 🔥 LE COMPOSANT BULK DELETE EST ICI 🔥 */}
-            <BulkDeleteFloatingBar
-                table={table}
-                selectedCount={Object.keys(rowSelection).length}
-                clearSelection={() => setRowSelection({})}
-            />
-
-            <div className="flex items-center justify-between px-4 lg:px-6">
-                <TabsList className="**:data-[slot=badge]:bg-muted-foreground/30 hidden **:data-[slot=badge]:size-5 **:data-[slot=badge]:rounded-full **:data-[slot=badge]:px-1 @4xl/main:flex">
-                    <TabsTrigger value="outline">Outline</TabsTrigger>
-                    <TabsTrigger value="past-performance">Past Performance <Badge variant="secondary">3</Badge></TabsTrigger>
-                    <TabsTrigger value="key-personnel">Key Personnel <Badge variant="secondary">2</Badge></TabsTrigger>
-                    <TabsTrigger value="focus-documents">Focus Documents</TabsTrigger>
-                </TabsList>
+        <div className="flex flex-col gap-4 mb-8">
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <div className="p-2 bg-muted rounded-md"><Icon className="w-5 h-5 text-muted-foreground" /></div>
+                    <div>
+                        <h3 className="text-lg font-semibold tracking-tight">{title}</h3>
+                        <p className="text-sm text-muted-foreground">{data.length} projets</p>
+                    </div>
+                </div>
 
                 <div className="flex items-center gap-2">
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm"><IconLayoutColumns className="mr-2 h-4 w-4" /><span className="hidden lg:inline">Colonnes</span><IconChevronDown className="ml-2 h-4 w-4" /></Button>
+                            <Button variant="outline" size="sm"><IconLayoutColumns className="mr-2 h-4 w-4" />Colonnes<IconChevronDown className="ml-2 h-4 w-4" /></Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-56">
                             {table.getAllColumns().filter((c) => typeof c.accessorFn !== "undefined" && c.getCanHide()).map((column) => (
@@ -250,54 +197,192 @@ export function DataTable({ data, columnFilters, onColumnFiltersChange }: {
                             ))}
                         </DropdownMenuContent>
                     </DropdownMenu>
+                </div>
+            </div>
+
+            {/* Bulk Delete for this specific table */}
+            <BulkDeleteFloatingBar table={table} selectedCount={Object.keys(rowSelection).length} clearSelection={() => setRowSelection({})} />
+
+            <div className="overflow-hidden rounded-lg border bg-background shadow-sm">
+                <Table>
+                    <TableHeader className="bg-muted/50">
+                        {table.getHeaderGroups().map((headerGroup) => (
+                            <TableRow key={headerGroup.id}>
+                                {headerGroup.headers.map((header) => (
+                                    <TableHead key={header.id} colSpan={header.colSpan}>{header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}</TableHead>
+                                ))}
+                            </TableRow>
+                        ))}
+                    </TableHeader>
+                    <TableBody>
+                        {table.getRowModel().rows?.length ? (
+                            table.getRowModel().rows.map((row) => (
+                                <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
+                                    {row.getVisibleCells().map((cell) => (<TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>))}
+                                </TableRow>
+                            ))
+                        ) : <TableRow><TableCell colSpan={columns.length} className="h-24 text-center">Aucun projet dans cette section.</TableCell></TableRow>}
+                    </TableBody>
+                </Table>
+            </div>
+
+            <div className="flex items-center justify-between px-2">
+                <div className="text-muted-foreground hidden flex-1 text-sm lg:flex">{table.getFilteredSelectedRowModel().rows.length} / {table.getFilteredRowModel().rows.length} sélectionné(s).</div>
+                <div className="flex w-full items-center gap-6 lg:w-fit">
+                    <div className="hidden items-center gap-2 lg:flex">
+                        <Label className="text-sm font-medium">Lignes</Label>
+                        <Select value={`${table.getState().pagination.pageSize}`} onValueChange={(v) => table.setPageSize(Number(v))}>
+                            <SelectTrigger size="sm" className="w-16"><SelectValue placeholder={table.getState().pagination.pageSize} /></SelectTrigger>
+                            <SelectContent side="top">{[5, 10, 20, 50].map((p) => <SelectItem key={p} value={`${p}`}>{p}</SelectItem>)}</SelectContent>
+                        </Select>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Button variant="outline" className="size-8" size="icon" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}><IconChevronLeft className="h-4 w-4" /></Button>
+                        <div className="text-sm font-medium">Page {table.getState().pagination.pageIndex + 1} / {table.getPageCount()}</div>
+                        <Button variant="outline" className="size-8" size="icon" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}><IconChevronRight className="h-4 w-4" /></Button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// --- MAIN WRAPPER COMPONENT ---
+function ProjectFeedUpdater({ currentUserId, refetchFeed }: { currentUserId: string; refetchFeed: () => void; }) {
+    useSubscription(TASK_CREATED_SUBSCRIPTION, {
+        variables: { userId: currentUserId },
+        onData: ({ data }) => {
+            const task = data.data?.taskCreated;
+            if (!task) { refetchFeed(); return; };
+            toast.info(`Nouvelle tâche assignée: ${task.description}`);
+            refetchFeed();
+        }
+    });
+    useSubscription(TASK_UPDATED_SUBSCRIPTION, { onData: () => refetchFeed() });
+    return null;
+}
+
+export function DataTable({ data, columnFilters, onColumnFiltersChange }: {
+    columns: any;
+    data: any[];
+    columnFilters: ColumnFiltersState;
+    onColumnFiltersChange: React.Dispatch<React.SetStateAction<ColumnFiltersState>>;
+}) {
+    const { data: meData, loading: roleLoading, refetch: refetchFeed } = useQuery(ME_QUERY);
+    const userRole = meData?.me.role.name;
+    const currentUserId = meData?.me.id;
+
+    // --- LOGIC: SPLIT PROJECTS (ACTIVE vs ARCHIVE/EXPIRED) ---
+    // --- LOGIC: SPLIT PROJECTS (ACTIVE vs ARCHIVE/EXPIRED) ---
+    const { activeProjects, archivedProjects } = React.useMemo(() => {
+        const active: any[] = [];
+        const archived: any[] = [];
+        const now = new Date();
+
+        // console.log(`🔍 DEBUG START: Checking ${data.length} projects...`);
+
+        data.forEach((item) => {
+            const project = item.project || item;
+            if (!project) return;
+
+            const status = project.generalStatus;
+            const deadlineRaw = project.submissionDeadline;
+
+            // 1. Vérification Date (Robust)
+            let isExpired = false;
+
+            if (deadlineRaw) {
+                // FIX: On convertit en Number car GraphQL peut renvoyer un string "1768..."
+                // Si c'est un timestamp (chiffres uniquement), on le parse en int
+                const isTimestamp = !isNaN(Number(deadlineRaw));
+
+                const deadlineDate = isTimestamp
+                    ? new Date(Number(deadlineRaw))
+                    : new Date(deadlineRaw);
+
+                if (isValid(deadlineDate)) {
+                    // Comparaison
+                    if (deadlineDate.getTime() < now.getTime()) {
+                        isExpired = true;
+                    }
+                }
+            }
+
+            // 2. Vérification Status
+            const isArchivedStatus = status === 'ARCHIVED' || status === 'CANCELLED';
+
+            // LOGIC DECISION:
+            if (isArchivedStatus || isExpired) {
+                archived.push({
+                    ...item,
+                    _virtualStatus: isExpired && !isArchivedStatus ? 'EXPIRED' : status
+                });
+            } else {
+                active.push(item);
+            }
+        });
+
+        // console.log(`✅ Result: ${active.length} Active, ${archived.length} Archived`);
+
+        // Sorting Active (le plus urgent en premier)
+        active.sort((a, b) => {
+            const tA = a.project.submissionDeadline ? Number(a.project.submissionDeadline) : Infinity;
+            const tB = b.project.submissionDeadline ? Number(b.project.submissionDeadline) : Infinity;
+            return tA - tB;
+        });
+
+        return { activeProjects: active, archivedProjects: archived };
+    }, [data]);
+
+    return (
+        <Tabs defaultValue="outline" className="w-full flex-col justify-start gap-6 relative">
+            <Toaster position="top-center" richColors />
+            {currentUserId && refetchFeed && <ProjectFeedUpdater currentUserId={currentUserId} refetchFeed={refetchFeed} />}
+
+            <div className="flex items-center justify-between px-4 lg:px-6">
+                <TabsList className="hidden @4xl/main:flex">
+                    <TabsTrigger value="outline">Outline</TabsTrigger>
+                    <TabsTrigger value="past-performance">Past Performance <Badge variant="secondary">3</Badge></TabsTrigger>
+                    <TabsTrigger value="key-personnel">Key Personnel <Badge variant="secondary">2</Badge></TabsTrigger>
+                    <TabsTrigger value="focus-documents">Focus Documents</TabsTrigger>
+                </TabsList>
+                <div className="flex items-center gap-2">
                     <CreateProjectDrawer />
                 </div>
             </div>
 
-            <TabsContent value="outline" className="relative flex flex-col gap-4 overflow-auto px-4 lg:px-6">
-                <div className="overflow-hidden rounded-lg border">
-                    <Table>
-                        <TableHeader className="bg-muted sticky top-0 z-10">
-                            {table.getHeaderGroups().map((headerGroup) => (
-                                <TableRow key={headerGroup.id}>
-                                    {headerGroup.headers.map((header) => (
-                                        <TableHead key={header.id} colSpan={header.colSpan}>{header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}</TableHead>
-                                    ))}
-                                </TableRow>
-                            ))}
-                        </TableHeader>
-                        <TableBody>
-                            {table.getRowModel().rows?.length ? (
-                                table.getRowModel().rows.map((row) => (
-                                    <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
-                                        {row.getVisibleCells().map((cell) => (<TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>))}
-                                    </TableRow>
-                                ))
-                            ) : <TableRow><TableCell colSpan={columns.length} className="h-24 text-center">Aucun résultat.</TableCell></TableRow>}
-                        </TableBody>
-                    </Table>
+            <TabsContent value="outline" className="relative flex flex-col gap-8 overflow-auto px-4 lg:px-6 pb-20">
+
+                {/* --- TABLE 1: EN COURS --- */}
+                <ProjectListTable
+                    title="🔥 Projets En Cours"
+                    icon={IconActivity}
+                    data={activeProjects}
+                    columns={columns}
+                    userRole={userRole}
+                    defaultSorting={[{ id: 'remainingTime', desc: false }]}
+                />
+
+                <div className="relative flex items-center py-4">
+                    <div className="flex-grow border-t border-border/60"></div>
+                    <span className="flex-shrink-0 mx-4 text-xs font-medium text-muted-foreground uppercase tracking-widest bg-background px-2">
+                        Historique & Archives
+                    </span>
+                    <div className="flex-grow border-t border-border/60"></div>
                 </div>
-                <div className="flex items-center justify-between px-4">
-                    <div className="text-muted-foreground hidden flex-1 text-sm lg:flex">{table.getFilteredSelectedRowModel().rows.length} sur {table.getFilteredRowModel().rows.length} ligne(s) sélectionnée(s).</div>
-                    <div className="flex w-full items-center gap-8 lg:w-fit">
-                        <div className="hidden items-center gap-2 lg:flex">
-                            <Label className="text-sm font-medium">Lignes par page</Label>
-                            <Select value={`${table.getState().pagination.pageSize}`} onValueChange={(v) => table.setPageSize(Number(v))}>
-                                <SelectTrigger size="sm" className="w-20"><SelectValue placeholder={table.getState().pagination.pageSize} /></SelectTrigger>
-                                <SelectContent side="top">{[10, 20, 30, 40, 50].map((p) => <SelectItem key={p} value={`${p}`}>{p}</SelectItem>)}</SelectContent>
-                            </Select>
-                        </div>
-                        <div className="flex w-fit items-center justify-center text-sm font-medium">Page {table.getState().pagination.pageIndex + 1} sur {table.getPageCount()}</div>
-                        <div className="ml-auto flex items-center gap-2 lg:ml-0">
-                            <Button variant="outline" className="hidden h-8 w-8 p-0 lg:flex" onClick={() => table.setPageIndex(0)} disabled={!table.getCanPreviousPage()}><IconChevronsLeft className="h-4 w-4" /><span className="sr-only">First</span></Button>
-                            <Button variant="outline" className="size-8" size="icon" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}><IconChevronLeft className="h-4 w-4" /><span className="sr-only">Prev</span></Button>
-                            <Button variant="outline" className="size-8" size="icon" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}><IconChevronRight className="h-4 w-4" /><span className="sr-only">Next</span></Button>
-                            <Button variant="outline" className="hidden size-8 lg:flex" size="icon" onClick={() => table.setPageIndex(table.getPageCount() - 1)} disabled={!table.getCanNextPage()}><IconChevronsRight className="h-4 w-4" /><span className="sr-only">Last</span></Button>
-                        </div>
-                    </div>
-                </div>
+
+                {/* --- TABLE 2: ARCHIVES --- */}
+                <ProjectListTable
+                    title="🗄️ Archives & Délais Dépassés"
+                    icon={IconArchive}
+                    data={archivedProjects}
+                    columns={columns}
+                    userRole={userRole}
+                    defaultSorting={[{ id: 'createdAt', desc: true }]}
+                />
+
             </TabsContent>
-            {/* Autres TabsContent vides conservés */}
+
             <TabsContent value="past-performance" className="flex flex-col px-4 lg:px-6"></TabsContent>
             <TabsContent value="key-personnel" className="flex flex-col px-4 lg:px-6"></TabsContent>
             <TabsContent value="focus-documents" className="flex flex-col px-4 lg:px-6"></TabsContent>

@@ -7,6 +7,7 @@ import { ProjectActionsMenu } from "../project-actions";
 import { FileStatusCell } from "./file-status";
 import { ProjectStatusPill, calculateRemainingDays } from "../utils";
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge"; // Make sure to import Badge if used, or use a span
 
 export type ProjectFeedItem = any;
 
@@ -31,14 +32,12 @@ export const columns: ColumnDef<ProjectFeedItem>[] = [
     { id: 'doc_cps', header: 'CPS', cell: ({ row }) => <FileStatusCell row={row} docType="CPS" />, enableHiding: true },
     { id: 'doc_rc', header: 'RC', cell: ({ row }) => <FileStatusCell row={row} docType="RC" />, enableHiding: true },
     { id: 'doc_avis', header: 'Avis', cell: ({ row }) => <FileStatusCell row={row} docType="Avis" />, enableHiding: true },
-    // --- 🆕 NOUVELLE COLONNE : BPE (Bordereau Prix Estimatif) ---
     {
         id: 'doc_bpe',
         header: 'BPE',
-        cell: ({ row }) => <FileStatusCell row={row} docType="BPE" />, // On utilise le même composant mais avec docType="BPE"
+        cell: ({ row }) => <FileStatusCell row={row} docType="BPE" />,
         enableHiding: true
     },
-    // ----------------------------------------------------------
     {
         accessorKey: "project.preparationStatus",
         header: "Status Préparation",
@@ -46,16 +45,14 @@ export const columns: ColumnDef<ProjectFeedItem>[] = [
     },
     {
         id: 'remainingTime',
+        // ✅ ADDED: accessorFn allows sorting by date while displaying the calculated text
+        accessorFn: (row) => row.project.submissionDeadline,
         header: 'Délai Restant',
         cell: ({ row }) => {
             const project = row.original.project;
-            // --- L-HALL: ---
-            // N-checkiw ghir wach l-date déja kayna, w sf n-calculiw
             if (!project.submissionDeadline) {
                 return <span className="text-muted-foreground">--</span>;
             }
-
-            // Daba l-calcul ghadi y-dar WAKHA l-status "En Production"
             const { text, color } = calculateRemainingDays(project.submissionDeadline);
             return <span className={cn("text-sm", color)}>{text}</span>;
         }
@@ -74,7 +71,8 @@ export const columns: ColumnDef<ProjectFeedItem>[] = [
         cell: ({ row }) => <TaskChecklistPanel project={row.original.project} />
     },
     {
-        accessorKey: "latestTask.description",
+        id: "latestTaskDesc",
+        accessorFn: (row) => row.latestTask?.description,
         header: "Dernière Tâche",
         size: 200,
         cell: ({ row }) => {
@@ -83,6 +81,15 @@ export const columns: ColumnDef<ProjectFeedItem>[] = [
             return <div className="truncate max-w-[180px] md:max-w-[250px] font-medium text-sm" title={description}>{description}</div>;
         }
     },
-    { accessorKey: "latestTask.status", header: "Status Tâche" },
+    // ✅ FIXED: Safe accessor for status to prevent "undefined" errors
+    {
+        id: "latestTaskStatus",
+        header: "Status Tâche",
+        accessorFn: (row) => row.latestTask?.status || "N/A",
+        cell: ({ row }) => {
+            const status = row.original.latestTask?.status;
+            return status ? <span>{status}</span> : <span className="text-muted-foreground">-</span>;
+        }
+    },
     { id: "actions", cell: ({ row }) => <ProjectActionsMenu project={row.original.project} /> },
 ];

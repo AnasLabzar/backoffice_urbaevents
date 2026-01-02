@@ -54,7 +54,7 @@ export const projectResolvers = {
             }
 
             let projectQuery = Project.find(queryFilter)
-                .sort({ updatedAt: -1 })
+                .sort({ submissionDeadline: 1, updatedAt: -1 })
                 .populate({ path: 'projectManagers', select: userSelect })
                 .populate({ path: 'createdBy', select: userSelect })
                 .populate({ path: 'assignedTeam', select: userSelect })
