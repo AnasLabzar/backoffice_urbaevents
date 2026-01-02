@@ -355,7 +355,7 @@ export function DataTable({ data, columnFilters, onColumnFiltersChange }: {
 
                 {/* --- TABLE 1: EN COURS --- */}
                 <ProjectListTable
-                    title="🔥 Projets En Cours"
+                    title="Projets En Cours"
                     icon={IconActivity}
                     data={activeProjects}
                     columns={columns}
@@ -373,7 +373,7 @@ export function DataTable({ data, columnFilters, onColumnFiltersChange }: {
 
                 {/* --- TABLE 2: ARCHIVES --- */}
                 <ProjectListTable
-                    title="🗄️ Archives & Délais Dépassés"
+                    title="Archives & Délais Dépassés"
                     icon={IconArchive}
                     data={archivedProjects}
                     columns={columns}
