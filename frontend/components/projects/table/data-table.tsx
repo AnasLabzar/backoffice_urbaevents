@@ -12,7 +12,7 @@ import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuChe
 import { CreateProjectDrawer } from "@/components/create-project-drawer";
 import {
     IconLayoutColumns, IconChevronDown, IconChevronLeft, IconChevronRight,
-    IconChevronsLeft, IconChevronsRight, IconTrash, IconLoader, IconArchive, IconActivity
+    IconTrash, IconLoader, IconArchive, IconActivity
 } from "@tabler/icons-react";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
@@ -36,7 +36,16 @@ const DELETE_PROJECT_MUTATION = gql`
   }
 `;
 
-// ✅ FIXED: Removed the comment inside the string which caused the Syntax Error
+// ✅ NOVAU: Mutation pour Archiver (Update status -> ARCHIVED)
+const ARCHIVE_PROJECT_MUTATION = gql`
+  mutation ArchiveProject($id: ID!) {
+    updateProject(id: $id, input: { generalStatus: "ARCHIVED" }) {
+      id
+      generalStatus
+    }
+  }
+`;
+
 const GET_PROJECTS_FEED = gql`
   query GetProjectsFeed {
     projects_feed {
@@ -57,12 +66,29 @@ const GET_PROJECTS_FEED = gql`
   }
 `;
 
-// --- COMPONENT: BULK ACTIONS BAR ---
-function BulkDeleteFloatingBar({ table, selectedCount, clearSelection }: { table: any, selectedCount: number, clearSelection: () => void }) {
-    const [isAlertOpen, setIsAlertOpen] = React.useState(false);
+// --- COMPONENT: BULK ACTIONS BAR (MODIFIED) ---
+function BulkDeleteFloatingBar({
+    table,
+    selectedCount,
+    clearSelection,
+    userRole // ✅ On récupère le rôle ici
+}: {
+    table: any,
+    selectedCount: number,
+    clearSelection: () => void,
+    userRole?: string
+}) {
+    // State pour Delete
+    const [isDeleteAlertOpen, setIsDeleteAlertOpen] = React.useState(false);
     const [deleteProject, { loading: deleting }] = useMutation(DELETE_PROJECT_MUTATION);
+
+    // ✅ State pour Archive
+    const [isArchiveAlertOpen, setIsArchiveAlertOpen] = React.useState(false);
+    const [archiveProject, { loading: archiving }] = useMutation(ARCHIVE_PROJECT_MUTATION);
+
     const { refetch: refetchFeed } = useQuery(GET_PROJECTS_FEED, { skip: true });
 
+    // Logic Delete (Ancien)
     const handleBulkDelete = async () => {
         const selectedRows = table.getSelectedRowModel().rows;
         const idsToDelete = selectedRows.map((row: any) => row.original.project.id);
@@ -75,7 +101,7 @@ function BulkDeleteFloatingBar({ table, selectedCount, clearSelection }: { table
             await Promise.all(promises);
             toast.success(`${idsToDelete.length} projets supprimés avec succès.`);
             clearSelection();
-            setIsAlertOpen(false);
+            setIsDeleteAlertOpen(false);
             if (refetchFeed) refetchFeed();
         } catch (error) {
             toast.error("Une erreur est survenue lors de la suppression.");
@@ -83,7 +109,31 @@ function BulkDeleteFloatingBar({ table, selectedCount, clearSelection }: { table
         }
     };
 
+    // ✅ Logic Archive (Nouveau)
+    const handleBulkArchive = async () => {
+        const selectedRows = table.getSelectedRowModel().rows;
+        const idsToArchive = selectedRows.map((row: any) => row.original.project.id);
+        if (idsToArchive.length === 0) return;
+
+        try {
+            const promises = idsToArchive.map((id: string) =>
+                archiveProject({ variables: { id } })
+            );
+            await Promise.all(promises);
+            toast.success(`${idsToArchive.length} projets archivés avec succès.`);
+            clearSelection();
+            setIsArchiveAlertOpen(false);
+            if (refetchFeed) refetchFeed();
+        } catch (error) {
+            toast.error("Une erreur est survenue lors de l'archivage.");
+            console.error(error);
+        }
+    };
+
     if (selectedCount === 0) return null;
+
+    // ✅ Permissions: Qui peut archiver ?
+    const canArchive = userRole === 'ADMIN' || userRole === 'PROPOSAL_MANAGER';
 
     return (
         <>
@@ -96,13 +146,30 @@ function BulkDeleteFloatingBar({ table, selectedCount, clearSelection }: { table
                 </div>
                 <div className="flex items-center gap-2">
                     <Button variant="ghost" size="sm" className="h-8 hover:bg-background/20 hover:text-background text-background/80" onClick={clearSelection}>Annuler</Button>
-                    <Button variant="destructive" size="sm" className="h-8 gap-2 rounded-full px-4" onClick={() => setIsAlertOpen(true)}>
+
+                    {/* ✅ BOUTON ARCHIVER (Visible seulement si autorisé) */}
+                    {canArchive && (
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            className="h-8 gap-2 rounded-full px-4 border border-input"
+                            onClick={() => setIsArchiveAlertOpen(true)}
+                            disabled={archiving || deleting}
+                        >
+                            {archiving ? <IconLoader className="w-4 h-4 animate-spin" /> : <IconArchive className="w-4 h-4" />}
+                            Archiver
+                        </Button>
+                    )}
+
+                    <Button variant="destructive" size="sm" className="h-8 gap-2 rounded-full px-4" onClick={() => setIsDeleteAlertOpen(true)} disabled={deleting || archiving}>
                         {deleting ? <IconLoader className="w-4 h-4 animate-spin" /> : <IconTrash className="w-4 h-4" />}
                         Supprimer
                     </Button>
                 </div>
             </div>
-            <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
+
+            {/* POPUP DELETE */}
+            <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Supprimer {selectedCount} projets ?</AlertDialogTitle>
@@ -112,6 +179,22 @@ function BulkDeleteFloatingBar({ table, selectedCount, clearSelection }: { table
                         <AlertDialogCancel disabled={deleting}>Annuler</AlertDialogCancel>
                         <AlertDialogAction onClick={(e) => { e.preventDefault(); handleBulkDelete(); }} className="bg-red-600 hover:bg-red-700" disabled={deleting}>
                             {deleting ? "..." : "Confirmer"}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            {/* ✅ POPUP ARCHIVE */}
+            <AlertDialog open={isArchiveAlertOpen} onOpenChange={setIsArchiveAlertOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Archiver {selectedCount} projets ?</AlertDialogTitle>
+                        <AlertDialogDescription>Les projets seront déplacés vers l'onglet "Archives".</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={archiving}>Annuler</AlertDialogCancel>
+                        <AlertDialogAction onClick={(e) => { e.preventDefault(); handleBulkArchive(); }} disabled={archiving}>
+                            {archiving ? "..." : "Archiver"}
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
@@ -200,8 +283,13 @@ function ProjectListTable({
                 </div>
             </div>
 
-            {/* Bulk Delete for this specific table */}
-            <BulkDeleteFloatingBar table={table} selectedCount={Object.keys(rowSelection).length} clearSelection={() => setRowSelection({})} />
+            {/* ✅ Bulk Delete for this specific table (AVEC USER ROLE PASSÉ) */}
+            <BulkDeleteFloatingBar
+                table={table}
+                selectedCount={Object.keys(rowSelection).length}
+                clearSelection={() => setRowSelection({})}
+                userRole={userRole}
+            />
 
             <div className="overflow-hidden rounded-lg border bg-background shadow-sm">
                 <Table>
@@ -273,13 +361,10 @@ export function DataTable({ data, columnFilters, onColumnFiltersChange }: {
     const currentUserId = meData?.me.id;
 
     // --- LOGIC: SPLIT PROJECTS (ACTIVE vs ARCHIVE/EXPIRED) ---
-    // --- LOGIC: SPLIT PROJECTS (ACTIVE vs ARCHIVE/EXPIRED) ---
     const { activeProjects, archivedProjects } = React.useMemo(() => {
         const active: any[] = [];
         const archived: any[] = [];
         const now = new Date();
-
-        // console.log(`🔍 DEBUG START: Checking ${data.length} projects...`);
 
         data.forEach((item) => {
             const project = item.project || item;
@@ -293,7 +378,6 @@ export function DataTable({ data, columnFilters, onColumnFiltersChange }: {
 
             if (deadlineRaw) {
                 // FIX: On convertit en Number car GraphQL peut renvoyer un string "1768..."
-                // Si c'est un timestamp (chiffres uniquement), on le parse en int
                 const isTimestamp = !isNaN(Number(deadlineRaw));
 
                 const deadlineDate = isTimestamp
@@ -321,8 +405,6 @@ export function DataTable({ data, columnFilters, onColumnFiltersChange }: {
                 active.push(item);
             }
         });
-
-        // console.log(`✅ Result: ${active.length} Active, ${archived.length} Archived`);
 
         // Sorting Active (le plus urgent en premier)
         active.sort((a, b) => {
