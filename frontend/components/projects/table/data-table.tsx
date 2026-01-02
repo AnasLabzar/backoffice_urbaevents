@@ -18,7 +18,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { useQuery, useSubscription, useMutation, gql } from "@apollo/client";
+import { useQuery, useSubscription, useMutation, gql, useApolloClient } from "@apollo/client";
 import { ME_QUERY, TASK_CREATED_SUBSCRIPTION, TASK_UPDATED_SUBSCRIPTION } from "@/lib/graphql/projects";
 import { toast, Toaster } from "sonner";
 import { columns } from "./columns";
@@ -28,23 +28,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import { differenceInDays, isPast, parseISO, isValid } from "date-fns";
-
-// --- GRAPHQL ---
-const DELETE_PROJECT_MUTATION = gql`
-  mutation DeleteProject($projectId: ID!) {
-    admin_deleteProject(projectId: $projectId)
-  }
-`;
-
-// Modification dans data-table.tsx
-const ARCHIVE_PROJECT_MUTATION = gql`
-  mutation ArchiveProject($id: ID!) {
-    updateProject(id: $id, input: { status: "ARCHIVED" }) { # Essayez 'status' au lieu de 'generalStatus'
-      id
-      generalStatus
-    }
-  }
-`;
 
 const GET_PROJECTS_FEED = gql`
   query GetProjectsFeed {
@@ -66,73 +49,96 @@ const GET_PROJECTS_FEED = gql`
   }
 `;
 
-// --- COMPONENT: BULK ACTIONS BAR (MODIFIED) ---
+const DELETE_PROJECT_MUTATION = gql`
+  mutation DeleteProject($projectId: ID!) {
+    admin_deleteProject(projectId: $projectId)
+  }
+`;
+
+const ARCHIVE_PROJECT_MUTATION = gql`
+  mutation ArchiveProject($id: ID!) {
+    archiveProject(id: $id) {
+      id
+      generalStatus
+    }
+  }
+`;
+
 function BulkDeleteFloatingBar({
     table,
     selectedCount,
     clearSelection,
-    userRole // ✅ On récupère le rôle ici
+    userRole
 }: {
     table: any,
     selectedCount: number,
     clearSelection: () => void,
     userRole?: string
 }) {
-    // State pour Delete
+    const client = useApolloClient();
     const [isDeleteAlertOpen, setIsDeleteAlertOpen] = React.useState(false);
-    const [deleteProject, { loading: deleting }] = useMutation(DELETE_PROJECT_MUTATION);
-
-    // ✅ State pour Archive
     const [isArchiveAlertOpen, setIsArchiveAlertOpen] = React.useState(false);
+
+    const [deleteProject, { loading: deleting }] = useMutation(DELETE_PROJECT_MUTATION);
     const [archiveProject, { loading: archiving }] = useMutation(ARCHIVE_PROJECT_MUTATION);
 
-    const { refetch: refetchFeed } = useQuery(GET_PROJECTS_FEED, { skip: true });
+    const { refetch } = useQuery(GET_PROJECTS_FEED, { skip: true });
 
-    // Logic Delete (Ancien)
     const handleBulkDelete = async () => {
         const selectedRows = table.getSelectedRowModel().rows;
         const idsToDelete = selectedRows.map((row: any) => row.original.project.id);
         if (idsToDelete.length === 0) return;
 
         try {
-            const promises = idsToDelete.map((id: string) =>
+            await Promise.all(idsToDelete.map((id: string) =>
                 deleteProject({ variables: { projectId: id } })
-            );
-            await Promise.all(promises);
-            toast.success(`${idsToDelete.length} projets supprimés avec succès.`);
+            ));
+            toast.success(`${idsToDelete.length} projets supprimés.`);
             clearSelection();
             setIsDeleteAlertOpen(false);
-            if (refetchFeed) refetchFeed();
+
+            await client.refetchQueries({ include: ["GetProjectsFeed"] });
         } catch (error) {
-            toast.error("Une erreur est survenue lors de la suppression.");
-            console.error(error);
+            toast.error("Erreur lors de la suppression.");
         }
     };
 
-    // ✅ Logic Archive (Nouveau)
     const handleBulkArchive = async () => {
         const selectedRows = table.getSelectedRowModel().rows;
         const idsToArchive = selectedRows.map((row: any) => row.original.project.id);
         if (idsToArchive.length === 0) return;
 
         try {
-            const promises = idsToArchive.map((id: string) =>
-                archiveProject({ variables: { id } })
-            );
-            await Promise.all(promises);
-            toast.success(`${idsToArchive.length} projets archivés avec succès.`);
+            await Promise.all(idsToArchive.map((id: string) =>
+                archiveProject({
+                    variables: { id },
+                    update(cache) {
+                        // ✅ Force update both fields to catch aliases
+                        cache.modify({
+                            id: cache.identify({ __typename: 'Project', id }),
+                            fields: {
+                                generalStatus() { return "ARCHIVED"; },
+                                status() { return "ARCHIVED"; }
+                            }
+                        });
+                    }
+                })
+            ));
+
+            toast.success(`${idsToArchive.length} projets archivés.`);
             clearSelection();
             setIsArchiveAlertOpen(false);
-            if (refetchFeed) refetchFeed();
+
+            await client.refetchQueries({ include: ["GetProjectsFeed"] });
+
         } catch (error) {
-            toast.error("Une erreur est survenue lors de l'archivage.");
+            toast.error("Erreur lors de l'archivage.");
             console.error(error);
         }
     };
 
     if (selectedCount === 0) return null;
 
-    // ✅ Permissions: Qui peut archiver ?
     const canArchive = userRole === 'ADMIN' || userRole === 'PROPOSAL_MANAGER';
 
     return (
@@ -147,7 +153,6 @@ function BulkDeleteFloatingBar({
                 <div className="flex items-center gap-2">
                     <Button variant="ghost" size="sm" className="h-8 hover:bg-background/20 hover:text-background text-background/80" onClick={clearSelection}>Annuler</Button>
 
-                    {/* ✅ BOUTON ARCHIVER (Visible seulement si autorisé) */}
                     {canArchive && (
                         <Button
                             variant="secondary"
@@ -168,7 +173,6 @@ function BulkDeleteFloatingBar({
                 </div>
             </div>
 
-            {/* POPUP DELETE */}
             <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
@@ -184,7 +188,6 @@ function BulkDeleteFloatingBar({
                 </AlertDialogContent>
             </AlertDialog>
 
-            {/* ✅ POPUP ARCHIVE */}
             <AlertDialog open={isArchiveAlertOpen} onOpenChange={setIsArchiveAlertOpen}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
@@ -203,7 +206,6 @@ function BulkDeleteFloatingBar({
     );
 }
 
-// --- NEW COMPONENT: REUSABLE TABLE INSTANCE ---
 function ProjectListTable({
     data,
     columns,
@@ -219,7 +221,6 @@ function ProjectListTable({
     icon: any,
     defaultSorting?: SortingState
 }) {
-    // Local state for this specific table instance
     const [rowSelection, setRowSelection] = React.useState({});
     const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
     const [sorting, setSorting] = React.useState<SortingState>(defaultSorting);
@@ -283,7 +284,6 @@ function ProjectListTable({
                 </div>
             </div>
 
-            {/* ✅ Bulk Delete for this specific table (AVEC USER ROLE PASSÉ) */}
             <BulkDeleteFloatingBar
                 table={table}
                 selectedCount={Object.keys(rowSelection).length}
@@ -335,7 +335,6 @@ function ProjectListTable({
     );
 }
 
-// --- MAIN WRAPPER COMPONENT ---
 function ProjectFeedUpdater({ currentUserId, refetchFeed }: { currentUserId: string; refetchFeed: () => void; }) {
     useSubscription(TASK_CREATED_SUBSCRIPTION, {
         variables: { userId: currentUserId },
@@ -366,36 +365,37 @@ export function DataTable({ data, columnFilters, onColumnFiltersChange }: {
         const archived: any[] = [];
         const now = new Date();
 
+        console.log("📊 STARTING FILTERING:", data.length, "projects");
+
         data.forEach((item) => {
             const project = item.project || item;
             if (!project) return;
 
-            const status = project.generalStatus;
+            // 👇👇👇 LE FIX EST ICI 👇👇👇
+            // On vérifie 'generalStatus' ET 'status' (l'alias venant de page.tsx)
+            const status = project.generalStatus || project.status;
+            // -----------------------------
+
             const deadlineRaw = project.submissionDeadline;
+
+            // LOGGING pour debug
+            // console.log(`👉 Project [${project.title}]: Status = ${status}, Deadline = ${deadlineRaw}`);
 
             // 1. Vérification Date (Robust)
             let isExpired = false;
-
             if (deadlineRaw) {
-                // FIX: On convertit en Number car GraphQL peut renvoyer un string "1768..."
                 const isTimestamp = !isNaN(Number(deadlineRaw));
+                const deadlineDate = isTimestamp ? new Date(Number(deadlineRaw)) : new Date(deadlineRaw);
 
-                const deadlineDate = isTimestamp
-                    ? new Date(Number(deadlineRaw))
-                    : new Date(deadlineRaw);
-
-                if (isValid(deadlineDate)) {
-                    // Comparaison
-                    if (deadlineDate.getTime() < now.getTime()) {
-                        isExpired = true;
-                    }
+                if (isValid(deadlineDate) && deadlineDate.getTime() < now.getTime()) {
+                    isExpired = true;
                 }
             }
 
             // 2. Vérification Status
             const isArchivedStatus = status === 'ARCHIVED' || status === 'CANCELLED';
 
-            // LOGIC DECISION:
+            // LOGIC DECISION
             if (isArchivedStatus || isExpired) {
                 archived.push({
                     ...item,
@@ -406,7 +406,8 @@ export function DataTable({ data, columnFilters, onColumnFiltersChange }: {
             }
         });
 
-        // Sorting Active (le plus urgent en premier)
+        console.log(`✅ FINISH: Active=${active.length}, Archived=${archived.length}`);
+
         active.sort((a, b) => {
             const tA = a.project.submissionDeadline ? Number(a.project.submissionDeadline) : Infinity;
             const tB = b.project.submissionDeadline ? Number(b.project.submissionDeadline) : Infinity;
