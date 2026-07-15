@@ -2,6 +2,9 @@ import { ApolloError } from 'apollo-server-errors';
 import Invoice from '../../models/Invoice';
 import InvoiceItem from '../../models/InvoiceItem';
 import Prestation from '../../models/Prestation';
+import Task from '../../models/Task';
+import Project from '../../models/Project';
+import ProjectBrief from '../../models/ProjectBrief';
 import { IContext } from '../../server';
 
 // Helper: Recalculer le total de la facture
@@ -104,6 +107,125 @@ export const invoiceResolvers = {
 
             // Recalculate Total
             await recalculateInvoiceTotal(invoiceId.toString());
+
+            return true;
+        },
+
+        updateInvoiceItemPrice: async (_: unknown, { id, unitPrice }: any, context: IContext) => {
+            if (!context.user) throw new ApolloError('Not authenticated');
+
+            const item = await InvoiceItem.findById(id);
+            if (!item) throw new ApolloError("Item introuvable");
+
+            item.unitPrice = unitPrice;
+            await item.save();
+
+            // Recalculate Total
+            await recalculateInvoiceTotal(item.invoice.toString());
+
+            return item;
+        },
+
+        // Importation globale depuis l'IA
+        importAIProduction: async (_: unknown, { input }: any, context: IContext) => {
+            if (!context.user) throw new ApolloError('Not authenticated');
+
+            const { projectId, prestations, tasks, creativeSummary, projectBrief } = input;
+
+            // 1. Get or Create Estimation (Invoice)
+            let invoice = await Invoice.findOne({ project: projectId, type: 'ESTIMATION' });
+            if (!invoice) {
+                const count = await Invoice.countDocuments({ type: 'ESTIMATION' });
+                const ref = `EST-${new Date().getFullYear()}-${String(count + 1).padStart(4, '0')}`;
+                invoice = await Invoice.create({
+                    project: projectId,
+                    type: 'ESTIMATION',
+                    reference: ref,
+                    status: 'DRAFT',
+                    totalAmount: 0,
+                    createdBy: context.user.id
+                });
+            }
+
+            // 2. Insert Prestations into Invoice AND Upsert into Catalog
+            if (prestations && prestations.length > 0) {
+                // A. Add to Project Estimation
+                const invoiceItemsData = prestations.map((p: any) => ({
+                    invoice: invoice._id,
+                    project: projectId,
+                    category: p.category,
+                    subCategory: p.subCategory || 'Divers',
+                    designation: p.designation,
+                    description: p.description,
+                    unit: 'U',
+                    quantity: p.quantity,
+                    unitPrice: p.unitPrice || 0
+                }));
+                await InvoiceItem.insertMany(invoiceItemsData);
+                await recalculateInvoiceTotal(invoice._id.toString());
+
+                // B. Auto-Alimentation du Catalogue (Upsert)
+                for (const p of prestations) {
+                    await Prestation.findOneAndUpdate(
+                        { designation: new RegExp(`^${p.designation}$`, 'i') }, // Case insensitive match
+                        {
+                            $setOnInsert: {
+                                category: p.category,
+                                subCategory: p.subCategory || 'Divers',
+                                designation: p.designation,
+                                description: p.description || '',
+                                unit: 'U',
+                                unitPrice: p.unitPrice || 0
+                            }
+                        },
+                        { upsert: true, new: true }
+                    );
+                }
+            }
+
+            // 3. Insert Tasks (Fixed AssignedTo and Status)
+            if (tasks && tasks.length > 0) {
+                const taskData = tasks.map((t: any) => ({
+                    project: projectId,
+                    department: t.department || 'CREATIVE',
+                    priority: t.priority || 'NORMAL',
+                    description: t.title + (t.description ? `\n${t.description}` : ''),
+                    status: 'TODO',
+                    assignedTo: context.user.id, // Assigned to the person importing it
+                    createdBy: context.user.id
+                }));
+                await Task.insertMany(taskData);
+            }
+
+            // 4. Update Project and ProjectBrief
+            if (creativeSummary) {
+                await Project.findByIdAndUpdate(projectId, {
+                    $set: { 
+                        'aiSummary.summary': creativeSummary,
+                        'aiSummary.generatedAt': new Date()
+                    }
+                });
+            }
+
+            if (projectBrief) {
+                await ProjectBrief.findOneAndUpdate(
+                    { project: projectId },
+                    {
+                        $set: {
+                            eventGoal: projectBrief.eventGoal || [],
+                            mainObjective: projectBrief.mainObjective || "",
+                            themeConcept: projectBrief.themeConcept || "",
+                            locationType: projectBrief.locationType || "AUTRE",
+                            visitorsCount: projectBrief.visitorsCount || 0,
+                            constraints: projectBrief.constraints || "",
+                            targetAudience: projectBrief.targetAudience || [],
+                            subObjectives: projectBrief.subObjectives || [],
+                            updatedBy: context.user.id
+                        }
+                    },
+                    { upsert: true, new: true }
+                );
+            }
 
             return true;
         }

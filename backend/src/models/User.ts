@@ -7,6 +7,8 @@ export interface IUser extends Document {
   name: string;
   email: string;
   password?: string; // '?' hit ma bghinach nrg3oh l-frontend
+  provider?: string;
+  googleId?: string;
   role: IRole['_id']; // L-ID dyal l-Role dyalo (Admin, Creative...)
   isActive: boolean; // Wach l-compte khdam wla la
 }
@@ -26,8 +28,16 @@ const UserSchema: Schema = new Schema(
     },
     password: {
       type: String,
-      required: true,
+      required: false, // <-- Khdinaha false bach Google login ykhdm mn be3d
       select: false, // <-- MOHIM: Mli njib user mn database, majibch l-password m3ah
+    },
+    provider: {
+      type: String,
+      default: 'local'
+    },
+    googleId: {
+      type: String,
+      required: false
     },
     role: {
       type: Schema.Types.ObjectId,

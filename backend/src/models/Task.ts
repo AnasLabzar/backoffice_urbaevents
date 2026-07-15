@@ -18,6 +18,7 @@ export interface ITask extends Document {
   dueDate?: Date;
   v1Uploads: IDocument[];
   finalUpload?: IDocument;
+  wbsLot?: mongoose.Types.ObjectId;
 }
 
 const TaskSchema: Schema = new Schema(
@@ -55,6 +56,11 @@ const TaskSchema: Schema = new Schema(
     },
     dueDate: {
       type: Date,
+      required: false,
+    },
+    wbsLot: {
+      type: Schema.Types.ObjectId,
+      ref: 'Project.wbsLots',
       required: false,
     },
     v1Uploads: [

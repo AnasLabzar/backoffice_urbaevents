@@ -6,12 +6,13 @@ import { toast } from "sonner";
 import {
     IconPlus, IconTrash, IconPackage, IconLoader,
     IconFileSpreadsheet, IconSearch, IconCalculator, IconSettings,
-    IconInfoCircle, IconAlertCircle, IconChevronRight
+    IconInfoCircle, IconAlertCircle, IconChevronRight, IconSparkles
 } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
 
 // UI Components
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -136,7 +137,7 @@ const CATEGORY_CONFIG: Record<string, { label: string; key: string; type: 'text'
 // --- GRAPHQL ---
 
 const GET_DATA = gql`
-  query GetData($invoiceId: ID!) {
+  query GetData($invoiceId: ID!, $projectId: ID!) {
     getInvoiceItems(invoiceId: $invoiceId) {
       id
       category
@@ -147,6 +148,13 @@ const GET_DATA = gql`
       unitPrice
       totalPrice
       unit
+    }
+    project(id: $projectId) {
+      id
+      stages {
+        administrative { documents { id fileName fileUrl originalFileName } }
+        technical { documents { id fileName fileUrl originalFileName } }
+      }
     }
     getPrestationCatalog
   }
@@ -182,6 +190,27 @@ const DELETE_ITEM = gql`
   }
 `;
 
+const UPDATE_ITEM_PRICE = gql`
+  mutation UpdateInvoiceItemPrice($id: ID!, $unitPrice: Float!) {
+    updateInvoiceItemPrice(id: $id, unitPrice: $unitPrice) {
+      id
+      unitPrice
+      totalPrice
+    }
+  }
+`;
+
+const ADD_PRESTATION_CATALOG = gql`
+  mutation AddPrestationCatalog($input: AddPrestationInput!) {
+    addPrestation(input: $input) {
+      id
+      name
+      category
+      unitPrice
+    }
+  }
+`;
+
 const IMPORT_EXCEL = gql`
   mutation ImportExcel($projectId: ID!, $invoiceId: ID!, $fileUrl: String!) {
     importPrestationsFromExcel(projectId: $projectId, invoiceId: $invoiceId, fileUrl: $fileUrl) {
@@ -189,6 +218,9 @@ const IMPORT_EXCEL = gql`
     }
   }
 `;
+
+import { AIAssistantButton } from "../projects/ai-assistant-button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 // --- COMPONENT ---
 
@@ -208,13 +240,19 @@ export function PrestationManager({ projectId, invoiceId, onTotalChange }: { pro
     // Dynamic Fields State
     const [dynamicFields, setDynamicFields] = useState<Record<string, any>>({});
 
+    // AI Modal State
+    const [aiModalOpen, setAiModalOpen] = useState(false);
+    const [aiData, setAiData] = useState<any>(null);
+    const [selectedAiItems, setSelectedAiItems] = useState<number[]>([]);
+    const [addingAi, setAddingAi] = useState(false);
+
     useEffect(() => {
         setSubCategory("");
         setDynamicFields({});
     }, [category]);
 
     const { data, loading, refetch } = useQuery(GET_DATA, {
-        variables: { invoiceId },
+        variables: { invoiceId, projectId },
         fetchPolicy: 'cache-and-network',
         onCompleted: (d) => {
             const total = d?.getInvoiceItems?.reduce((acc: number, item: any) => acc + item.totalPrice, 0) || 0;
@@ -242,13 +280,24 @@ export function PrestationManager({ projectId, invoiceId, onTotalChange }: { pro
     });
 
     const [deleteItem] = useMutation(DELETE_ITEM, {
-        onCompleted: () => { toast.success("Supprimé"); refetch(); }
+        onCompleted: () => refetch(),
+        onError: (e) => toast.error(e.message)
+    });
+
+    const [updateItemPrice] = useMutation(UPDATE_ITEM_PRICE, {
+        onCompleted: () => {
+            toast.success("Prix mis à jour");
+            refetch();
+        },
+        onError: (e) => toast.error(e.message)
     });
 
     const [importExcel, { loading: importing }] = useMutation(IMPORT_EXCEL, {
         onCompleted: (d) => { toast.success(`${d.importPrestationsFromExcel.length} importés`); refetch(); },
         onError: (e) => toast.error(e.message)
     });
+
+    const [addPrestationToCatalog] = useMutation(ADD_PRESTATION_CATALOG);
 
     // Helpers
     const resetForm = () => {
@@ -307,28 +356,86 @@ export function PrestationManager({ projectId, invoiceId, onTotalChange }: { pro
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
+    const handleAIExtract = (data: any) => {
+        setAiData(data);
+        setSelectedAiItems(data.prestations.map((_: any, i: number) => i)); // Select all by default
+        setAiModalOpen(true);
+    };
+
+    const handleSaveAIToInvoice = async () => {
+        if (selectedAiItems.length === 0) return;
+        setAddingAi(true);
+        toast.loading("Ajout des prestations au devis...", { id: 'ai-financial' });
+        try {
+            for (const idx of selectedAiItems) {
+                const item = aiData.prestations[idx];
+                
+                // Si la prestation est nouvelle, on l'ajoute au catalogue d'abord
+                if (item.isNew) {
+                    await addPrestationToCatalog({
+                        variables: {
+                            input: {
+                                projectId,
+                                name: item.designation,
+                                category: item.category,
+                                description: item.description,
+                                unitPrice: Number(item.unitPrice),
+                                unit: "U"
+                            }
+                        }
+                    });
+                }
+                
+                // On l'ajoute ensuite au devis
+                await addItem({
+                    variables: {
+                        input: {
+                            invoiceId,
+                            projectId,
+                            category: item.category,
+                            subCategory: item.subCategory || 'Divers',
+                            name: item.designation,
+                            description: item.description || '',
+                            quantity: Number(item.quantity) || 1,
+                            unitPrice: Number(item.unitPrice) || 0
+                        }
+                    }
+                });
+            }
+            toast.success(`${selectedAiItems.length} prestations ajoutées au devis !`, { id: 'ai-financial' });
+            setAiModalOpen(false);
+            setAiData(null);
+            setSelectedAiItems([]);
+            refetch();
+        } catch (error: any) {
+            toast.error(`Erreur: ${error.message}`, { id: 'ai-financial' });
+        } finally {
+            setAddingAi(false);
+        }
+    };
+
     const renderDetails = (jsonDesc: string) => {
         try {
             const fields = JSON.parse(jsonDesc);
             if (Object.keys(fields).length === 0) return null;
             return (
-                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                <div className="flex flex-wrap gap-1.5 mt-1.5 max-w-2xl">
                     {Object.entries(fields).map(([key, val]) => {
                         const catKey = Object.keys(CATEGORY_CONFIG).find(k => CATEGORY_CONFIG[k].some(f => f.key === key)) || '';
                         const fieldConfig = CATEGORY_CONFIG[catKey]?.find(f => f.key === key);
                         const label = fieldConfig?.label || key;
 
                         return (
-                            <span key={key} className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted border border-border text-muted-foreground/80">
-                                <span className="mr-1 opacity-70">{label}:</span>
-                                <span className="text-foreground">{String(val)}</span>
+                            <span key={key} className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-muted border border-border text-muted-foreground/80 max-w-xs truncate">
+                                <span className="mr-1 opacity-70 shrink-0">{label}:</span>
+                                <span className="text-foreground truncate" title={String(val)}>{String(val)}</span>
                             </span>
                         );
                     })}
                 </div>
             );
         } catch (e) {
-            return <div className="text-xs text-muted-foreground mt-1">{jsonDesc}</div>;
+            return <div className="text-xs text-muted-foreground mt-1 line-clamp-2 max-w-2xl" title={jsonDesc}>{jsonDesc}</div>;
         }
     };
 
@@ -365,6 +472,19 @@ export function PrestationManager({ projectId, invoiceId, onTotalChange }: { pro
     }, [data?.getInvoiceItems]);
 
     const grandTotal = data?.getInvoiceItems?.reduce((acc: number, i: any) => acc + i.totalPrice, 0) || 0;
+    
+    // Synchroniser le total avec le composant parent (ex: Rentabilité)
+    useEffect(() => {
+        if (onTotalChange) {
+            onTotalChange(grandTotal);
+        }
+    }, [grandTotal, onTotalChange]);
+    
+    // Extraire les documents du projet pour l'IA
+    const projectDocs = [
+        ...(data?.project?.stages?.administrative?.documents || []),
+        ...(data?.project?.stages?.technical?.documents || [])
+    ];
 
     const currentConfig = CATEGORY_CONFIG[category] || [];
     const availableSubCats = CATEGORY_SUBCATEGORIES[category] || [];
@@ -384,7 +504,13 @@ export function PrestationManager({ projectId, invoiceId, onTotalChange }: { pro
                         </h2>
                     </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                    <AIAssistantButton 
+                        projectId={projectId} 
+                        documents={projectDocs} 
+                        mode="financial" 
+                        onExtractFinancial={handleAIExtract} 
+                    />
                     <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={importing} className="h-9">
                         {importing ? <IconLoader className="animate-spin w-4 h-4 mr-2" /> : <IconFileSpreadsheet className="w-4 h-4 mr-2 text-green-600" />}
                         Import Excel
@@ -709,12 +835,12 @@ export function PrestationManager({ projectId, invoiceId, onTotalChange }: { pro
                                     <TableBody>
                                         {items.map((item: any) => (
                                             <TableRow key={item.id} className="group border-b last:border-0 hover:bg-muted/20 transition-colors">
-                                                <TableCell className="pl-4 py-3 align-top">
+                                                <TableCell className="pl-4 py-3 align-top max-w-md">
                                                     <div className="flex flex-col gap-1">
-                                                        <div className="font-semibold text-sm text-foreground flex items-center gap-2">
-                                                            {item.designation}
+                                                        <div className="font-semibold text-sm text-foreground flex items-start gap-2">
+                                                            <span className="line-clamp-2 break-words" title={item.designation}>{item.designation}</span>
                                                             {item.subCategory && item.subCategory !== 'Divers' && (
-                                                                <Badge variant="secondary" className="text-[9px] h-4 px-1 rounded-sm font-normal text-muted-foreground/70">
+                                                                <Badge variant="secondary" className="text-[9px] h-4 px-1 rounded-sm font-normal text-muted-foreground/70 shrink-0 mt-0.5">
                                                                     {item.subCategory}
                                                                 </Badge>
                                                             )}
@@ -729,19 +855,35 @@ export function PrestationManager({ projectId, invoiceId, onTotalChange }: { pro
                                                     </div>
                                                 </TableCell>
                                                 <TableCell className="text-right py-3 align-top">
-                                                    <span className="font-mono text-sm text-muted-foreground">
-                                                        {item.unitPrice.toLocaleString('fr-FR')}
-                                                    </span>
+                                                    <div className="flex justify-end">
+                                                        <Input 
+                                                            type="number" 
+                                                            min="0"
+                                                            className="w-24 h-8 text-right font-mono text-sm text-muted-foreground focus:text-foreground bg-transparent border-transparent hover:border-input focus:border-input focus:bg-background transition-all"
+                                                            defaultValue={item.unitPrice}
+                                                            onBlur={(e) => {
+                                                                const newVal = Number(e.target.value);
+                                                                if (newVal !== item.unitPrice) {
+                                                                    updateItemPrice({ variables: { id: item.id, unitPrice: newVal }});
+                                                                }
+                                                            }}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter') {
+                                                                    e.currentTarget.blur();
+                                                                }
+                                                            }}
+                                                        />
+                                                    </div>
                                                 </TableCell>
                                                 <TableCell className="text-right py-3 pr-6 align-top">
-                                                    <span className="font-mono text-sm font-bold text-foreground">
+                                                    <span className="font-mono text-sm font-bold text-foreground inline-block mt-1">
                                                         {(item.quantity * item.unitPrice).toLocaleString('fr-FR')}
                                                     </span>
                                                 </TableCell>
                                                 <TableCell className="text-right py-3 pr-4 align-top">
                                                     <Button
                                                         variant="ghost" size="icon"
-                                                        className="h-8 w-8 text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all duration-200"
+                                                        className="h-8 w-8 mt-0.5 text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all duration-200"
                                                         onClick={() => { if (confirm("Voulez-vous vraiment supprimer cet article ?")) deleteItem({ variables: { id: item.id } }); }}
                                                     >
                                                         <IconTrash className="w-4 h-4" />
@@ -755,6 +897,134 @@ export function PrestationManager({ projectId, invoiceId, onTotalChange }: { pro
                         </Card>
                     ))}
                 </div>
+            )}
+            {/* AI FINANCIAL MODAL */}
+            {aiData && (
+                <Dialog open={aiModalOpen} onOpenChange={setAiModalOpen}>
+                    <DialogContent className="max-w-4xl max-h-[85vh] flex flex-col p-0 overflow-hidden bg-background/95 backdrop-blur-md rounded-2xl border-primary/20">
+                        <DialogHeader className="p-6 border-b shrink-0 bg-muted/20">
+                            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+                                <IconSparkles className="w-5 h-5 text-indigo-500" />
+                                Prestations détectées par l'IA
+                            </DialogTitle>
+                            <DialogDescription>
+                                Voici les éléments extraits de votre document. Décochez ceux que vous ne souhaitez pas intégrer au devis.
+                            </DialogDescription>
+                        </DialogHeader>
+                        
+                        <ScrollArea className="flex-1 p-6">
+                            <div className="space-y-8">
+                                {/* SECTION: FOUND IN CATALOG */}
+                                <div>
+                                    <h3 className="font-bold text-sm text-foreground mb-4 uppercase tracking-wider flex items-center gap-2">
+                                        <div className="w-2 h-2 rounded-full bg-green-500" />
+                                        Déjà dans le Catalogue ({aiData.prestations.filter((p: any) => !p.isNew).length})
+                                    </h3>
+                                    <div className="grid gap-3">
+                                        {aiData.prestations.map((p: any, idx: number) => {
+                                            if (p.isNew) return null;
+                                            const isSelected = selectedAiItems.includes(idx);
+                                            return (
+                                                <div 
+                                                    key={idx} 
+                                                    className={cn(
+                                                        "flex items-center gap-4 p-3 rounded-xl border transition-all cursor-pointer",
+                                                        isSelected ? "border-green-500/50 bg-green-500/5 shadow-sm" : "border-border/50 bg-muted/10 opacity-60"
+                                                    )}
+                                                    onClick={() => {
+                                                        if (isSelected) setSelectedAiItems(prev => prev.filter(i => i !== idx));
+                                                        else setSelectedAiItems(prev => [...prev, idx]);
+                                                    }}
+                                                >
+                                                    <Checkbox checked={isSelected} className="pointer-events-none data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500" />
+                                                    <div className="flex-1 grid grid-cols-12 gap-3 items-center">
+                                                        <div className="col-span-5">
+                                                            <p className="font-semibold text-sm line-clamp-1">{p.designation}</p>
+                                                            <p className="text-[10px] text-muted-foreground uppercase">{p.category}</p>
+                                                        </div>
+                                                        <div className="col-span-3 text-sm text-muted-foreground line-clamp-2 leading-snug">
+                                                            {p.description}
+                                                        </div>
+                                                        <div className="col-span-2 text-center text-sm font-semibold">
+                                                            {p.quantity} {p.unit || 'U'}
+                                                        </div>
+                                                        <div className="col-span-2 text-right font-mono text-sm font-bold">
+                                                            {new Intl.NumberFormat('fr-MA', { style: 'currency', currency: 'MAD' }).format(p.unitPrice)}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )
+                                        })}
+                                        {aiData.prestations.filter((p: any) => !p.isNew).length === 0 && (
+                                            <p className="text-xs text-muted-foreground italic text-center py-4 border border-dashed rounded-xl">Aucune prestation existante trouvée.</p>
+                                        )}
+                                    </div>
+                                </div>
+                                
+                                {/* SECTION: NEW ITEMS TO VALIDATE */}
+                                <div>
+                                    <h3 className="font-bold text-sm text-foreground mb-4 uppercase tracking-wider flex items-center gap-2">
+                                        <div className="w-2 h-2 rounded-full bg-indigo-500" />
+                                        Nouveaux Articles - À Créer ({aiData.prestations.filter((p: any) => p.isNew).length})
+                                    </h3>
+                                    <div className="grid gap-3">
+                                        {aiData.prestations.map((p: any, idx: number) => {
+                                            if (!p.isNew) return null;
+                                            const isSelected = selectedAiItems.includes(idx);
+                                            return (
+                                                <div 
+                                                    key={idx} 
+                                                    className={cn(
+                                                        "flex items-center gap-4 p-3 rounded-xl border transition-all cursor-pointer relative overflow-hidden",
+                                                        isSelected ? "border-indigo-500/50 bg-indigo-500/5 shadow-sm" : "border-border/50 bg-muted/10 opacity-60"
+                                                    )}
+                                                    onClick={() => {
+                                                        if (isSelected) setSelectedAiItems(prev => prev.filter(i => i !== idx));
+                                                        else setSelectedAiItems(prev => [...prev, idx]);
+                                                    }}
+                                                >
+                                                    {isSelected && <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500" />}
+                                                    <Checkbox checked={isSelected} className="pointer-events-none data-[state=checked]:bg-indigo-500 data-[state=checked]:border-indigo-500" />
+                                                    <div className="flex-1 grid grid-cols-12 gap-3 items-center">
+                                                        <div className="col-span-5">
+                                                            <p className="font-semibold text-sm text-indigo-700 dark:text-indigo-400 line-clamp-1">{p.designation}</p>
+                                                            <p className="text-[10px] text-muted-foreground uppercase">{p.category}</p>
+                                                        </div>
+                                                        <div className="col-span-3 text-sm text-muted-foreground line-clamp-2 leading-snug">
+                                                            {p.description}
+                                                        </div>
+                                                        <div className="col-span-2 text-center text-sm font-semibold">
+                                                            {p.quantity} {p.unit || 'U'}
+                                                        </div>
+                                                        <div className="col-span-2 text-right font-mono text-sm font-bold">
+                                                            {new Intl.NumberFormat('fr-MA', { style: 'currency', currency: 'MAD' }).format(p.unitPrice)}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )
+                                        })}
+                                        {aiData.prestations.filter((p: any) => p.isNew).length === 0 && (
+                                            <p className="text-xs text-muted-foreground italic text-center py-4 border border-dashed rounded-xl">Aucune nouvelle prestation suggérée.</p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </ScrollArea>
+                        
+                        <div className="p-4 border-t bg-muted/30 flex justify-between items-center shrink-0">
+                            <span className="text-sm text-muted-foreground font-medium">
+                                <span className="font-bold text-foreground">{selectedAiItems.length}</span> éléments sélectionnés
+                            </span>
+                            <div className="flex gap-2">
+                                <Button variant="outline" onClick={() => setAiModalOpen(false)}>Annuler</Button>
+                                <Button onClick={handleSaveAIToInvoice} disabled={addingAi || selectedAiItems.length === 0} className="bg-indigo-600 hover:bg-indigo-700">
+                                    {addingAi ? <IconLoader className="w-4 h-4 mr-2 animate-spin" /> : <IconPlus className="w-4 h-4 mr-2" />}
+                                    Ajouter au devis
+                                </Button>
+                            </div>
+                        </div>
+                    </DialogContent>
+                </Dialog>
             )}
         </div>
     );

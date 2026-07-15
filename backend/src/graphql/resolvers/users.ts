@@ -6,6 +6,10 @@ import Role from '../../models/Role';
 import User from '../../models/User';
 import { IContext } from '../../server';
 import { checkPermission } from './helpers';
+import { OAuth2Client } from 'google-auth-library';
+
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID || '384169644096-n1hjir3eqjfa0k49qc2636kqsfvfunn0.apps.googleusercontent.com');
+
 
 export const userResolvers = {
     Query: {
@@ -96,11 +100,80 @@ export const userResolvers = {
         login: async (_: unknown, { email, password }: any) => {
             const user = await User.findOne({ email }).select('+password').populate('role');
             if (!user) throw new ApolloError('Invalid credentials', 'INVALID_CREDENTIALS');
+            // If they signed up with Google, they might not have a password
+            if (!user.password) {
+                throw new ApolloError('Please sign in with Google.', 'INVALID_CREDENTIALS');
+            }
             const isMatch = await bcrypt.compare(password, user.password || '');
             if (!isMatch) throw new ApolloError('Invalid credentials', 'INVALID_CREDENTIALS');
             const token = generateToken(user);
-            await logActivity({ userId: user._id, action: 'USER_LOGIN', details: `User ${user.name} logged in.` });
+            await logActivity({ userId: user._id as any, action: 'USER_LOGIN', details: `User ${user.name} logged in.` });
             return { token, user };
+        },
+
+        googleLogin: async (_: unknown, { token }: any) => {
+            try {
+                // We use the access_token from the frontend to fetch the user's profile
+                const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                
+                if (!response.ok) {
+                    throw new ApolloError('Invalid Google Token', 'INVALID_TOKEN');
+                }
+                
+                const payload = await response.json();
+                
+                if (!payload || !payload.email) {
+                    throw new ApolloError('Invalid Google Token Payload', 'INVALID_TOKEN');
+                }
+
+                const email = payload.email;
+                const name = payload.name || 'Google User';
+
+                let user = await User.findOne({ email }).populate('role');
+                
+                if (!user) {
+                    let defaultRoleName = 'PROPOSAL_MANAGER';
+                    const userCount = await User.countDocuments();
+                    if (userCount === 0) defaultRoleName = 'ADMIN';
+
+                    let role = await Role.findOne({ name: defaultRoleName });
+                    if (!role) {
+                        const permissions: string[] = defaultRoleName === 'ADMIN'
+                            ? [
+                                'configure_roles', 'manage_users', 'assign_project_managers', 'assign_teams',
+                                'set_project_status', 'view_all_logs', 'view_all_analytics', 'create_project_proposal',
+                                'manage_assigned_projects', 'assign_creative_tasks', 'update_workflow_stage',
+                                'manage_cautions', 'manage_own_tasks', 'upload_methodology',
+                                'assign_dynamic_pm', 'view_team_logs'
+                            ]
+                            : ['create_project_proposal'];
+                        role = await Role.create({ name: defaultRoleName, permissions });
+                    }
+
+                    user = await User.create({
+                        name,
+                        email,
+                        provider: 'google',
+                        googleId: payload.sub,
+                        role: role._id
+                    });
+                    user = await user.populate('role');
+                } else if (!user.googleId) {
+                    user.googleId = payload.sub;
+                    user.provider = 'google';
+                    await user.save();
+                }
+
+                const jwtToken = generateToken(user);
+                await logActivity({ userId: user._id as any, action: 'USER_LOGIN_GOOGLE', details: `User ${user.name} logged in with Google.` });
+                
+                return { token: jwtToken, user };
+            } catch (error: any) {
+                console.error("🔥 GOOGLE LOGIN ERROR:", error);
+                throw new ApolloError(error.message || "Google Login Failed", "INTERNAL_ERROR");
+            }
         },
 
         admin_createUser: async (_: unknown, { input }: any, context: IContext) => {

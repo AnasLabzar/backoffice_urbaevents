@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useState } from "react";
 import { useMutation } from "@apollo/client";
 import { toast } from "sonner";
 import {
@@ -11,16 +12,19 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-    IconFileText, IconLoader, IconX, IconTrash, IconCloudUpload, IconFileCheck, IconCalendar, IconDatabase
-} from "@tabler/icons-react";
-
+import { IconFile, IconTrash, IconX, IconCheck, IconLoader, IconUpload, IconSparkles, IconCalendar, IconDatabase } from "@tabler/icons-react";
 import {
     GET_PROJECTS_FEED,
     UPLOAD_DOCUMENT_MUTATION,
-    DELETE_DOCUMENT_MUTATION
+    DELETE_DOCUMENT_MUTATION,
+    ANALYZE_CPS_MUTATION,
+    GENERATE_TASKS_MUTATION,
+    IMPORT_AI_PRODUCTION,
+    GET_ESTIMATION
 } from "@/lib/graphql/projects";
-import { cn } from "@/lib/utils";
+import { formatDistanceToNow } from "date-fns";
+import { fr } from "date-fns/locale";
+import { AIAssistantButton } from "@/components/projects/ai-assistant-button";
 
 // --- HELPER: Format File Size (Bytes -> MB) ---
 const formatBytes = (bytes: number, decimals = 2) => {
@@ -82,7 +86,7 @@ function DocumentRow({
     const removePending = (idx: number) => setFiles((prev: File[]) => prev.filter((_, i) => i !== idx));
 
     return (
-        <div className="flex flex-col gap-3 p-4 border rounded-xl bg-white dark:bg-card shadow-sm transition-all hover:shadow-md group relative overflow-hidden">
+        <div className="flex flex-col gap-4 p-5 border border-border/50 rounded-2xl bg-card/60 backdrop-blur-xl shadow-sm hover:shadow-md hover:border-primary/40 transition-all duration-300 relative overflow-hidden group">
             {isUploading && <div className="absolute top-0 left-0 h-1 bg-blue-600 transition-all duration-300 z-20" style={{ width: `${progress}%` }} />}
 
             {/* Header Section */}
@@ -98,7 +102,7 @@ function DocumentRow({
                 <div className="relative">
                     <input type="file" multiple disabled={isUploading} className="absolute inset-0 opacity-0 cursor-pointer z-10" onChange={handleFileChange} />
                     <Button variant="outline" size="sm" className="h-8 gap-2 bg-background hover:bg-accent text-xs font-medium">
-                        {isUploading ? <IconLoader className="animate-spin w-3.5 h-3.5" /> : <IconCloudUpload className="w-3.5 h-3.5" />}
+                        {isUploading ? <IconLoader className="animate-spin w-3.5 h-3.5" /> : <IconUpload className="w-3.5 h-3.5" />}
                         <span>Uploader</span>
                     </Button>
                 </div>
@@ -113,7 +117,7 @@ function DocumentRow({
                             {/* File Info Left */}
                             <div className="flex items-center gap-3 overflow-hidden">
                                 <div className="h-10 w-10 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center shrink-0 text-blue-600">
-                                    <IconFileText size={20} />
+                                    <IconFile size={20} />
                                 </div>
                                 <div className="flex flex-col overflow-hidden">
                                     <a href={`https://backoffice.urbagroupe.ma/${doc.fileUrl}`} target="_blank" className="text-sm font-medium truncate hover:underline text-foreground block max-w-[220px]" title={doc.originalFileName}>
@@ -150,7 +154,7 @@ function DocumentRow({
                         <div key={idx} className="flex items-center justify-between p-2.5 rounded-lg border border-blue-200 bg-blue-50/50 dark:bg-blue-950/10 dark:border-blue-800">
                             <div className="flex items-center gap-3 overflow-hidden">
                                 <div className="h-8 w-8 rounded-md bg-white dark:bg-blue-950 flex items-center justify-center shrink-0 border border-blue-100">
-                                    <IconFileCheck size={16} className="text-blue-500" />
+                                    <IconCheck size={16} className="text-blue-500" />
                                 </div>
                                 <div className="flex flex-col overflow-hidden">
                                     <span className="text-xs font-medium text-blue-900 dark:text-blue-100 truncate max-w-[200px]">{file.name}</span>
@@ -184,10 +188,10 @@ export function EditDocumentsSheet({ project, open, onOpenChange }: EditDocument
     const [filesTech, setFilesTech] = React.useState<File[]>([]);
 
     const [uploadProgress, setUploadProgress] = React.useState<Record<string, number>>({});
-
+    
     // Mutations
     const [uploadDocument, { loading: uploading }] = useMutation(UPLOAD_DOCUMENT_MUTATION);
-
+    
     const [deleteDocument, { loading: deleting }] = useMutation(DELETE_DOCUMENT_MUTATION, {
         onCompleted: () => toast.success("Document supprimé avec succès"),
         onError: (e) => toast.error(e.message),
@@ -215,13 +219,12 @@ export function EditDocumentsSheet({ project, open, onOpenChange }: EditDocument
                     stageName, docType,
                     originalFileName: file.name,
                     fileUrl: result.fileUrl,
-                    // size: file.size // NOTE: Si l backend dyalk fih size zido hna
                 }
             });
-            return true;
+            return result.fileUrl;
         } catch (e) {
             console.error(e);
-            return false;
+            return null;
         } finally {
             setUploadProgress(prev => ({ ...prev, [docType]: 0 }));
         }
@@ -232,8 +235,8 @@ export function EditDocumentsSheet({ project, open, onOpenChange }: EditDocument
         let count = 0;
         const processFiles = async (files: File[], type: string, stage: string) => {
             for (const f of files) {
-                const ok = await handleFileUpload(f, type, stage);
-                if (ok) count++;
+                const url = await handleFileUpload(f, type, stage);
+                if (url) count++;
             }
         };
 
@@ -253,7 +256,6 @@ export function EditDocumentsSheet({ project, open, onOpenChange }: EditDocument
     };
 
     const handleDelete = (docId: string, stageName: string) => {
-        // Custom Confirmation Toast au lieu de window.confirm
         toast("Supprimer ce document ?", {
             action: {
                 label: "Confirmer",
@@ -269,60 +271,74 @@ export function EditDocumentsSheet({ project, open, onOpenChange }: EditDocument
 
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
-            <SheetContent className="sm:max-w-xl flex flex-col h-full p-0 gap-0 bg-muted/10">
-                <SheetHeader className="p-6 pb-4 border-b bg-background">
-                    <SheetTitle className="text-xl">Gestion des Documents</SheetTitle>
-                    <SheetDescription>
-                        Documents pour le projet <span className="font-semibold text-primary">{project.object || project.title}</span>.
+            <SheetContent className="sm:max-w-2xl flex flex-col h-full p-0 gap-0 bg-background/95 backdrop-blur-2xl border-l shadow-2xl z-[100]">
+                <SheetHeader className="p-6 pb-5 border-b border-border/50 bg-background/50">
+                    <SheetTitle className="text-2xl font-black tracking-tight">Gestion des Documents</SheetTitle>
+                    <SheetDescription className="text-sm font-medium mt-1">
+                        Documents pour le projet <span className="font-bold text-foreground">{project.object || project.title}</span>.
                     </SheetDescription>
                 </SheetHeader>
 
                 <ScrollArea className="flex-1 px-6 py-6">
-                    <div className="flex flex-col gap-8 pb-10">
+                    <div className="flex flex-col gap-10 pb-10">
                         {/* Section Administrative */}
-                        <div className="space-y-4">
-                            <div className="flex items-center gap-2 mb-2">
-                                <Badge variant="default" className="bg-indigo-600 hover:bg-indigo-700">Dossier Administratif</Badge>
-                                <Separator className="flex-1" />
+                        <div className="space-y-6">
+                            <div className="flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-3 flex-1">
+                                    <Badge variant="default" className="bg-indigo-500/10 text-indigo-500 hover:bg-indigo-500/20 border border-indigo-500/20 px-3 py-1 text-xs uppercase tracking-widest font-bold shadow-sm">
+                                        Dossier Administratif
+                                    </Badge>
+                                    <Separator className="flex-1 bg-indigo-500/10" />
+                                </div>
+                                <AIAssistantButton 
+                                    projectId={project.id} 
+                                    documents={administrativeDocs} 
+                                />
                             </div>
-                            <DocumentRow
-                                label="Cahier des Charges (CPS)" type="CPS"
-                                existingDocs={administrativeDocs}
-                                files={filesCPS} setFiles={setFilesCPS} progress={uploadProgress['CPS']}
-                                onDelete={(id: string) => handleDelete(id, 'administrative')}
-                            />
-                            <DocumentRow
-                                label="Règlement (RC)" type="RC"
-                                existingDocs={administrativeDocs}
-                                files={filesRC} setFiles={setFilesRC} progress={uploadProgress['RC']}
-                                onDelete={(id: string) => handleDelete(id, 'administrative')}
-                            />
-                            <DocumentRow
-                                label="Avis de Marché" type="Avis"
-                                existingDocs={administrativeDocs}
-                                files={filesAvis} setFiles={setFilesAvis} progress={uploadProgress['Avis']}
-                                onDelete={(id: string) => handleDelete(id, 'administrative')}
-                            />
-                            <DocumentRow
-                                label="Bordereau Prix (BPE)" type="BPE"
-                                existingDocs={administrativeDocs}
-                                files={filesBPE} setFiles={setFilesBPE} progress={uploadProgress['BPE']}
-                                onDelete={(id: string) => handleDelete(id, 'administrative')}
-                            />
+                            <div className="grid gap-4">
+                                <DocumentRow
+                                    label="Cahier des Charges (CPS)" type="CPS"
+                                    existingDocs={administrativeDocs}
+                                    files={filesCPS} setFiles={setFilesCPS} progress={uploadProgress['CPS']}
+                                    onDelete={(id: string) => handleDelete(id, 'administrative')}
+                                />
+                                <DocumentRow
+                                    label="Règlement (RC)" type="RC"
+                                    existingDocs={administrativeDocs}
+                                    files={filesRC} setFiles={setFilesRC} progress={uploadProgress['RC']}
+                                    onDelete={(id: string) => handleDelete(id, 'administrative')}
+                                />
+                                <DocumentRow
+                                    label="Avis de Marché" type="Avis"
+                                    existingDocs={administrativeDocs}
+                                    files={filesAvis} setFiles={setFilesAvis} progress={uploadProgress['Avis']}
+                                    onDelete={(id: string) => handleDelete(id, 'administrative')}
+                                />
+                                <DocumentRow
+                                    label="Bordereau Prix (BPE)" type="BPE"
+                                    existingDocs={administrativeDocs}
+                                    files={filesBPE} setFiles={setFilesBPE} progress={uploadProgress['BPE']}
+                                    onDelete={(id: string) => handleDelete(id, 'administrative')}
+                                />
+                            </div>
                         </div>
 
                         {/* Section Technique */}
-                        <div className="space-y-4">
-                            <div className="flex items-center gap-2 mb-2">
-                                <Badge variant="default" className="bg-amber-600 hover:bg-amber-700">Dossier Technique</Badge>
-                                <Separator className="flex-1" />
+                        <div className="space-y-6">
+                            <div className="flex items-center gap-3">
+                                <Badge variant="default" className="bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 border border-amber-500/20 px-3 py-1 text-xs uppercase tracking-widest font-bold shadow-sm">
+                                    Dossier Technique
+                                </Badge>
+                                <Separator className="flex-1 bg-amber-500/10" />
                             </div>
-                            <DocumentRow
-                                label="Fichier Technique / Plans" type="Fichier Technique"
-                                existingDocs={technicalDocs}
-                                files={filesTech} setFiles={setFilesTech} progress={uploadProgress['Fichier Technique']}
-                                onDelete={(id: string) => handleDelete(id, 'technical')}
-                            />
+                            <div className="grid gap-4">
+                                <DocumentRow
+                                    label="Fichier Technique / Plans" type="Fichier Technique"
+                                    existingDocs={technicalDocs}
+                                    files={filesTech} setFiles={setFilesTech} progress={uploadProgress['Fichier Technique']}
+                                    onDelete={(id: string) => handleDelete(id, 'technical')}
+                                />
+                            </div>
                         </div>
                     </div>
                 </ScrollArea>

@@ -218,6 +218,7 @@ export function TechnicalDetails({ projectId, projectTitle, initialBudget, initi
                                             className="pl-4 pr-12 h-12 text-xl font-bold font-mono bg-background border-input hover:border-primary/50 focus:border-primary transition-colors shadow-sm"
                                             value={budgetClient}
                                             onChange={e => setBudgetClient(parseFloat(e.target.value) || 0)}
+                                            onBlur={handleSave}
                                         />
                                         <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-muted-foreground group-hover:text-foreground transition-colors">MAD</span>
                                     </div>
@@ -231,6 +232,7 @@ export function TechnicalDetails({ projectId, projectTitle, initialBudget, initi
                                             className="pl-4 pr-12 h-10 text-sm font-mono bg-background/50 border-input hover:border-primary/30 focus:border-primary/50 transition-colors"
                                             value={estimatedBudget}
                                             onChange={e => setEstimatedBudget(parseFloat(e.target.value) || 0)}
+                                            onBlur={handleSave}
                                         />
                                         <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-muted-foreground group-hover:text-foreground transition-colors">MAD</span>
                                     </div>

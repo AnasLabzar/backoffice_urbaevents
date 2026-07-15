@@ -14,6 +14,7 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import {
     IconActivity,
@@ -43,6 +44,9 @@ import { fr } from "date-fns/locale";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SiteHeader } from "@/components/site-header";
+import { AIAssistantButton } from "@/components/projects/ai-assistant-button";
+import { Retroplanning } from "@/components/production/retroplanning";
+import { ProjectProfitabilityCard } from "@/components/projects/ProjectProfitabilityCard";
 
 // --- 1. QUERIES ---
 
@@ -61,6 +65,8 @@ const GET_PROJECT_BY_ID = gql`
       submissionDeadline
       marketEstimate
       estimatedBudget
+      budgetTarget
+      budgetClient
       cautionAmount
       
       projectManagers { id name email }
@@ -77,6 +83,11 @@ const GET_PROJECT_BY_ID = gql`
         givenAt
       }
       aiSummary { risks }
+      stages {
+        administrative {
+          documents { fileName originalFileName fileUrl }
+        }
+      }
     }
   }
 `;
@@ -465,6 +476,10 @@ export default function ProjectDetailPage() {
                                 </p>
                             </div>
                             <div className="flex gap-2">
+                                <AIAssistantButton 
+                                    projectId={project.id} 
+                                    documents={project.stages?.administrative?.documents || []} 
+                                />
                                 <Button variant="outline" className="shadow-sm" onClick={() => router.push(`/dashboard/projects/${id}/brief`)}>
                                     <IconFileDescription className="w-4 h-4 mr-2" /> Éditer Brief
                                 </Button>
@@ -474,183 +489,206 @@ export default function ProjectDetailPage() {
 
                     <Separator />
 
-                    {/* --- MAIN GRID LAYOUT --- */}
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    {/* --- TABS --- */}
+                    <Tabs defaultValue="overview" className="w-full">
+                        <TabsList className="mb-8 w-full justify-start bg-muted/50 border-b border-border/50 h-auto p-0 rounded-none">
+                            <TabsTrigger value="overview" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none rounded-none px-6 py-3 font-semibold">
+                                Vue d'ensemble
+                            </TabsTrigger>
+                            <TabsTrigger value="planification" className="data-[state=active]:bg-transparent data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none rounded-none px-6 py-3 font-semibold">
+                                Planification (Rétroplanning)
+                            </TabsTrigger>
+                        </TabsList>
+                        
+                        <TabsContent value="overview" className="mt-0">
+                            {/* 2 COLUMNS GRID */}
+                            <div className="grid xl:grid-cols-3 gap-8 items-start">
 
-                        {/* LEFT COLUMN (Brief, Details & Team) */}
-                        <div className="lg:col-span-2 space-y-8">
+                                {/* LEFT COLUMN (Brief, Details & Team) */}
+                                <div className="lg:col-span-2 space-y-8">
 
-                            {/* ✅ 1. BRIEF SUMMARY CARD (Display Logic) */}
-                            {/* Shows skeleton while loading brief, then shows card if brief exists, else shows empty state */}
-                            {loadingBrief ? (
-                                <Skeleton className="h-64 w-full rounded-xl" />
-                            ) : brief ? (
-                                <BriefSummaryCard brief={brief} />
-                            ) : (
-                                <Card className="border-dashed border-2 bg-muted/5">
-                                    <CardContent className="flex flex-col items-center justify-center py-10 text-center">
-                                        <IconFileDescription className="w-10 h-10 text-muted-foreground/30 mb-2" />
-                                        <p className="text-sm text-muted-foreground">Aucun brief détaillé n'a encore été saisi pour ce projet.</p>
-                                        <Button variant="link" onClick={() => router.push(`/dashboard/projects/${id}/brief`)}>Remplir le brief maintenant</Button>
-                                    </CardContent>
-                                </Card>
-                            )}
+                                    {/* ✅ 1. BRIEF SUMMARY CARD (Display Logic) */}
+                                    {/* Shows skeleton while loading brief, then shows card if brief exists, else shows empty state */}
+                                    {loadingBrief ? (
+                                        <Skeleton className="h-64 w-full rounded-xl" />
+                                    ) : brief ? (
+                                        <BriefSummaryCard brief={brief} />
+                                    ) : (
+                                        <Card className="border-dashed border-2 bg-muted/5">
+                                            <CardContent className="flex flex-col items-center justify-center py-10 text-center">
+                                                <IconFileDescription className="w-10 h-10 text-muted-foreground/30 mb-2" />
+                                                <p className="text-sm text-muted-foreground">Aucun brief détaillé n'a encore été saisi pour ce projet.</p>
+                                                <Button variant="link" onClick={() => router.push(`/dashboard/projects/${id}/brief`)}>Remplir le brief maintenant</Button>
+                                            </CardContent>
+                                        </Card>
+                                    )}
 
-                            {/* 2. PROJECT INFO & RISKS */}
-                            <Card className="border shadow-sm bg-card">
-                                <CardHeader className="pb-4 border-b bg-muted/10">
-                                    <div className="flex justify-between items-center">
-                                        <CardTitle className="text-base font-bold flex items-center gap-2">
-                                            <IconBuildingSkyscraper className="w-4 h-4 text-primary" /> Informations Générales
-                                        </CardTitle>
-                                        <Badge variant="outline" className="font-mono text-xs">{project.projectType}</Badge>
-                                    </div>
-                                </CardHeader>
-                                <CardContent className="p-6 grid sm:grid-cols-2 gap-6 text-sm">
-                                    <div className="space-y-1">
-                                        <span className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">Référence AO</span>
-                                        <p className="font-medium font-mono">{project.referenceAO || "Non spécifié"}</p>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <span className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">Risques Identifiés (IA)</span>
-                                        {project.aiSummary?.risks?.length > 0 ? (
-                                            <div className="flex flex-wrap gap-1.5 mt-1.5">
-                                                {project.aiSummary.risks.map((risk: string, i: number) => (
-                                                    <Badge key={i} variant="destructive" className="text-[10px] px-2 py-0.5 shadow-sm">{risk}</Badge>
+                                    {/* 2. PROJECT INFO & RISKS */}
+                                    <Card className="border shadow-sm bg-card">
+                                        <CardHeader className="pb-4 border-b bg-muted/10">
+                                            <div className="flex justify-between items-center">
+                                                <CardTitle className="text-base font-bold flex items-center gap-2">
+                                                    <IconBuildingSkyscraper className="w-4 h-4 text-primary" /> Informations Générales
+                                                </CardTitle>
+                                                <Badge variant="outline" className="font-mono text-xs">{project.projectType}</Badge>
+                                            </div>
+                                        </CardHeader>
+                                        <CardContent className="p-6 grid sm:grid-cols-2 gap-6 text-sm">
+                                            <div className="space-y-1">
+                                                <span className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">Référence AO</span>
+                                                <p className="font-medium font-mono">{project.referenceAO || "Non spécifié"}</p>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <span className="text-[10px] font-bold uppercase text-muted-foreground tracking-wider">Risques Identifiés (IA)</span>
+                                                {project.aiSummary?.risks?.length > 0 ? (
+                                                    <div className="flex flex-wrap gap-1.5 mt-1.5">
+                                                        {project.aiSummary.risks.map((risk: string, i: number) => (
+                                                            <Badge key={i} variant="destructive" className="text-[10px] px-2 py-0.5 shadow-sm">{risk}</Badge>
+                                                        ))}
+                                                    </div>
+                                                ) : <p className="text-muted-foreground italic text-xs">Aucun risque signalé</p>}
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+
+                                    {/* 3. TEAM CARD */}
+                                    <Card className="border shadow-sm">
+                                        <CardHeader className="pb-4 border-b bg-muted/10">
+                                            <CardTitle className="text-base font-bold flex items-center gap-2">
+                                                <IconUsers className="w-4 h-4 text-primary" /> Équipe Projet
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="p-6">
+                                            <div className="flex flex-wrap gap-3">
+                                                {project.projectManagers?.map((pm: any) => (
+                                                    <TeamMemberPill key={pm.id} member={pm} role="Chef de Projet" />
                                                 ))}
+                                                {project.team?.infographistes?.map((user: any) => (
+                                                    <TeamMemberPill key={user.id} member={user} role="Infographiste" />
+                                                ))}
+                                                {project.team?.team3D?.map((user: any) => (
+                                                    <TeamMemberPill key={user.id} member={user} role="Artiste 3D" />
+                                                ))}
+                                                {project.team?.coordinators?.map((user: any) => (
+                                                    <TeamMemberPill key={user.id} member={user} role="Coordinateur" />
+                                                ))}
+                                                {project.team?.pmJuniors?.map((user: any) => (
+                                                    <TeamMemberPill key={user.id} member={user} role="PM Junior" />
+                                                ))}
+                                                {(!project.projectManagers?.length && !project.team?.infographistes?.length && !project.team?.team3D?.length) && (
+                                                    <span className="text-sm text-muted-foreground italic bg-muted/30 px-3 py-2 rounded-md">Aucune équipe assignée pour le moment.</span>
+                                                )}
                                             </div>
-                                        ) : <p className="text-muted-foreground italic text-xs">Aucun risque signalé</p>}
+                                        </CardContent>
+                                    </Card>
+
+                                    {/* 4. TIMELINE */}
+                                    <div className="space-y-4">
+                                        <h3 className="text-lg font-bold flex items-center gap-2">
+                                            <IconActivity className="w-5 h-5 text-primary" /> Journal d'activité
+                                        </h3>
+                                        <Card className="border shadow-sm">
+                                            <CardContent className="p-6 max-h-[600px] overflow-y-auto custom-scrollbar">
+                                                {(loadingTasks || loadingLogs) ? (
+                                                    <div className="space-y-4">
+                                                        <Skeleton className="h-12 w-full" />
+                                                        <Skeleton className="h-12 w-full" />
+                                                        <Skeleton className="h-12 w-full" />
+                                                    </div>
+                                                ) : (
+                                                    <ProjectTimeline tasks={tasks} logs={logs} />
+                                                )}
+                                            </CardContent>
+                                        </Card>
                                     </div>
-                                </CardContent>
-                            </Card>
 
-                            {/* 3. TEAM CARD */}
-                            <Card className="border shadow-sm">
-                                <CardHeader className="pb-4 border-b bg-muted/10">
-                                    <CardTitle className="text-base font-bold flex items-center gap-2">
-                                        <IconUsers className="w-4 h-4 text-primary" /> Équipe Projet
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="p-6">
-                                    <div className="flex flex-wrap gap-3">
-                                        {project.projectManagers?.map((pm: any) => (
-                                            <TeamMemberPill key={pm.id} member={pm} role="Chef de Projet" />
-                                        ))}
-                                        {project.team?.infographistes?.map((user: any) => (
-                                            <TeamMemberPill key={user.id} member={user} role="Infographiste" />
-                                        ))}
-                                        {project.team?.team3D?.map((user: any) => (
-                                            <TeamMemberPill key={user.id} member={user} role="Artiste 3D" />
-                                        ))}
-                                        {project.team?.coordinators?.map((user: any) => (
-                                            <TeamMemberPill key={user.id} member={user} role="Coordinateur" />
-                                        ))}
-                                        {project.team?.pmJuniors?.map((user: any) => (
-                                            <TeamMemberPill key={user.id} member={user} role="PM Junior" />
-                                        ))}
-                                        {(!project.projectManagers?.length && !project.team?.infographistes?.length && !project.team?.team3D?.length) && (
-                                            <span className="text-sm text-muted-foreground italic bg-muted/30 px-3 py-2 rounded-md">Aucune équipe assignée pour le moment.</span>
-                                        )}
-                                    </div>
-                                </CardContent>
-                            </Card>
+                                </div>
 
-                            {/* 4. TIMELINE */}
-                            <div className="space-y-4">
-                                <h3 className="text-lg font-bold flex items-center gap-2">
-                                    <IconActivity className="w-5 h-5 text-primary" /> Journal d'activité
-                                </h3>
-                                <Card className="border shadow-sm">
-                                    <CardContent className="p-6 max-h-[600px] overflow-y-auto custom-scrollbar">
-                                        {(loadingTasks || loadingLogs) ? (
-                                            <div className="space-y-4">
-                                                <Skeleton className="h-12 w-full" />
-                                                <Skeleton className="h-12 w-full" />
-                                                <Skeleton className="h-12 w-full" />
+                                {/* RIGHT COLUMN (Stats, Dates, Avis) */}
+                                <div className="space-y-6">
+
+                                    {/* Financials / Profitability */}
+                                    <ProjectProfitabilityCard 
+                                        projectId={project.id}
+                                        initialBudgetClient={project.budgetClient || project.estimatedBudget || project.budgetTarget || 0} 
+                                        coutTechnique={0} // Mocked for now until WBS is wired
+                                    />
+
+                                    {/* Dates Card */}
+                                    <Card className="border shadow-sm">
+                                        <CardHeader className="bg-muted/10 pb-3 border-b border-border/50">
+                                            <CardTitle className="text-sm font-bold uppercase tracking-wider flex items-center gap-2">
+                                                <IconCalendarStats className="w-4 h-4 text-primary" /> Dates Clés
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="p-4 grid gap-4">
+                                            <div className="bg-muted/20 p-3 rounded-lg border border-border/50">
+                                                <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Date Limite de Dépôt</p>
+                                                <div className="flex items-center gap-2 text-foreground font-medium">
+                                                    <IconClock className="h-4 w-4 text-orange-500" />
+                                                    {formatDate(parseDate(project.submissionDeadline), "PPP à p")}
+                                                </div>
                                             </div>
-                                        ) : (
-                                            <ProjectTimeline tasks={tasks} logs={logs} />
-                                        )}
-                                    </CardContent>
-                                </Card>
-                            </div>
-
-                        </div>
-
-                        {/* RIGHT COLUMN (Stats, Dates, Avis) */}
-                        <div className="space-y-6">
-
-                            {/* Financials */}
-                            <FinancialCard project={project} />
-
-                            {/* Dates Card */}
-                            <Card className="border shadow-sm">
-                                <CardHeader className="bg-muted/10 pb-3 border-b border-border/50">
-                                    <CardTitle className="text-sm font-bold uppercase tracking-wider flex items-center gap-2">
-                                        <IconCalendarStats className="w-4 h-4 text-primary" /> Dates Clés
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="p-4 grid gap-4">
-                                    <div className="bg-muted/20 p-3 rounded-lg border border-border/50">
-                                        <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Date Limite de Dépôt</p>
-                                        <div className="flex items-center gap-2 text-foreground font-medium">
-                                            <IconClock className="h-4 w-4 text-orange-500" />
-                                            {formatDate(parseDate(project.submissionDeadline), "PPP à p")}
-                                        </div>
-                                    </div>
-                                    {/* BRIEF DATES (displayed only if brief exists) */}
-                                    {brief?.startDate && (
-                                        <div className="bg-muted/20 p-3 rounded-lg border border-border/50">
-                                            <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Début Événement</p>
-                                            <div className="flex items-center gap-2 text-foreground font-medium">
-                                                <IconCalendarStats className="h-4 w-4 text-blue-500" />
-                                                {formatDate(parseDate(brief.startDate), "PPP")}
-                                            </div>
-                                        </div>
-                                    )}
-                                    {brief?.endDate && (
-                                        <div className="bg-muted/20 p-3 rounded-lg border border-border/50">
-                                            <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Fin Événement</p>
-                                            <div className="flex items-center gap-2 text-foreground font-medium">
-                                                <IconCalendarStats className="h-4 w-4 text-blue-500" />
-                                                {formatDate(parseDate(brief.endDate), "PPP")}
-                                            </div>
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
-
-                            {/* Avis de Préparation */}
-                            {project.proposalAvis && (
-                                <Card className={cn("border shadow-sm transition-colors", project.proposalAvis.status === 'ACCEPTED' ? 'border-green-500/30 bg-green-50/20 dark:bg-green-900/10' : 'border-red-500/30 bg-red-50/20 dark:bg-red-900/10')}>
-                                    <CardHeader className="pb-3 border-b border-border/10">
-                                        <CardTitle className="text-sm font-bold uppercase tracking-wider flex items-center gap-2">
-                                            <IconMessageCircle className="w-4 h-4" /> Avis CP
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="p-4 space-y-3">
-                                        <div className="flex items-center justify-between">
-                                            {project.proposalAvis.status === 'ACCEPTED' ? (
-                                                <Badge className="bg-green-100 text-green-800 hover:bg-green-100 border-green-200 dark:bg-green-900 dark:text-green-100 dark:border-green-800">Accepté</Badge>
-                                            ) : (
-                                                <Badge className="bg-red-100 text-red-800 hover:bg-red-100 border-red-200 dark:bg-red-900 dark:text-red-100 dark:border-red-800">Refusé</Badge>
+                                            {/* BRIEF DATES (displayed only if brief exists) */}
+                                            {brief?.startDate && (
+                                                <div className="bg-muted/20 p-3 rounded-lg border border-border/50">
+                                                    <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Début Événement</p>
+                                                    <div className="flex items-center gap-2 text-foreground font-medium">
+                                                        <IconCalendarStats className="h-4 w-4 text-blue-500" />
+                                                        {formatDate(parseDate(brief.startDate), "PPP")}
+                                                    </div>
+                                                </div>
                                             )}
-                                            <span className="text-xs text-muted-foreground">par {project.proposalAvis.givenBy?.name}</span>
-                                        </div>
-                                        {project.proposalAvis.reason && (
-                                            <div className="text-sm italic text-muted-foreground bg-background/60 p-3 rounded-md border border-border/20 shadow-sm">
-                                                "{project.proposalAvis.reason}"
-                                            </div>
-                                        )}
-                                        <p className="text-[10px] text-muted-foreground text-right border-t border-border/10 pt-2">
-                                            Donné le {formatDate(parseDate(project.proposalAvis.givenAt))}
-                                        </p>
-                                    </CardContent>
-                                </Card>
-                            )}
+                                            {brief?.endDate && (
+                                                <div className="bg-muted/20 p-3 rounded-lg border border-border/50">
+                                                    <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Fin Événement</p>
+                                                    <div className="flex items-center gap-2 text-foreground font-medium">
+                                                        <IconCalendarStats className="h-4 w-4 text-blue-500" />
+                                                        {formatDate(parseDate(brief.endDate), "PPP")}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </CardContent>
+                                    </Card>
 
-                        </div>
-                    </div>
+                                    {/* Avis de Préparation */}
+                                    {project.proposalAvis && (
+                                        <Card className={cn("border shadow-sm transition-colors", project.proposalAvis.status === 'ACCEPTED' ? 'border-green-500/30 bg-green-50/20 dark:bg-green-900/10' : 'border-red-500/30 bg-red-50/20 dark:bg-red-900/10')}>
+                                            <CardHeader className="pb-3 border-b border-border/10">
+                                                <CardTitle className="text-sm font-bold uppercase tracking-wider flex items-center gap-2">
+                                                    <IconMessageCircle className="w-4 h-4" /> Avis CP
+                                                </CardTitle>
+                                            </CardHeader>
+                                            <CardContent className="p-4 space-y-3">
+                                                <div className="flex items-center justify-between">
+                                                    {project.proposalAvis.status === 'ACCEPTED' ? (
+                                                        <Badge className="bg-green-100 text-green-800 hover:bg-green-100 border-green-200 dark:bg-green-900 dark:text-green-100 dark:border-green-800">Accepté</Badge>
+                                                    ) : (
+                                                        <Badge className="bg-red-100 text-red-800 hover:bg-red-100 border-red-200 dark:bg-red-900 dark:text-red-100 dark:border-red-800">Refusé</Badge>
+                                                    )}
+                                                    <span className="text-xs text-muted-foreground">par {project.proposalAvis.givenBy?.name}</span>
+                                                </div>
+                                                {project.proposalAvis.reason && (
+                                                    <div className="text-sm italic text-muted-foreground bg-background/60 p-3 rounded-md border border-border/20 shadow-sm">
+                                                        "{project.proposalAvis.reason}"
+                                                    </div>
+                                                )}
+                                                <p className="text-[10px] text-muted-foreground text-right border-t border-border/10 pt-2">
+                                                    Donné le {formatDate(parseDate(project.proposalAvis.givenAt))}
+                                                </p>
+                                            </CardContent>
+                                        </Card>
+                                    )}
+
+                                </div>
+                            </div>
+                        </TabsContent>
+
+                        <TabsContent value="planification" className="mt-0">
+                            <Retroplanning projectId={id} currentPhase={project.currentPhase} />
+                        </TabsContent>
+                    </Tabs>
+
                 </main>
             </SidebarInset>
         </SidebarProvider>

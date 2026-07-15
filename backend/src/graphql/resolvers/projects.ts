@@ -16,9 +16,38 @@ import {
     teamPopulates, userSelect, buildProjectFilter, isDynamicPmCandidate,
     getRoleUserIds, patchProjectUsers
 } from './helpers';
-import { aiService } from '../../../services/aiService';
+import { analyzeCPSForPrestations, generateTasksFromPrestations, extractBriefFromCPS, extractPlanDeMasseFromCPS } from '../../services/aiService';
 import Role from '../../models/Role';
 import ProjectBriefModel from '../../models/ProjectBrief';
+import PrestationModel from '../../models/Prestation';
+
+// --- HELPER: RETROPLANNING CALCULATOR ---
+const calculateTargetDeadlines = (eventDate: Date) => {
+    const t0 = new Date(eventDate).getTime();
+    const day = 24 * 60 * 60 * 1000;
+    return {
+        deadlineJ2: new Date(t0 - 25 * day),
+        deadlineAchats: new Date(t0 - 21 * day),
+        deadlineReperage: new Date(t0 - 18 * day),
+        deadlineBAT: new Date(t0 - 12 * day),
+        deadlineImpression: new Date(t0 - 10 * day),
+        deadlineProduction: new Date(t0 - 7 * day),
+        deadlineMontage: new Date(t0 - 3 * day),
+    };
+};
+
+const STANDARD_WBS_LOTS = [
+    { name: '1. Management de projet', status: 'PENDING' },
+    { name: '2. Conception créative', status: 'PENDING' },
+    { name: '3. Études techniques & repérage', status: 'PENDING' },
+    { name: '4. Achats & sous-traitance', status: 'PENDING' },
+    { name: '5. Production', status: 'PENDING' },
+    { name: '6. Logistique & transport', status: 'PENDING' },
+    { name: '7. Montage / installation', status: 'PENDING' },
+    { name: '8. Exploitation / Jour J', status: 'PENDING' },
+    { name: '9. Démontage & repli', status: 'PENDING' },
+    { name: '10. Clôture & bilan', status: 'PENDING' }
+];
 
 // --- HELPER: CHECK PM ACCESS ---
 const checkPMAccess = async (context: IContext, project: any, requiredPermission: string) => {
@@ -161,7 +190,6 @@ export const projectResolvers = {
             return feed;
         },
 
-        // 👇👇👇 LE FIX EST ICI DANS LA QUERY PROJECT 👇👇👇
         project: async (_: unknown, { id }: { id: string }, context: IContext) => {
             if (!context.user) throw new ApolloError('Not authenticated', 'UNAUTHENTICATED');
 
@@ -189,9 +217,169 @@ export const projectResolvers = {
 
             return projectObj;
         },
+
+        getProjectRetroplanning: async (_: unknown, { projectId }: { projectId: string }, context: IContext) => {
+            if (!context.user) throw new ApolloError('Not authenticated', 'UNAUTHENTICATED');
+            const project = await Project.findById(projectId);
+            if (!project) throw new ApolloError('Project not found');
+
+            let status = 'ON_TRACK';
+            const now = new Date().getTime();
+
+            // Check missed BAT
+            if (project.targetDeadlines && project.targetDeadlines.deadlineBAT) {
+                if (now > project.targetDeadlines.deadlineBAT.getTime() && project.currentPhase !== 'CONCEPTION' && project.currentPhase !== 'EXECUTION' && project.currentPhase !== 'CLOTURE') {
+                    status = 'AT_RISK';
+                }
+            }
+
+            return {
+                wbsLots: project.wbsLots || [],
+                targetDeadlines: project.targetDeadlines || {},
+                status
+            };
+        },
     },
 
     Mutation: {
+        analyzeCPS: async (_: unknown, { projectId, fileUrl }: { projectId: string; fileUrl: string }, context: IContext) => {
+            if (!context.user) throw new ApolloError('Not authenticated', 'UNAUTHENTICATED');
+            const result = await analyzeCPSForPrestations(fileUrl);
+            
+            const enrichedResult = await Promise.all(result.map(async (item: any) => {
+                // Recherche dans le catalogue existant (insensible à la casse)
+                // Échapper les caractères spéciaux dans la désignation pour éviter les erreurs Regex
+                const escapedDesignation = item.designation.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').trim();
+                const existing = await PrestationModel.findOne({ 
+                    designation: { $regex: new RegExp(`^${escapedDesignation}$`, 'i') } 
+                });
+                
+                return {
+                    ...item,
+                    isNew: !existing,
+                    matchedPrestationId: existing ? existing._id : null
+                };
+            }));
+            
+            return enrichedResult;
+        },
+        extractBriefFromCPS: async (_: unknown, { projectId, fileUrl }: { projectId: string; fileUrl: string }, context: IContext) => {
+            if (!context.user) throw new ApolloError('Non autorisé');
+            const result = await extractBriefFromCPS(fileUrl);
+            return result;
+        },
+
+        extractPlanDeMasseFromCPS: async (_: unknown, { projectId, fileUrl }: { projectId: string; fileUrl: string }, context: IContext) => {
+            if (!context.user) throw new ApolloError('Non autorisé');
+            const result = await extractPlanDeMasseFromCPS(fileUrl);
+            return result.spaces || [];
+        },
+        generateTasksFromPrestations: async (_: unknown, { projectId, prestations }: any, context: IContext) => {
+            if (!context.user) throw new ApolloError('Not authenticated', 'UNAUTHENTICATED');
+            const result = await generateTasksFromPrestations(prestations);
+            return result;
+        },
+        createProjectJ1: async (_: unknown, { title, clientName, eventDate, budgetTarget, managerId }: any, context: IContext) => {
+            if (!context.user) throw new ApolloError('Not authenticated', 'UNAUTHENTICATED');
+
+            const user = await User.findById(context.user.id).populate('role');
+            if (!user) throw new ApolloError('User not found');
+            
+            const roleName = (user.role as any)?.name;
+            if (!['DG', 'DO', 'CP', 'ADMIN'].includes(roleName)) {
+                throw new ApolloError(`UNAUTHORIZED: Role ${roleName} cannot initiate J1 Projects.`, 'UNAUTHORIZED');
+            }
+
+            // Generate Project Code
+            const lastProject = await Project.findOne({}, { projectCode: 1 }).sort({ createdAt: -1 });
+            let nextSequence = 1;
+            if (lastProject && lastProject.projectCode) {
+                const parts = lastProject.projectCode.split('-');
+                if (parts.length === 2 && !isNaN(parseInt(parts[1]))) nextSequence = parseInt(parts[1]) + 1;
+            }
+            const projectCode = `J1-${nextSequence.toString().padStart(4, '0')}`;
+
+            let targetDeadlines = undefined;
+            if (eventDate) {
+                targetDeadlines = calculateTargetDeadlines(eventDate);
+            }
+
+            const newProject = await Project.create({
+                title,
+                clientName,
+                eventDate,
+                budgetTarget,
+                projectManagers: managerId ? [managerId] : [],
+                createdBy: context.user.id,
+                projectCode,
+                projectType: 'INTERNAL', 
+                object: title,           
+                submissionDeadline: eventDate || new Date(), 
+                currentPhase: 'INITIATION',
+                wbsLots: STANDARD_WBS_LOTS,
+                targetDeadlines,
+                milestones: [{
+                    code: 'J1',
+                    status: 'PENDING'
+                }],
+                stages: {
+                    administrative: { responsible: [], documents: [] },
+                    technical: { responsible: [], documents: [] },
+                    technicalOffer: { responsible: [], documents: [] },
+                    financialOffer: { responsible: [], documents: [] },
+                    printing: { responsible: [], documents: [] },
+                    workshop: { responsible: [], documents: [] },
+                    field: { responsible: [], documents: [] },
+                    logistics: { responsible: [], documents: [] },
+                }
+            });
+
+            await logActivity({
+                userId: context.user.id as any,
+                action: 'J1_PROJECT_INITIATION',
+                project: newProject._id,
+                details: `Project initiated by ${roleName}: "${title}"`
+            });
+
+            pubsub.publish('PROJECT_CREATED', { projectCreated: newProject });
+
+            return newProject;
+        },
+
+        validateJalonJ2: async (_: unknown, { projectId }: { projectId: string }, context: IContext) => {
+            if (!context.user) throw new ApolloError('Not authenticated');
+            
+            const user = await User.findById(context.user.id).populate('role');
+            const roleName = (user?.role as any)?.name;
+            
+            if (!['DG', 'DO', 'ADMIN'].includes(roleName)) {
+                throw new ApolloError('Forbidden: Seuls les DO, DG ou ADMIN peuvent valider le Jalon J2.', 'FORBIDDEN');
+            }
+
+            const project = await Project.findById(projectId);
+            if (!project) throw new ApolloError('Project not found');
+            
+            project.currentPhase = 'CONCEPTION';
+            const j2Index = project.milestones.findIndex((m: any) => m.code === 'J2');
+            if (j2Index >= 0) {
+                project.milestones[j2Index].status = 'APPROVED';
+                project.milestones[j2Index].approvedAt = new Date();
+            } else {
+                project.milestones.push({ code: 'J2', status: 'APPROVED', approvedAt: new Date() });
+            }
+
+            await project.save();
+
+            await logActivity({
+                userId: context.user.id as any,
+                action: 'J2_VALIDATED',
+                project: project._id,
+                details: `Jalon J2 validé par ${roleName}. Phase: CONCEPTION.`
+            });
+
+            return project;
+        },
+
         assignDynamicProjectManager: async (_: unknown, { projectId, newPmId }: { projectId: string, newPmId: string }, context: IContext) => {
             await checkPermission(context, 'assign_dynamic_pm');
             const isCandidate = await isDynamicPmCandidate(newPmId);
@@ -332,29 +520,7 @@ export const projectResolvers = {
             ((project.stages as any)[stageName].documents as any).push(newDocument._id);
 
             const isCPS = docType.includes('CPS') || originalFileName.toLowerCase().includes('cps');
-
-            if (isCPS) {
-                console.log("🤖 CPS détecté, analyse contextuelle IA...");
-                const absoluteFilePath = path.join(process.cwd(), newDocument.fileUrl);
-
-                try {
-                    const analysis = await aiService.analyzeCPSPDF(
-                        absoluteFilePath,
-                        project.title,
-                        project.object
-                    );
-
-                    project.aiSummary = {
-                        summary: analysis.summary,
-                        thematic: analysis.thematic,
-                        risks: analysis.risks || [],
-                        generatedAt: new Date()
-                    };
-                    console.log("✅ Résumé IA généré avec succès !");
-                } catch (err) {
-                    console.error("⚠️ Echec analyse IA:", err);
-                }
-            }
+            // L'analyse détaillée se fait maintenant via la mutation analyzeCPS dédiée.
 
             await project.save();
 
@@ -949,6 +1115,12 @@ export const projectResolvers = {
 
             return project;
         },
+    },
+
+    Subscription: {
+        projectCreated: {
+            subscribe: () => pubsub.asyncIterator(['PROJECT_CREATED'])
+        }
     },
 
     // ✅ Field Resolvers

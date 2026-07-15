@@ -72,6 +72,29 @@ export const typeDefs = gql`
     updatedAt: String
   }
 
+  type TargetDeadlines {
+    deadlineJ2: String
+    deadlineAchats: String
+    deadlineReperage: String
+    deadlineBAT: String
+    deadlineImpression: String
+    deadlineProduction: String
+    deadlineMontage: String
+  }
+
+  type WBSLot {
+    id: ID!
+    name: String!
+    status: String!
+    targetDeadline: String
+  }
+
+  type Retroplanning {
+    wbsLots: [WBSLot]
+    targetDeadlines: TargetDeadlines
+    status: String
+  }
+
   type Project {
     id: ID!
     projectCode: String!
@@ -95,6 +118,9 @@ export const typeDefs = gql`
     proposalAvis: ProposalAvis
     caution: Caution!
     
+    wbsLots: [WBSLot]
+    targetDeadlines: TargetDeadlines
+    
     # Computed / Linked fields
     prestations: [Prestation] 
     invoices: [Invoice]
@@ -108,8 +134,21 @@ export const typeDefs = gql`
 
     aiSummary: AiSummary
 
+    clientName: String
+    eventDate: String
+    budgetTarget: Float
+    budgetClient: Float
+    currentPhase: String
+    milestones: [Milestone]
+
     createdAt: String
     updatedAt: String
+  }
+
+  type Milestone {
+    code: String!
+    status: String!
+    approvedAt: String
   }
 
 type Space {
@@ -285,6 +324,112 @@ type Space {
     generatedAt: String
   }
 
+  type AIPrestation {
+    designation: String!
+    category: String!
+    subCategory: String!
+    quantity: Int!
+    unitPrice: Float!
+    description: String!
+    isNew: Boolean
+    matchedPrestationId: ID
+  }
+
+  type AITask {
+    title: String!
+    description: String!
+    department: String!
+    priority: String
+  }
+
+  type ProjectBriefAIExtract {
+    clientName: String
+    clientNature: String
+    projectName: String
+    eventFormat: String
+    toneStyle: String
+    location: String
+    locationType: String
+    visitorsCount: Int
+    startDate: String
+    endDate: String
+    durationDays: Int
+    estimatedBudget: Float
+    eventGoal: [String]
+    targetAudience: [String]
+    mainObjective: String
+    subObjectives: [String]
+    history: String
+    themeConcept: String
+    themeDeclination: String
+    constraints: String
+  }
+
+  type AISpaceExtract {
+    name: String!
+    surface: Float!
+    capacity: Int!
+    type: String!
+    x: Int!
+    y: Int!
+    w: Int!
+    h: Int!
+    features: [String]
+  }
+
+  type GenerateTasksResult {
+    tasks: [AITask]!
+    creativeSummary: String!
+    projectBrief: ProjectBriefAIExtract
+  }
+
+  type AITasksResult {
+    tasks: [AITask!]!
+    creativeSummary: String!
+    projectBrief: ProjectBriefAIExtract
+  }
+
+  input AIPrestationInput {
+    category: String!
+    subCategory: String
+    designation: String!
+    description: String
+    quantity: Int!
+    unitPrice: Float!
+  }
+
+  input AITaskInput {
+    department: String!
+    title: String!
+    description: String
+    priority: String
+  }
+
+  input ProjectBriefAIExtractInput {
+    clientNature: String
+    eventFormat: String
+    toneStyle: String
+    location: String
+    startDate: String
+    endDate: String
+    eventGoal: [String]
+    targetAudience: [String]
+    mainObjective: String
+    subObjectives: [String]
+    themeConcept: String
+    locationType: String
+    visitorsCount: Int
+    constraints: String
+  }
+
+  input ImportAIProductionInput {
+    projectId: ID!
+    prestations: [AIPrestationInput!]!
+    tasks: [AITaskInput!]!
+    creativeSummary: String
+    projectBrief: ProjectBriefAIExtractInput
+  }
+
   type Notification {
     id: ID!
     level: NotificationLevel!
@@ -415,6 +560,7 @@ input CreateProjectInput {
     marketEstimate: Float
     estimatedBudget: Float
     cautionAmount: Float
+    budgetClient: Float
     generalStatus: String
     
     # 👇 ZID HADO ILA MAKANOCH
@@ -422,6 +568,10 @@ input CreateProjectInput {
     submissionDeadline: String
     technicalOfferRequired: Boolean
     projectType: String
+    clientName: String
+    eventDate: String
+    budgetTarget: Float
+    currentPhase: String
   }
 
   input AdminAssignProjectInput {
@@ -487,6 +637,7 @@ input CreateProjectInput {
     
     projects_feed: [ProjectFeedItem!]
     project(id: ID!): Project
+    getProjectRetroplanning(projectId: ID!): Retroplanning
     
     tasksByProject(projectId: ID!): [Task!]
     myTasks: [Task!]
@@ -512,10 +663,22 @@ input CreateProjectInput {
     # Auth
     register(name: String!, email: String!, password: String!): AuthPayload!
     login(email: String!, password: String!): AuthPayload!
+    googleLogin(token: String!): AuthPayload!
+
+    # Jalon J1
+    createProjectJ1(title: String!, clientName: String!, eventDate: String!, budgetTarget: Float!, managerId: ID!): Project!
 
     # Projects
     updateProject(id: ID!, input: UpdateProjectInput!): Project!
+    validateJalonJ2(projectId: ID!): Project!
+    deleteProject(id: ID!): Boolean
     generateCPSSummary(projectId: ID!): Project
+    
+    # AI Mutations
+    analyzeCPS(projectId: ID!, fileUrl: String!): [AIPrestation!]!
+    generateTasksFromPrestations(projectId: ID!, fileUrl: String!): AITasksResult!
+    extractBriefFromCPS(projectId: ID!, fileUrl: String!): ProjectBriefAIExtract!
+    extractPlanDeMasseFromCPS(projectId: ID!, fileUrl: String!): [AISpaceExtract]!
     
     # Proposal
     proposal_createProject(input: CreateProjectInput!): Project!
@@ -542,8 +705,10 @@ input CreateProjectInput {
     
     # ✅ NEW: Invoicing Mutations
     addInvoiceItem(input: AddInvoiceItemInput!): InvoiceItem!
+    updateInvoiceItemPrice(id: ID!, unitPrice: Float!): InvoiceItem!
     deleteInvoiceItem(id: ID!): Boolean
     importPrestationsFromExcel(projectId: ID!, invoiceId: ID!, fileUrl: String!): [InvoiceItem] # Updated return type
+    importAIProduction(input: ImportAIProductionInput!): Boolean!
 
     # Brief
     saveProjectBrief(input: ProjectBriefInput!): ProjectBrief
@@ -561,6 +726,7 @@ input CreateProjectInput {
     # Tasks & Project Management
     pm_createTask(input: PMCreateTaskInput!): Task!
     pm_updateTaskStatus(taskId: ID!, status: String!): Task!
+    pm_updateTaskPriority(taskId: ID!, priority: String!): Task!
     pm_validateStage(projectId: ID!, stage: String!): Project!
     giveProposalAvis(projectId: ID!, status: String!, reason: String): Project!
     
@@ -594,5 +760,6 @@ input CreateProjectInput {
     taskCreated(userId: ID!): Task
     taskUpdated: Task
     newNotification(userId: ID!): Notification
+    projectCreated: Project
   }
 `;

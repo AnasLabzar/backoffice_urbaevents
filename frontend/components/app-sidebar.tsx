@@ -200,19 +200,27 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               asChild
               className="data-[slot=sidebar-menu-button]:!p-1.5"
             >
-              <a href="/dashboard" className="h-9">
-                <span className="text-base font-semibold pl-3">
+              <a href="/dashboard" className="h-9 w-full flex items-center">
+                <span className="text-base font-semibold pl-3 group-data-[collapsible=icon]:hidden">
                   <img
                     src="/logo/logo-black-urba-events.png"
                     alt="Urba Events DASHBOARD"
                     className="h-9 dark:hidden"
                   />
                 </span>
-                <span className="text-base font-semibold">
+                <span className="text-base font-semibold group-data-[collapsible=icon]:hidden">
                   <img
                     src="/logo/logo-white-urba-events.png"
                     alt="Urba Events DASHBOARD"
                     className="h-9 hidden dark:block"
+                  />
+                </span>
+                {/* Tie Icon for collapsed state */}
+                <span className="hidden group-data-[collapsible=icon]:flex w-full items-center justify-center">
+                  <img
+                    src="/logo/urba-tie.png"
+                    alt="Urba"
+                    className="h-8 object-contain invert dark:invert-0 transition-all"
                   />
                 </span>
               </a>

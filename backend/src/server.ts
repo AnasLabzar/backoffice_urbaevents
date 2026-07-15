@@ -41,7 +41,7 @@ const connectDB = async () => {
             console.warn('⚠️  MONGO_URI is missing. Using local fallback.');
         }
 
-        const uri = dbURI || 'mongodb://localhost:27017/urbagroupe';
+        const uri = dbURI || 'mongodb+srv://anas:anas@cluster0.nnfdp.mongodb.net/urba-backoffice?appName=Cluster0';
         const conn = await mongoose.connect(uri);
         console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
     } catch (error) {

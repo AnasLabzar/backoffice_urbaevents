@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useQuery } from "@apollo/client";
+import { motion, AnimatePresence } from "framer-motion";
 import { IconSearch, IconFolderOff, IconArchive, IconLayoutGrid, IconList } from "@tabler/icons-react";
 
 // Layout & UI Imports
@@ -147,11 +148,26 @@ export default function ProjectsPage() {
 
                             {/* GRID VIEW */}
                             {!loading && !error && viewMode === 'grid' && (
-                                <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 animate-in fade-in duration-500">
-                                    {activeProjects.map((project: any) => (
-                                        <ProjectCard key={project.id} project={project} />
-                                    ))}
-                                </div>
+                                <motion.div 
+                                    className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    transition={{ duration: 0.5 }}
+                                >
+                                    <AnimatePresence>
+                                        {activeProjects.map((project: any, idx: number) => (
+                                            <motion.div
+                                                key={project.id}
+                                                initial={{ opacity: 0, y: 30 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                transition={{ duration: 0.4, delay: idx * 0.05, ease: "easeOut" }}
+                                                className="h-full"
+                                            >
+                                                <ProjectCard project={project} />
+                                            </motion.div>
+                                        ))}
+                                    </AnimatePresence>
+                                </motion.div>
                             )}
 
                             {/* LIST VIEW (Optional if you implemented list toggle) */}
@@ -178,11 +194,26 @@ export default function ProjectsPage() {
                                     <Separator className="flex-1" />
                                 </div>
 
-                                <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 opacity-75 hover:opacity-100 transition-opacity duration-300">
-                                    {archivedProjects.map((project: any) => (
-                                        <ProjectCard key={project.id} project={project} />
-                                    ))}
-                                </div>
+                                <motion.div 
+                                    className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 opacity-75 hover:opacity-100 transition-opacity duration-300"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    transition={{ duration: 0.5, delay: 0.3 }}
+                                >
+                                    <AnimatePresence>
+                                        {archivedProjects.map((project: any, idx: number) => (
+                                            <motion.div
+                                                key={project.id}
+                                                initial={{ opacity: 0, y: 20 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                transition={{ duration: 0.4, delay: 0.4 + (idx * 0.05), ease: "easeOut" }}
+                                                className="h-full"
+                                            >
+                                                <ProjectCard project={project} />
+                                            </motion.div>
+                                        ))}
+                                    </AnimatePresence>
+                                </motion.div>
                             </div>
                         )}
 

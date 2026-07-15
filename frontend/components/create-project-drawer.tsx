@@ -32,14 +32,17 @@ import { Separator } from "@/components/ui/separator";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
 
 // --- GRAPHQL ---
-const CREATE_PROJECT_MUTATION = gql`
-  mutation CreateProject($input: CreateProjectInput!) {
-    proposal_createProject(input: $input) { 
-      id 
-      projectCode 
-      title 
-      estimatedBudget
-      cautionAmount
+const CREATE_PROJECT_J1_MUTATION = gql`
+  mutation CreateProjectJ1($title: String!, $clientName: String!, $eventDate: String!, $budgetTarget: Float!, $managerId: ID!) {
+    createProjectJ1(title: $title, clientName: $clientName, eventDate: $eventDate, budgetTarget: $budgetTarget, managerId: $managerId) {
+      id
+      title
+      clientName
+      projectCode
+      currentPhase
+      eventDate
+      budgetTarget
+      milestones { code status }
     }
   }
 `;
@@ -49,18 +52,10 @@ const UPDATE_PROJECT_MUTATION = gql`
     updateProject(id: $id, input: $input) {
       id 
       title 
-      object 
-      generalStatus 
-      preparationStatus
-      
-      # Refresh Cache Fields
-      estimatedBudget
-      cautionAmount
-      marketEstimate
-      referenceAO
-      submissionDeadline
-      technicalOfferRequired
-      projectType
+      clientName
+      eventDate
+      budgetTarget
+      currentPhase
     }
   }
 `;
@@ -75,17 +70,10 @@ const GET_PROJECTS_FEED = gql`
         status: generalStatus 
         preparationStatus
         
-        # Champs Edit
-        projectType
-        referenceAO
-        submissionDeadline
-        technicalOfferRequired
-        
-        # Financials
-        marketEstimate
-        estimatedBudget
-        cautionAmount
-
+        clientName
+        eventDate
+        budgetTarget
+        currentPhase
         projectManagers { name }
         stages { administrative { documents { id fileName } } }
       }
@@ -109,15 +97,9 @@ const safeDate = (dateInput: any): Date | undefined => {
 // --- INTERFACE POUR LE STATE (C'EST ÇA QUI MANQUAIT) ---
 interface ProjectFormData {
   title: string;
-  object: string;
-  projectType: string;
-  submissionDeadline: Date | undefined;
-  referenceAO: string;
-  // On autorise string | number pour gérer le formatage "1,200,000"
-  estimatedBudget: string | number;
-  cautionAmount: string | number;
-  marketEstimate: string | number;
-  technicalOfferRequired: boolean;
+  clientName: string;
+  eventDate: Date | undefined;
+  budgetTarget: string | number;
 }
 
 // --- FORM CONTENT ---
@@ -126,8 +108,7 @@ function ProjectFormContent({
   formData,
   handleChange,
   handleSelectChange,
-  handleDateChange, // <--- C'est ici
-  handleCheckboxChange,
+  handleDateChange,
   handleSubmit,
   loading,
   userRole,
@@ -136,58 +117,52 @@ function ProjectFormContent({
   formData: ProjectFormData;
   handleChange: (e: any) => void;
   handleSelectChange: (id: string, val: any) => void;
-  // 👇 MODIFICATION ICI : Ajoute "| null"
   handleDateChange: (date: Date | undefined | null) => void;
-  handleCheckboxChange: (id: string, val: boolean) => void;
   handleSubmit: (e: React.FormEvent) => void;
   loading: boolean;
   userRole: string;
   isEditMode: boolean;
 }) {
 
-  const canCreate = userRole === 'PROPOSAL_MANAGER' || userRole === 'ADMIN';
-  const isDirectProd = formData.projectType === 'CONFIRMED' || formData.projectType === 'INTERNAL';
+  const canCreate = ['DG', 'DO', 'CP', 'ADMIN'].includes(userRole);
 
   if (!canCreate) {
     return (
       <Alert variant="destructive">
         <AlertCircle className="h-4 w-4" />
         <AlertTitle>Accès Refusé</AlertTitle>
-        <AlertDescription>Permission manquante.</AlertDescription>
+        <AlertDescription>Seuls les DG, DO, CP ou ADMIN peuvent initier un projet (J1).</AlertDescription>
       </Alert>
     );
   }
 
   return (
     <form id="project-form" className="flex flex-col gap-6 px-1" onSubmit={handleSubmit}>
-      <Alert className={cn(
-        "border",
-        isDirectProd ? "bg-green-50 border-green-200 text-green-800" : "bg-blue-50 border-blue-200 text-blue-800"
-      )}>
-        {isDirectProd ? <CheckCircle2 className="h-4 w-4 text-green-600" /> : <Info className="h-4 w-4 text-blue-600" />}
+      <Alert className="bg-blue-50 border-blue-200 text-blue-800">
+        <Info className="h-4 w-4 text-blue-600" />
         <AlertTitle className="font-semibold">
-          {isEditMode ? "Mode Modification" : (isDirectProd ? "Mode Production Directe" : "Mode Brouillon (Draft)")}
+          {isEditMode ? "Mode Modification" : "Initiation J1"}
         </AlertTitle>
         <AlertDescription className="text-xs opacity-90">
           {isEditMode
-            ? "Vous modifiez les informations de ce projet."
-            : "Ce projet sera créé en attente de validation."
+            ? "Vous modifiez les informations de base du projet."
+            : "Ce projet sera créé en phase INITIATION."
           }
         </AlertDescription>
       </Alert>
 
       <div className="space-y-4">
         <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-          <User className="h-4 w-4 text-muted-foreground" /> Informations Client
+          <User className="h-4 w-4 text-muted-foreground" /> Informations Générales
         </h3>
         <div className="grid gap-4">
           <div className="space-y-2">
-            <Label htmlFor="title" className="text-xs font-bold text-muted-foreground uppercase">Nom du Client *</Label>
-            <Input id="title" placeholder="Ex: Ministère de la Culture..." value={formData.title} onChange={handleChange} required className="bg-background" />
+            <Label htmlFor="title" className="text-xs font-bold text-muted-foreground uppercase">Titre du Projet *</Label>
+            <Input id="title" placeholder="Ex: Festival des Arts..." value={formData.title} onChange={handleChange} required className="bg-background" />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="object" className="text-xs font-bold text-muted-foreground uppercase">Objet du Projet *</Label>
-            <Input id="object" placeholder="Ex: Organisation de l'événement..." value={formData.object} onChange={handleChange} required className="bg-background" />
+            <Label htmlFor="clientName" className="text-xs font-bold text-muted-foreground uppercase">Nom du Client *</Label>
+            <Input id="clientName" placeholder="Ex: Ministère de la Culture" value={formData.clientName} onChange={handleChange} required className="bg-background" />
           </div>
         </div>
       </div>
@@ -196,60 +171,24 @@ function ProjectFormContent({
 
       <div className="space-y-4">
         <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-          <Hash className="h-4 w-4 text-muted-foreground" /> Détails Techniques
+          <Hash className="h-4 w-4 text-muted-foreground" /> Planning & Budget
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="projectType">Type de Projet</Label>
-            <Select value={formData.projectType} onValueChange={(value) => handleSelectChange("projectType", value)}>
-              <SelectTrigger id="projectType" className="bg-background"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="PUBLIC_TENDER">🏛️ Appel d'Offre</SelectItem>
-                <SelectItem value="CONFIRMED">✅ Projet Confirmé</SelectItem>
-                <SelectItem value="INTERNAL">🏢 Projet Interne</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="referenceAO">Référence AO</Label>
-            <Input id="referenceAO" placeholder="N° 12/2026/..." value={formData.referenceAO} onChange={handleChange} className="bg-background" />
-          </div>
-          <div className="space-y-2 md:col-span-2">
-            <Label htmlFor="submissionDeadline">Date Deadline</Label>
+            <Label htmlFor="eventDate">Date de l'événement *</Label>
             <DatePickerInput
-              date={formData.submissionDeadline}
+              date={formData.eventDate}
               setDate={handleDateChange}
-              placeholder="Sélectionner la date limite"
+              placeholder="Sélectionner la date"
             />
           </div>
-        </div>
-      </div>
-
-      <Separator />
-
-      <div className="space-y-4">
-        <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-          <span className="font-bold text-green-600 text-xs border border-green-200 px-1 rounded">DH</span> Financier
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="estimatedBudget">Budget Est. (DH)</Label>
-            <PriceInput id="estimatedBudget" value={formData.estimatedBudget} onChange={(val) => handleSelectChange("estimatedBudget", val)} placeholder="0.00" />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="cautionAmount">Caution (DH)</Label>
-            <PriceInput id="cautionAmount" value={formData.cautionAmount} onChange={(val) => handleSelectChange("cautionAmount", val)} placeholder="0.00" />
+            <Label htmlFor="budgetTarget">Budget Cible Est. (DH) *</Label>
+            <PriceInput id="budgetTarget" value={formData.budgetTarget} onChange={(val) => handleSelectChange("budgetTarget", val)} placeholder="0.00" />
           </div>
         </div>
       </div>
 
-      <div className="flex items-center space-x-3 bg-muted/30 p-4 rounded-lg border">
-        <Checkbox id="technicalOfferRequired" checked={formData.technicalOfferRequired} onCheckedChange={(checked) => handleCheckboxChange("technicalOfferRequired", checked as boolean)} />
-        <div className="grid gap-1">
-          <Label htmlFor="technicalOfferRequired" className="text-sm font-medium cursor-pointer">Besoin d'équipe technique ?</Label>
-          <p className="text-xs text-muted-foreground">Cochez si le projet nécessite des Infographistes ou 3D.</p>
-        </div>
-      </div>
     </form>
   );
 }
@@ -290,14 +229,9 @@ export function ProjectSheet({ projectToEdit, trigger, open: controlledOpen, onO
 
   const defaultState: ProjectFormData = {
     title: "",
-    object: "",
-    projectType: "PUBLIC_TENDER",
-    submissionDeadline: undefined,
-    referenceAO: "",
-    estimatedBudget: "",
-    cautionAmount: "",
-    marketEstimate: "",
-    technicalOfferRequired: true,
+    clientName: "",
+    eventDate: undefined,
+    budgetTarget: "",
   };
 
   // ✅ Utilisation de l'interface dans useState pour éviter les erreurs TS
@@ -309,28 +243,18 @@ export function ProjectSheet({ projectToEdit, trigger, open: controlledOpen, onO
 
       setFormData({
         title: projectToEdit.title || "",
-        object: projectToEdit.object || "",
-        projectType: projectToEdit.projectType || "PUBLIC_TENDER",
-        submissionDeadline: safeDate(projectToEdit.submissionDeadline),
-
-        // Si referenceAO est vide ici, le problème vient du Parent (Query)
-        referenceAO: projectToEdit.referenceAO || "",
-
-        // On formate les nombres en strings pour l'affichage
-        estimatedBudget: formatVal(projectToEdit.estimatedBudget),
-        cautionAmount: formatVal(projectToEdit.cautionAmount),
-        marketEstimate: formatVal(projectToEdit.marketEstimate),
-
-        technicalOfferRequired: projectToEdit.technicalOfferRequired ?? true,
+        clientName: projectToEdit.clientName || "",
+        eventDate: safeDate(projectToEdit.eventDate),
+        budgetTarget: formatVal(projectToEdit.budgetTarget),
       });
     } else if (isOpen && !projectToEdit) {
       setFormData(defaultState);
     }
   }, [isOpen, projectToEdit]);
 
-  const [createProject, { loading: creating }] = useMutation(CREATE_PROJECT_MUTATION, {
+  const [createProjectJ1, { loading: creating }] = useMutation(CREATE_PROJECT_J1_MUTATION, {
     onCompleted: () => {
-      toast.success("Projet créé avec succès !");
+      toast.success("Projet initié avec succès !");
       setIsOpen(false);
       setFormData(defaultState);
     },
@@ -357,9 +281,7 @@ export function ProjectSheet({ projectToEdit, trigger, open: controlledOpen, onO
   // 1. Accepte 'null' dans les arguments
   // 2. Utilise '|| undefined' pour convertir le null en undefined avant de set le state
   const handleDateChange = (date: Date | undefined | null) =>
-    setFormData({ ...formData, submissionDeadline: date || undefined });
-
-  const handleCheckboxChange = (id: string, val: boolean) => setFormData({ ...formData, [id]: val });
+    setFormData({ ...formData, eventDate: date || undefined });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -367,9 +289,7 @@ export function ProjectSheet({ projectToEdit, trigger, open: controlledOpen, onO
     // Nettoyage avant envoi au backend (String -> Number)
     const inputData = {
       ...formData,
-      estimatedBudget: parseAmount(formData.estimatedBudget),
-      cautionAmount: parseAmount(formData.cautionAmount),
-      marketEstimate: parseAmount(formData.marketEstimate),
+      budgetTarget: parseAmount(formData.budgetTarget),
     };
 
     console.log("Envoi au Backend:", inputData);
@@ -379,8 +299,14 @@ export function ProjectSheet({ projectToEdit, trigger, open: controlledOpen, onO
         variables: { id: projectToEdit.id, input: inputData }
       });
     } else {
-      createProject({
-        variables: { input: inputData }
+      createProjectJ1({
+        variables: { 
+          title: inputData.title,
+          clientName: inputData.clientName,
+          eventDate: inputData.eventDate,
+          budgetTarget: inputData.budgetTarget,
+          managerId: meData?.me?.id
+        }
       });
     }
   };
@@ -414,7 +340,6 @@ export function ProjectSheet({ projectToEdit, trigger, open: controlledOpen, onO
             handleChange={handleChange}
             handleSelectChange={handleSelectChange}
             handleDateChange={handleDateChange}
-            handleCheckboxChange={handleCheckboxChange}
             handleSubmit={handleSubmit}
             loading={loading}
             userRole={userRole}

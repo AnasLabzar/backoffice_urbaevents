@@ -26,12 +26,63 @@ const StageSchema = new Schema({
   documents: [{ type: Schema.Types.ObjectId, ref: 'Document' }]
 });
 
+// --- NEW SCHEMA FIELDS ---
+const MilestoneSchema = new Schema({
+  code: { type: String, required: true },
+  status: { type: String, enum: ['PENDING', 'APPROVED', 'REJECTED'], default: 'PENDING' },
+  approvedAt: { type: Date }
+});
+
+const WBSLotSchema = new Schema({
+  name: { type: String, required: true },
+  status: { type: String, enum: ['PENDING', 'IN_PROGRESS', 'DONE', 'DELAYED'], default: 'PENDING' },
+  targetDeadline: { type: Date }
+});
+
+const TargetDeadlinesSchema = new Schema({
+  deadlineJ2: { type: Date },
+  deadlineAchats: { type: Date },
+  deadlineReperage: { type: Date },
+  deadlineBAT: { type: Date },
+  deadlineImpression: { type: Date },
+  deadlineProduction: { type: Date },
+  deadlineMontage: { type: Date }
+}, { _id: false });
+
 // --- MAIN PROJECT INTERFACE ---
 export interface IProject extends Document {
   projectCode: string;
   projectType: 'PUBLIC_TENDER' | 'CONFIRMED' | 'INTERNAL';
   createdBy: IUser['_id'];
   title: string;
+  clientName?: string;
+  eventDate?: Date;
+  budgetTarget?: Number;
+  budgetClient?: Number;
+
+  currentPhase: 'INITIATION' | 'PLANIFICATION' | 'CONCEPTION' | 'EXECUTION' | 'CLOTURE';
+  milestones: {
+    code: string;
+    status: string;
+    approvedAt?: Date;
+  }[];
+
+  wbsLots: {
+    _id?: mongoose.Types.ObjectId;
+    name: string;
+    status: 'PENDING' | 'IN_PROGRESS' | 'DONE' | 'DELAYED';
+    targetDeadline?: Date;
+  }[];
+
+  targetDeadlines?: {
+    deadlineJ2?: Date;
+    deadlineAchats?: Date;
+    deadlineReperage?: Date;
+    deadlineBAT?: Date;
+    deadlineImpression?: Date;
+    deadlineProduction?: Date;
+    deadlineMontage?: Date;
+  };
 
   aiSummary?: {
     summary: string;
@@ -85,6 +136,19 @@ const ProjectSchema: Schema = new Schema(
     projectType: { type: String, enum: ['PUBLIC_TENDER', 'CONFIRMED', 'INTERNAL'], required: true },
     createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     title: { type: String, required: true },
+    clientName: { type: String },
+    eventDate: { type: Date },
+    budgetTarget: { type: Number },
+    budgetClient: { type: Number },
+
+    currentPhase: { 
+      type: String, 
+      enum: ['INITIATION', 'PLANIFICATION', 'CONCEPTION', 'EXECUTION', 'CLOTURE'], 
+      default: 'INITIATION' 
+    },
+    milestones: [MilestoneSchema],
+    wbsLots: [WBSLotSchema],
+    targetDeadlines: TargetDeadlinesSchema,
 
     aiSummary: {
       summary: String,

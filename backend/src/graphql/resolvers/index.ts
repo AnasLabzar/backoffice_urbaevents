@@ -39,8 +39,9 @@ export const resolvers = {
     },
 
     Subscription: {
-        ...taskResolvers.Subscription,
-        ...notificationResolvers.Subscription,
+        ...(taskResolvers.Subscription || {}),
+        ...(notificationResolvers.Subscription || {}),
+        ...((projectResolvers as any).Subscription || {}),
     },
 
     // --- TYPES RESOLVERS ---

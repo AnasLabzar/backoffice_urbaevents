@@ -23,6 +23,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
+import { AIAssistantButton } from "@/components/projects/ai-assistant-button";
 
 // Import du Manager
 import { PrestationManager } from "./prestation-manager";
@@ -358,6 +359,24 @@ export function BriefForm({ projectId, projectTitle, projectObject, initialData,
         documents.forEach(doc => window.open(getFileUrl(doc.fileUrl), '_blank'));
     };
 
+    const handleAiAutoFill = (aiData: any) => {
+        setFormData(prev => ({
+            ...prev,
+            clientNature: aiData.clientNature || prev.clientNature,
+            eventFormat: aiData.eventFormat || prev.eventFormat,
+            toneStyle: aiData.toneStyle || prev.toneStyle,
+            location: aiData.location || prev.location,
+            locationType: aiData.locationType || prev.locationType,
+            visitorsCount: aiData.visitorsCount || prev.visitorsCount,
+            startDate: safeDate(aiData.startDate) || prev.startDate,
+            endDate: safeDate(aiData.endDate) || prev.endDate,
+            targetAudience: aiData.targetAudience?.length ? aiData.targetAudience : prev.targetAudience,
+            eventGoal: aiData.eventGoal?.length ? aiData.eventGoal : prev.eventGoal,
+            mainObjective: aiData.mainObjective || prev.mainObjective,
+            constraints: aiData.constraints || prev.constraints,
+        }));
+    };
+
     // Financial Logic
     const budgetClient = parseFloat(formData.estimatedBudget.toString()) || 0;
     const marge = budgetClient - technicalCost;
@@ -382,6 +401,12 @@ export function BriefForm({ projectId, projectTitle, projectObject, initialData,
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
+                    <AIAssistantButton 
+                        projectId={projectId} 
+                        documents={documents} 
+                        mode="brief"
+                        onExtractBrief={handleAiAutoFill}
+                    />
                     <Button onClick={handleSubmit} disabled={isSaving} size="lg" className="shadow-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-all active:scale-95">
                         {isSaving ? <IconLoader className="w-4 h-4 mr-2 animate-spin" /> : isUpdate ? <IconRefresh className="w-4 h-4 mr-2" /> : <IconDeviceFloppy className="w-4 h-4 mr-2" />}
                         {isSaving ? "Sauvegarde..." : isUpdate ? "Mettre à jour" : "Enregistrer"}
@@ -600,9 +625,11 @@ export function BriefForm({ projectId, projectTitle, projectObject, initialData,
                                         Spaces Manager
                                     </CardHeader>
                                     <CardContent className="p-6 bg-slate-50/50 dark:bg-slate-950/20">
-                                        <SpacesManager
-                                            spaces={formData.spaces}
-                                            onChange={(newSpaces) => handleChange('spaces', newSpaces)}
+                                        <SpacesManager 
+                                            spaces={formData.spaces} 
+                                            onChange={(spaces) => setFormData(prev => ({ ...prev, spaces }))} 
+                                            projectId={projectId}
+                                            documents={documents}
                                         />
                                     </CardContent>
                                 </Card>
@@ -629,9 +656,11 @@ export function BriefForm({ projectId, projectTitle, projectObject, initialData,
                             Spaces Manager
                         </CardHeader>
                         <CardContent className="p-6 bg-slate-50/50 dark:bg-slate-950/20">
-                            <SpacesManager
-                                spaces={formData.spaces}
-                                onChange={(newSpaces) => handleChange('spaces', newSpaces)}
+                            <SpacesManager 
+                                spaces={formData.spaces} 
+                                onChange={(spaces) => setFormData(prev => ({ ...prev, spaces }))} 
+                                projectId={projectId}
+                                documents={documents}
                             />
                         </CardContent>
                     </Card>

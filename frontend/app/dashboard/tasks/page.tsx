@@ -20,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
+import { motion, AnimatePresence } from "framer-motion";
 
 // --- 1. QUERY MISE À JOUR (COMPLÈTE POUR LE TABLEAU) ---
 const GET_PAGE_DATA = gql`
@@ -68,14 +69,17 @@ const GET_PAGE_DATA = gql`
 // --- STAT CARD COMPONENT ---
 function StatCard({ title, value, icon: Icon, description, className, trend }: any) {
   return (
-    <Card className={cn("shadow-sm bg-card text-card-foreground border-border", className)}>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
-        <Icon className="h-4 w-4 text-muted-foreground opacity-70" />
+    <Card className={cn("shadow-sm bg-card/40 backdrop-blur-xl border-border/40 hover:border-primary/40 hover:shadow-lg transition-all duration-300 relative overflow-hidden group", className)}>
+      <div className="absolute -inset-0.5 bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10">
+        <CardTitle className="text-sm font-bold text-muted-foreground tracking-tight">{title}</CardTitle>
+        <div className="p-2 bg-primary/10 rounded-lg group-hover:bg-primary/20 transition-colors">
+            <Icon className="h-4 w-4 text-primary" />
+        </div>
       </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold tracking-tight">{value}</div>
-        <p className="text-xs text-muted-foreground mt-1">{description}</p>
+      <CardContent className="relative z-10">
+        <div className="text-3xl font-black tracking-tighter text-foreground">{value}</div>
+        <p className="text-xs text-muted-foreground mt-1 font-medium">{description}</p>
         {trend && <div className="mt-3">{trend}</div>}
       </CardContent>
     </Card>
@@ -136,8 +140,14 @@ export default function TasksPage() {
         <div className="flex flex-1 flex-col p-4 md:p-6 max-w-[1600px] mx-auto w-full space-y-6">
 
           {/* 1. Dashboard Header */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-6 rounded-xl border shadow-sm">
-            <div className="flex items-center gap-4">
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
+            className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card/40 backdrop-blur-xl p-6 rounded-2xl border border-border/40 shadow-sm relative overflow-hidden"
+          >
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary/50 via-secondary/50 to-primary/50" />
+            <div className="flex items-center gap-4 relative z-10">
               {loading ? (
                 <Skeleton className="h-14 w-14 rounded-full" />
               ) : (
@@ -177,23 +187,37 @@ export default function TasksPage() {
                 </span>
               )}
             </div>
-          </div>
+          </motion.div>
 
           {/* 2. Key Metrics Grid */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <StatCard title={isManager ? "Total Tâches" : "Mes Tâches"} value={loading ? "-" : totalTasks} description="Actives" icon={IconChecklist} />
-            <StatCard title="Priorité Haute" value={loading ? "-" : urgentTasks} description="Urgentes" icon={IconAlertCircle} className={urgentTasks > 0 ? "border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-900/10" : ""} />
-            <StatCard title="Productivité" value={loading ? "-" : `${completionRate}%`} description="Taux de complétion" icon={IconChartPie} trend={<Progress value={completionRate} className="h-1.5 bg-muted" indicatorClassName="bg-emerald-600" />} />
-            <StatCard title="En Cours" value={loading ? "-" : pendingTasks} description="À traiter" icon={IconClock} />
+            <AnimatePresence>
+                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1, duration: 0.4 }}>
+                    <StatCard title={isManager ? "Total Tâches" : "Mes Tâches"} value={loading ? "-" : totalTasks} description="Actives" icon={IconChecklist} />
+                </motion.div>
+                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2, duration: 0.4 }}>
+                    <StatCard title="Priorité Haute" value={loading ? "-" : urgentTasks} description="Urgentes" icon={IconAlertCircle} className={urgentTasks > 0 ? "border-red-500/30 bg-red-500/5 dark:bg-red-500/10 hover:border-red-500/50" : ""} />
+                </motion.div>
+                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3, duration: 0.4 }}>
+                    <StatCard title="Productivité" value={loading ? "-" : `${completionRate}%`} description="Taux de complétion" icon={IconChartPie} trend={<Progress value={completionRate} className="h-1.5 bg-muted/50" indicatorClassName="bg-emerald-500" />} />
+                </motion.div>
+                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4, duration: 0.4 }}>
+                    <StatCard title="En Cours" value={loading ? "-" : pendingTasks} description="À traiter" icon={IconClock} />
+                </motion.div>
+            </AnimatePresence>
           </div>
 
           {/* 3. Main Data Table */}
-          <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+          <motion.div 
+            initial={{ opacity: 0, y: 30 }} 
+            animate={{ opacity: 1, y: 0 }} 
+            transition={{ delay: 0.5, duration: 0.5, ease: "easeOut" }}
+            className="rounded-2xl border border-border/40 bg-card/40 backdrop-blur-xl shadow-lg overflow-hidden"
+          >
             <div className="p-1">
-              {/* ✅ COMPOSANT CORRIGÉ : On passe les données, on ne fetch pas dedans */}
               <TasksTable initialData={tasks} isManager={isManager} isLoading={loading} />
             </div>
-          </div>
+          </motion.div>
         </div>
       </SidebarInset>
     </SidebarProvider>

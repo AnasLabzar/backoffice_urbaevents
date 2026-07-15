@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { ActiveThemeProvider } from "@/components/active-theme";
 import { ApolloClientProvider } from "@/components/providers/apollo-provider";
+import { GoogleOAuthProvider } from '@react-oauth/google';
 
 // --- 1. CONFIGURATION VIEWPORT ---
 export const viewport: Viewport = {
@@ -61,11 +62,13 @@ export default async function RootLayout({
           disableTransitionOnChange
           enableColorScheme
         >
-          <ApolloClientProvider>
-            <ActiveThemeProvider initialTheme={activeThemeValue}>
-              {children}
-            </ActiveThemeProvider>
-          </ApolloClientProvider>
+          <GoogleOAuthProvider clientId="384169644096-n1hjir3eqjfa0k49qc2636kqsfvfunn0.apps.googleusercontent.com">
+            <ApolloClientProvider>
+              <ActiveThemeProvider initialTheme={activeThemeValue}>
+                {children}
+              </ActiveThemeProvider>
+            </ApolloClientProvider>
+          </GoogleOAuthProvider>
         </ThemeProvider>
       </body>
     </html>

@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { gql, useQuery, useLazyQuery } from "@apollo/client";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Card,
   CardContent,
@@ -20,8 +21,10 @@ import {
   IconFileText,
   IconTimelineEvent,
   IconAlertCircle,
+  IconExternalLink,
 } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
 import {
   Sheet,
   SheetContent,
@@ -155,13 +158,16 @@ function UserTraceabilityModal({
   projectId,
   isOpen,
   onOpenChange,
+  allTasks,
 }: {
   user: User | null;
   projectId: string | null;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
+  allTasks: Task[];
 }) {
   const isMobile = useIsMobile();
+  const router = useRouter();
   const [getLogs, { data: logData, loading: logLoading }] =
     useLazyQuery(GET_LOGS_QUERY);
 
@@ -177,6 +183,12 @@ function UserTraceabilityModal({
     return logData.logs.filter((log: Log) => log.user.name === user.name);
   }, [logData, user]);
 
+  // Filtre les tâches pour l'utilisateur
+  const userTasks: Task[] = React.useMemo(() => {
+    if (!allTasks || !user) return [];
+    return allTasks.filter((task) => task.assignedTo?.id === user.id);
+  }, [allTasks, user]);
+
   const Content = (
     <>
       <SheetHeader>
@@ -185,41 +197,95 @@ function UserTraceabilityModal({
           Affichage de l'activité de l'utilisateur sur son dernier projet.
         </SheetDescription>
       </SheetHeader>
-      <div className="flex-1 overflow-y-auto p-4">
-        {logLoading && (
-          <div className="space-y-4">
-            <Skeleton className="h-16 w-full" />
-            <Skeleton className="h-16 w-full" />
-          </div>
-        )}
-        {!logLoading && userLogs.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-            <IconTimelineEvent className="h-12 w-12" />
-            <p className="mt-2">Aucune activité enregistrée pour cet utilisateur sur ce projet.</p>
-          </div>
-        )}
-        {!logLoading && userLogs.length > 0 && (
-          <div className="relative space-y-6 pl-6">
-            <div className="absolute left-[.1em] top-[1em] bottom-0 w-0.5 bg-border ml-[23px] border-[1px dashed #ffffff1a]" />
-            {userLogs.map((log) => (
-              <div key={log.id} className="relative flex items-start">
-                <div className="z-10 flex-shrink-0 bg-background p-2 rounded-full border">
-                  <IconActivity className="h-4 w-4 text-primary" />
+      <div className="flex-1 overflow-y-auto p-4 space-y-8 custom-scrollbar">
+        
+        {/* SECTION TÂCHES */}
+        <div className="space-y-4">
+          <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">
+            <IconFileText className="h-4 w-4 text-primary" />
+            Tâches Assignées ({userTasks.length})
+          </h3>
+          {userTasks.length === 0 ? (
+            <div className="p-4 bg-muted/20 border border-border/30 rounded-xl border-dashed text-center">
+              <p className="text-xs text-muted-foreground italic">Aucune tâche assignée.</p>
+            </div>
+          ) : (
+            <div className="grid gap-3">
+              {userTasks.map((task) => {
+                const isDone = task.status === "DONE";
+                return (
+                  <div key={task.id} className="p-3.5 bg-background/60 backdrop-blur-sm border border-border/50 rounded-xl flex flex-col gap-2 shadow-sm">
+                    <p className="text-sm font-semibold text-foreground leading-tight">{task.description}</p>
+                    <div className="flex items-center justify-between mt-1">
+                      <span className={cn(
+                        "text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1.5 border border-transparent w-fit",
+                        isDone ? "bg-green-500/10 text-green-600 border-green-500/20" : "bg-blue-500/10 text-blue-600 border-blue-500/20"
+                      )}>
+                        <div className={cn("w-1.5 h-1.5 rounded-full", isDone ? "bg-green-500" : "bg-blue-500")} />
+                        {task.status.replace("_", " ")}
+                      </span>
+                      {task.project && (
+                        <div 
+                           onClick={() => router.push(`/dashboard/projects/${task.project!.id}/production`)}
+                           className="flex items-center gap-1.5 cursor-pointer group/link hover:bg-muted/50 px-2 py-1 rounded-md transition-colors"
+                        >
+                          <span className="text-[10px] font-medium text-muted-foreground group-hover/link:text-primary transition-colors truncate max-w-[130px]" title={task.project.object}>
+                            {task.project.object}
+                          </span>
+                          <IconExternalLink className="w-3 h-3 text-muted-foreground group-hover/link:text-primary transition-colors" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <Separator className="bg-border/50" />
+
+        {/* SECTION LOGS / ACTIVITÉ */}
+        <div className="space-y-4">
+          <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">
+            <IconActivity className="h-4 w-4 text-primary" />
+            Historique d'Activité
+          </h3>
+          {logLoading && (
+            <div className="space-y-4">
+              <Skeleton className="h-16 w-full rounded-xl" />
+              <Skeleton className="h-16 w-full rounded-xl" />
+            </div>
+          )}
+          {!logLoading && userLogs.length === 0 && (
+            <div className="flex flex-col items-center justify-center p-8 bg-muted/10 border border-border/30 rounded-xl border-dashed text-muted-foreground">
+              <IconTimelineEvent className="h-8 w-8 opacity-20 mb-2" />
+              <p className="text-xs">Aucune activité enregistrée.</p>
+            </div>
+          )}
+          {!logLoading && userLogs.length > 0 && (
+            <div className="relative space-y-6 pl-6 pt-2">
+              <div className="absolute left-[.1em] top-[1em] bottom-0 w-0.5 bg-border ml-[23px] border-[1px dashed #ffffff1a]" />
+              {userLogs.map((log) => (
+                <div key={log.id} className="relative flex items-start">
+                  <div className="z-10 flex-shrink-0 bg-card p-1.5 rounded-full border border-border/50 shadow-sm mt-0.5">
+                    <IconActivity className="h-3.5 w-3.5 text-primary" />
+                  </div>
+                  <div className="ml-4">
+                    <p className="text-sm font-semibold text-foreground">{log.details}</p>
+                    <p className="text-[10px] font-medium text-muted-foreground mt-0.5">
+                      {format(
+                        parseDate(log.createdAt)!,
+                        "d MMMM yyyy 'à' HH:mm",
+                        { locale: fr }
+                      )}
+                    </p>
+                  </div>
                 </div>
-                <div className="ml-4">
-                  <p className="font-semibold text-foreground">{log.details}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {format(
-                      parseDate(log.createdAt)!,
-                      "d MMMM yyyy 'à' HH:mm",
-                      { locale: fr }
-                    )}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+        </div>
       </div>
       <SheetFooter>
         <SheetClose asChild>
@@ -252,32 +318,41 @@ function UserTraceabilityModal({
 function UserLastTask({ lastTask }: { lastTask: Task | null }) {
   if (!lastTask) {
     return (
-      <p className="text-sm text-muted-foreground italic">
-        Aucune tâche récente.
-      </p>
+      <div className="flex flex-col items-center justify-center h-24 bg-muted/20 border border-border/30 rounded-xl border-dashed">
+        <p className="text-xs text-muted-foreground italic">Aucune tâche récente.</p>
+      </div>
     );
   }
 
+  const isDone = lastTask.status === "DONE";
+
   return (
-    <div className="p-3 bg-muted/50 rounded-lg">
-      <p className="text-sm font-medium truncate" title={lastTask.description}>
-        {lastTask.description}
-      </p>
-      <span
-        className={cn(
-          "text-xs font-semibold px-2 py-0.5 rounded-full",
-          lastTask.status === "DONE"
-            ? "bg-green-100 text-green-700"
-            : "bg-blue-100 text-blue-700"
-        )}
-      >
-        {lastTask.status.replace("_", " ")}
-      </span>
-      {lastTask.project && (
-        <p className="text-xs text-muted-foreground mt-1">
-          Projet: {lastTask.project.object}
+    <div className="p-3.5 bg-background/60 backdrop-blur-sm border border-border/50 rounded-xl flex flex-col gap-2 group-hover:bg-background/80 transition-colors shadow-sm">
+      <div className="flex justify-between items-start gap-2">
+        <p className="text-sm font-semibold text-foreground line-clamp-2 leading-tight" title={lastTask.description}>
+          {lastTask.description}
         </p>
-      )}
+      </div>
+      
+      <div className="flex items-center justify-between mt-1">
+        <span
+          className={cn(
+            "text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1.5 border border-transparent",
+            isDone
+              ? "bg-green-500/10 text-green-600 border-green-500/20"
+              : "bg-blue-500/10 text-blue-600 border-blue-500/20"
+          )}
+        >
+          <div className={cn("w-1.5 h-1.5 rounded-full", isDone ? "bg-green-500" : "bg-blue-500")} />
+          {lastTask.status.replace("_", " ")}
+        </span>
+        
+        {lastTask.project && (
+          <span className="text-[10px] font-medium text-muted-foreground truncate max-w-[120px]" title={lastTask.project.object}>
+            {lastTask.project.object}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
@@ -310,30 +385,36 @@ function UserCard({
   const lastProjectId = lastTask?.project?.id || null;
 
   return (
-    <Card className="flex flex-col">
-      <CardHeader>
-        <CardTitle className="text-lg">{user.name}</CardTitle>
-        <CardDescription>{user.email}</CardDescription>
-      </CardHeader>
-      <CardContent className="flex-grow space-y-4">
-        <div className="flex items-center gap-2">
-          <IconShieldCheck className="h-5 w-5 text-muted-foreground" />
-          <span className="font-medium">{user.role.name}</span>
+    <Card className="flex flex-col bg-card/40 backdrop-blur-xl border-border/40 hover:border-primary/40 shadow-sm hover:shadow-lg transition-all duration-300 group relative overflow-hidden h-full">
+      {/* Subtle background glow effect on hover */}
+      <div className="absolute -inset-0.5 bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
+      
+      <CardHeader className="pb-4 relative z-10">
+        <div className="flex items-center justify-between mb-1">
+            <CardTitle className="text-xl font-bold tracking-tight">{user.name}</CardTitle>
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary shrink-0">
+                <IconShieldCheck className="w-3.5 h-3.5" />
+                <span className="text-[10px] font-bold tracking-widest uppercase">{user.role.name}</span>
+            </div>
         </div>
-        <Separator />
-        <div>
-          <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
-            <IconFileText className="h-4 w-4" />
-            Dernière Tâche Assignée
+        <CardDescription className="text-xs truncate">{user.email}</CardDescription>
+      </CardHeader>
+
+      <CardContent className="flex-grow space-y-4 relative z-10 pb-2">
+        <Separator className="bg-border/40 group-hover:bg-border/60 transition-colors" />
+        <div className="pt-2">
+          <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3 flex items-center gap-2">
+            <IconFileText className="w-3.5 h-3.5 text-primary/70" />
+            Dernière Tâche
           </h4>
           <UserLastTask lastTask={lastTask} />
         </div>
       </CardContent>
-      <CardFooter>
-        {/* Bouton de traçabilité RÉ-ACTIVÉ */}
+
+      <CardFooter className="relative z-10 pt-4">
         <Button
-          variant="outline"
-          className="w-full"
+          variant="secondary"
+          className="w-full bg-background/50 hover:bg-primary/10 hover:text-primary border border-border/40 hover:border-primary/30 transition-all font-semibold text-xs h-9 shadow-sm"
           onClick={() => onViewTraceability(user, lastProjectId!)}
           disabled={!lastProjectId}
         >
@@ -395,26 +476,35 @@ export default function TeamPage() {
             <h1 className="text-3xl font-bold">Équipe</h1>
           </div>
 
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {loading &&
               Array.from({ length: 8 }).map((_, i) => (
-                <Skeleton key={i} className="h-80" />
+                <Skeleton key={i} className="h-[300px] w-full rounded-2xl" />
               ))}
             {error && (
-              <p className="col-span-full text-red-500">
+              <p className="col-span-full text-red-500 bg-red-500/10 p-4 rounded-xl border border-red-500/20">
                 Erreur de chargement: {error.message}
               </p>
             )}
-            {!loading &&
-              !error &&
-              users.map((user) => (
-                <UserCard
-                  key={user.id}
-                  user={user}
-                  allTasks={allTasks}
-                  onViewTraceability={handleViewTraceability}
-                />
-              ))}
+            {!loading && !error && (
+              <AnimatePresence>
+                {users.map((user, idx) => (
+                  <motion.div
+                    key={user.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.05, duration: 0.4, ease: "easeOut" }}
+                    className="h-full"
+                  >
+                    <UserCard
+                      user={user}
+                      allTasks={allTasks}
+                      onViewTraceability={handleViewTraceability}
+                    />
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            )}
           </div>
         </div>
       </SidebarInset>
@@ -425,6 +515,7 @@ export default function TeamPage() {
         projectId={selectedProjectId}
         isOpen={isModalOpen}
         onOpenChange={setIsModalOpen}
+        allTasks={allTasks}
       />
     </SidebarProvider>
   );

@@ -15,13 +15,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { AIAssistantButton } from "@/components/projects/ai-assistant-button";
 
 // Icons
 import {
     IconCheck, IconFileText, IconUpload, IconDownload, IconAlertCircle, IconLoader,
     IconChartPie, IconTrendingUp, IconTrendingDown, IconCalculator, IconBuildingBank,
     IconUserShield, IconFileDescription, IconArrowRight,
-    IconX, IconPlus, IconTrash, IconFileSpreadsheet
+    IconX, IconPlus, IconTrash, IconFileSpreadsheet, IconSparkles
 } from "@tabler/icons-react";
 
 
@@ -282,8 +283,8 @@ function MarginCalculator({
 
 // --- MAIN COMPONENT ---
 export function ProjectEditDrawer({ item }: { item: any }) {
-    const isMobile = useIsMobile();
     const router = useRouter();
+    const isMobile = useIsMobile();
     const { data: meData } = useQuery(ME_QUERY);
     const userRole = meData?.me.role.name;
     const userPermissions = meData?.me.role.permissions || [];
@@ -309,14 +310,12 @@ export function ProjectEditDrawer({ item }: { item: any }) {
     const [teamData, setTeamData] = React.useState({ infographisteIds: item.team.infographistes.map((u: any) => u.id), team3DIds: item.team.team3D.map((u: any) => u.id), assistantIds: item.team.coordinators.map((u: any) => u.id) });
 
     const [formData, setFormData] = React.useState({
-        ...item,
-        marketEstimate: item.marketEstimate || 0,
-        estimatedBudget: item.estimatedBudget || 0
+        title: item.title || "",
+        object: item.object || "",
+        marketEstimate: item.marketEstimate || "",
+        estimatedBudget: item.estimatedBudget || "",
     });
 
-    const [newTaskDesc, setNewTaskDesc] = React.useState("");
-    const [newTaskAssignee, setNewTaskAssignee] = React.useState("");
-    const [newTaskDept, setNewTaskDept] = React.useState("");
     const [avisData, setAvisData] = React.useState({ status: '', reason: '' });
 
     // Mutations
@@ -329,14 +328,10 @@ export function ProjectEditDrawer({ item }: { item: any }) {
     const [adminLaunchProject, { loading: loadingLaunch }] = useMutation(ADMIN_LAUNCH_PROJECT_MUTATION, { onCompleted: () => toast.success("Projet lancé!"), refetchQueries: [GET_PROJECTS_FEED] });
     const [financeRequestCaution, { loading: loadingCaution }] = useMutation(FINANCE_REQUEST_CAUTION_MUTATION, { onCompleted: () => toast.success("Caution demandée!"), refetchQueries: [GET_PROJECTS_FEED] });
     const [cpAssignTeam, { loading: loadingTeam }] = useMutation(CP_ASSIGN_TEAM_MUTATION, { onCompleted: () => toast.success("Équipe assignée!"), refetchQueries: [GET_PROJECTS_FEED] });
-    const [createTask, { loading: loadingTaskCreate }] = useMutation(PM_CREATE_TASK_MUTATION, { onCompleted: () => { toast.success("Tâche créée!"); setNewTaskDesc(""); setNewTaskAssignee(""); setNewTaskDept(""); }, onError: (err) => toast.error(err.message), refetchQueries: [{ query: GET_TASKS_BY_PROJECT_QUERY, variables: { projectId: item.id } }, { query: GET_PROJECTS_FEED }] });
     const [giveProposalAvis, { loading: loadingAvis }] = useMutation(GIVE_PROPOSAL_AVIS_MUTATION, { onCompleted: () => { toast.success("Avis enregistré!"); setAvisData({ status: '', reason: '' }); }, refetchQueries: [{ query: GET_PROJECTS_FEED }] });
-    const [updateTaskStatus] = useMutation(PM_UPDATE_TASK_STATUS_MUTATION, { onCompleted: () => toast.success("Status MAJ!"), refetchQueries: [GET_PROJECTS_FEED] });
     const [cpUploadAsset, { loading: loadingAsset }] = useMutation(CP_UPLOAD_ASSET_MUTATION, { onCompleted: () => { toast.success("Asset uploadé!"); setFileAsset(null); }, refetchQueries: [{ query: GET_PROJECTS_FEED }] });
 
     const { data: allUsersData, loading: loadingUsers } = useQuery(GET_ALL_USERS, { skip: userRole !== 'ADMIN' });
-    const { data: pmData, loading: loadingPMs } = useQuery(GET_PROJECT_MANAGERS, { skip: userRole !== 'ADMIN' });
-    const { data: teamMembers, loading: loadingTeamMembers } = useQuery(GET_TEAM_MEMBERS, { skip: !(userRole === 'ADMIN' || userPermissions.includes('assign_creative_tasks')) });
 
     const existingDocs = item.stages?.administrative?.documents || [];
     const existingTechDocs = item.stages?.technical?.documents || [];
@@ -348,44 +343,21 @@ export function ProjectEditDrawer({ item }: { item: any }) {
     // --- FINANCIAL DATA FETCHING ---
     const { data: estimationData } = useQuery(GET_ESTIMATION, {
         variables: { projectId: item.id },
-        fetchPolicy: "cache-and-network"
+        fetchPolicy: "cache-and-network",
+        pollInterval: 3000
     });
 
     const realCostPrice = estimationData?.getProjectEstimation?.totalAmount || item.estimatedBudget || 0;
 
     // --- HANDLERS FOR MARGIN CALCULATOR ---
     const handleMarketPriceChange = (val: number) => {
-        // ✅ FIX: Explicit typing for prev
         setFormData((prev: any) => ({ ...prev, marketEstimate: val }));
     };
 
     const handleTargetMarginChange = (marginPercent: number) => {
         const market = Number(formData.marketEstimate) || 0;
         const newEstimatedBudget = market * (1 - (marginPercent / 100));
-        // ✅ FIX: Explicit typing for prev
         setFormData((prev: any) => ({ ...prev, estimatedBudget: newEstimatedBudget }));
-    };
-
-    // Pour les documents administratifs standards
-    const getDoc = (type: string) => existingDocs.find((d: any) => d.fileName === type);
-
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => { setFormData({ ...formData, [e.target.id]: e.target.value }); };
-
-    // Updated handleSubmit to send financial data to backend on save
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        updateProject({
-            variables: {
-                id: item.id,
-                input: {
-                    title: formData.title,
-                    object: formData.object,
-                    status: formData.status,
-                    marketEstimate: parseFloat(formData.marketEstimate),
-                    estimatedBudget: parseFloat(formData.estimatedBudget)
-                }
-            }
-        });
     };
 
     const handleAvisFormChange = (field: string, value: string) => { setAvisData(prev => ({ ...prev, [field]: value })); };
@@ -409,7 +381,6 @@ export function ProjectEditDrawer({ item }: { item: any }) {
             }
 
             const uploadUrl = `${apiBaseUrl}/api/upload/${item.id}`;
-            console.log(`Uploading ${docType} to: ${uploadUrl}`);
 
             const result = await uploadFileWithProgress(
                 file,
@@ -452,7 +423,6 @@ export function ProjectEditDrawer({ item }: { item: any }) {
         return successCount === files.length;
     };
 
-    // Handlers
     const handleSubmitForReview = async () => {
         const isDraft = item.preparationStatus === 'DRAFT';
         const hasCPS = filesCPS.length > 0 || hasDocType(existingDocs, 'CPS');
@@ -477,13 +447,12 @@ export function ProjectEditDrawer({ item }: { item: any }) {
         else toast.success("Documents mis à jour.");
     };
 
-    const handleSubmitAsset = () => { handleFileUploadAndMutate(fileAsset, cpUploadAsset, 'ASSET', 'technical'); };
     const handleSubmitEstimate = () => { handleFileUploadAndMutate(fileEstimate, cpUploadEstimate, 'CP_ESTIMATE', 'technical'); };
 
     React.useEffect(() => { setFormData({ ...item }); }, [item]);
 
     const isUploadingFiles = Object.values(uploadProgress).some(p => p > 0 && p < 100);
-    const loading = loadingUpdate || loadingUpload || loadingSubmit || loadingAssign || loadingEstimate || loadingFeasibility || loadingLaunch || loadingCaution || loadingTeam || loadingTaskCreate || isUploadingFiles;
+    const loading = loadingUpdate || loadingUpload || loadingSubmit || loadingAssign || loadingEstimate || loadingFeasibility || loadingLaunch || loadingCaution || loadingTeam || isUploadingFiles;
 
     const isDraft = item.preparationStatus === 'DRAFT';
     const isPendingAdminReview = item.preparationStatus === 'TO_CONFIRM';
@@ -493,14 +462,22 @@ export function ProjectEditDrawer({ item }: { item: any }) {
     const isInProduction = item.preparationStatus === 'IN_PRODUCTION';
 
     const renderPanelContent = () => {
-        if (userRole === 'PROPOSAL_MANAGER') {
+        if (userRole === 'PROPOSAL_MANAGER' || (userRole === 'ADMIN' && isDraft)) {
             return (
                 <div className="flex flex-col gap-6">
                     <div className={cn("p-3 rounded-md text-sm font-medium flex items-center gap-2 border", isDraft ? "bg-amber-50 text-amber-800 border-amber-200" : "bg-green-50 text-green-700 border-green-200")}>
                         <IconAlertCircle size={20} />{isDraft ? "Dossier en constitution." : "Dossier soumis."}
                     </div>
                     <div className="space-y-3">
-                        <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Documents Requis</h4>
+                        <div className="flex items-center justify-between">
+                            <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Documents Requis</h4>
+                            <div className="flex gap-2">
+                                <AIAssistantButton 
+                                    projectId={item.id} 
+                                    documents={administrativeDocs.length > 0 ? administrativeDocs : existingDocs} 
+                                />
+                            </div>
+                        </div>
                         <DocumentRow label="Cahier des Charges (CPS)" type="CPS" existingDocs={administrativeDocs} files={filesCPS} setFiles={setFilesCPS} progress={uploadProgress['CPS'] || 0} />
                         <DocumentRow label="Règlement Consultation (RC)" type="RC" existingDocs={administrativeDocs} files={filesRC} setFiles={setFilesRC} progress={uploadProgress['RC'] || 0} />
                         <DocumentRow label="Avis de Marché" type="Avis" existingDocs={administrativeDocs} files={filesAvis} setFiles={setFilesAvis} progress={uploadProgress['Avis'] || 0} />
@@ -518,7 +495,6 @@ export function ProjectEditDrawer({ item }: { item: any }) {
         if (userRole === 'ADMIN' && isPendingAdminReview) {
             return (
                 <form id="admin-assign-form" className="flex flex-col gap-6" onSubmit={handleAdminSubmit}>
-                    {/* ... (Code Admin identique) ... */}
                     <div className="bg-muted/30 border rounded-lg p-4 space-y-3">
                         <div className="flex items-center gap-2 text-primary font-semibold">
                             <IconUserShield size={20} /><span>Espace Validation</span>
@@ -568,7 +544,6 @@ export function ProjectEditDrawer({ item }: { item: any }) {
 
                     <div className="space-y-3">
                         <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Calcul Financier (Live)</h4>
-                        {/* ✅ MODIFICATION ICI AUSSI */}
                         <MarginCalculator
                             marketPrice={Number(formData.marketEstimate) || 0}
                             costPrice={realCostPrice}
@@ -577,7 +552,6 @@ export function ProjectEditDrawer({ item }: { item: any }) {
                         />
                     </div>
 
-                    {/* ✅ SECTION ESTIMATION EXCEL REFAITE - PROFESSIONNELLE */}
                     <div className="bg-card border rounded-lg p-4 shadow-sm space-y-4">
                         <div className="flex items-center gap-2 border-b pb-2">
                             <div className="bg-green-100 text-green-700 p-1.5 rounded dark:bg-green-900/30 dark:text-green-400">
@@ -653,15 +627,13 @@ export function ProjectEditDrawer({ item }: { item: any }) {
                 <div className="flex flex-col gap-6">
                     <div className="rounded-lg border bg-card p-4">
                         <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">Analyse Financière</h4>
-                        {/* ✅ MODIFICATION ICI */}
                         <MarginCalculator
                             marketPrice={Number(formData.marketEstimate) || 0}
-                            costPrice={realCostPrice} // From GET_ESTIMATION query
+                            costPrice={realCostPrice}
                             onMarketPriceChange={handleMarketPriceChange}
                             onTargetMarginChange={handleTargetMarginChange}
                         />
                     </div>
-                    {/* ✅ SECTION DOCUMENT REFERENCE AJOUTEE ICI */}
                     <div className="space-y-3">
                         <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Documents de Référence</h4>
                         {estimateDoc ? (
@@ -698,7 +670,7 @@ export function ProjectEditDrawer({ item }: { item: any }) {
     };
 
     const renderPanelFooter = () => {
-        if (userRole === 'PROPOSAL_MANAGER' && (isDraft || isPendingAdminReview)) {
+        if ((userRole === 'PROPOSAL_MANAGER' || (userRole === 'ADMIN' && isDraft)) && (isDraft || isPendingAdminReview)) {
             const hasNewUploads = filesCPS.length > 0 || filesRC.length > 0 || filesAvis.length > 0 || filesBPE.length > 0 || filesTech.length > 0;
             return <Button onClick={handleSubmitForReview} disabled={loading} className={cn("w-full transition-all", !isDraft ? "bg-blue-600 hover:bg-blue-700" : "bg-green-600 hover:bg-green-700")}>{isUploadingFiles ? "Upload en cours..." : !isDraft ? (hasNewUploads ? "Mettre à jour" : "Sélectionner un fichier") : "Valider et Soumettre"}</Button>;
         }

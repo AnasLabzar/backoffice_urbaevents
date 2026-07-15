@@ -36,12 +36,15 @@ export const GET_PROJECTS_FEED = gql`
         object
         status: generalStatus
         preparationStatus
-        
         # Champs Edit
         projectType
         referenceAO
         technicalOfferRequired
         submissionDeadline
+        currentPhase
+        targetDeadlines {
+            deadlineBAT
+        }
         
         # Champs financiers
         marketEstimate
@@ -141,6 +144,7 @@ export const GET_TASKS_BY_PROJECT_QUERY = gql`
       id
       description
       status
+      priority
       department
       createdAt 
       assignedTo { id name }
@@ -260,6 +264,15 @@ export const PM_UPDATE_TASK_STATUS_MUTATION = gql`
   }
 `;
 
+export const PM_UPDATE_TASK_PRIORITY_MUTATION = gql`
+  mutation PmUpdateTaskPriority($taskId: ID!, $priority: String!) {
+    pm_updateTaskPriority(taskId: $taskId, priority: $priority) {
+      id
+      priority
+    }
+  }
+`;
+
 export const CP_UPLOAD_ASSET_MUTATION = gql`
   mutation CpUploadAsset($projectId: ID!, $fileUrl: String!, $originalFileName: String!) {
     cp_uploadAsset(projectId: $projectId, fileUrl: $fileUrl, originalFileName: $originalFileName) {
@@ -310,6 +323,142 @@ export const DELETE_DOCUMENT_MUTATION = gql`
       stages { 
         administrative { documents { id fileName originalFileName } }
         technical { documents { id fileName originalFileName } }
+      }
+    }
+  }
+`;
+
+export const ANALYZE_CPS_MUTATION = gql`
+  mutation AnalyzeCPS($projectId: ID!, $fileUrl: String!) {
+    analyzeCPS(projectId: $projectId, fileUrl: $fileUrl) {
+      designation
+      category
+      subCategory
+      description
+      quantity
+      unitPrice
+      isNew
+      matchedPrestationId
+    }
+  }
+`;
+
+export const ADD_PRESTATION_MUTATION = gql`
+  mutation AddPrestation($input: AddPrestationInput!) {
+    addPrestation(input: $input) {
+      id
+      name
+      category
+      unitPrice
+    }
+  }
+`;
+
+export const GENERATE_TASKS_MUTATION = gql`
+  mutation GenerateTasksFromPrestations($projectId: ID!, $prestations: [AIPrestationInput!]!) {
+    generateTasksFromPrestations(projectId: $projectId, prestations: $prestations) {
+      tasks {
+        title
+        description
+        department
+        priority
+      }
+      creativeSummary
+      projectBrief {
+        eventGoal
+        targetAudience
+        mainObjective
+        subObjectives
+        themeConcept
+        locationType
+        visitorsCount
+        constraints
+      }
+    }
+  }
+`;
+
+export const IMPORT_AI_PRODUCTION = gql`
+  mutation ImportAIProduction($input: ImportAIProductionInput!) {
+    importAIProduction(input: $input)
+  }
+`;
+
+export const EXTRACT_BRIEF_FROM_CPS_MUTATION = gql`
+  mutation ExtractBriefFromCPS($projectId: ID!, $fileUrl: String!) {
+    extractBriefFromCPS(projectId: $projectId, fileUrl: $fileUrl) {
+      clientName
+      clientNature
+      projectName
+      eventFormat
+      toneStyle
+      location
+      locationType
+      visitorsCount
+      startDate
+      endDate
+      durationDays
+      estimatedBudget
+      eventGoal
+      targetAudience
+      mainObjective
+      subObjectives
+      history
+      themeConcept
+      themeDeclination
+      constraints
+    }
+  }
+`;
+
+export const EXTRACT_SPACES_FROM_CPS_MUTATION = gql`
+  mutation ExtractPlanDeMasseFromCPS($projectId: ID!, $fileUrl: String!) {
+    extractPlanDeMasseFromCPS(projectId: $projectId, fileUrl: $fileUrl) {
+      name
+      surface
+      capacity
+      type
+      x
+      y
+      w
+      h
+      features
+    }
+  }
+`;
+
+export const GET_PROJECT_RETROPLANNING = gql`
+  query GetProjectRetroplanning($projectId: ID!) {
+    getProjectRetroplanning(projectId: $projectId) {
+      wbsLots {
+        id
+        name
+        status
+        targetDeadline
+      }
+      targetDeadlines {
+        deadlineJ2
+        deadlineAchats
+        deadlineReperage
+        deadlineBAT
+        deadlineImpression
+        deadlineProduction
+        deadlineMontage
+      }
+      status
+    }
+  }
+`;
+
+export const VALIDATE_JALON_J2 = gql`
+  mutation ValidateJalonJ2($projectId: ID!) {
+    validateJalonJ2(projectId: $projectId) {
+      id
+      currentPhase
+      milestones {
+        code
+        status
+        approvedAt
       }
     }
   }

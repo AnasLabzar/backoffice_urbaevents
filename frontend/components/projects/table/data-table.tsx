@@ -35,6 +35,11 @@ const GET_PROJECTS_FEED = gql`
       project { 
         id 
         title 
+        clientName
+        eventDate
+        budgetTarget
+        currentPhase
+        milestones { code status }
         generalStatus 
         submissionDeadline 
         createdAt 
@@ -303,7 +308,7 @@ function ProjectListTable({
                         ))}
                     </TableHeader>
                     <TableBody>
-                        {table.getRowModel().rows?.length ? (
+                        {table.getRowModel().rows?.length > 0 ? (
                             table.getRowModel().rows.map((row) => (
                                 <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
                                     {row.getVisibleCells().map((cell) => (<TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>))}

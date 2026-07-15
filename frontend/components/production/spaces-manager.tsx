@@ -5,7 +5,8 @@ import {
     IconPlus, IconTrash, IconLayoutGrid, IconList, IconMap,
     IconMaximize, IconRuler, IconUsers, IconX, IconGripVertical,
     IconInfoCircle, IconArrowRight, IconArmchair, IconDeviceTv, IconCoffee,
-    IconAlertTriangle, IconDoor, IconBarrierBlock, IconArrowsMove, IconCompass
+    IconAlertTriangle, IconDoor, IconBarrierBlock, IconArrowsMove, IconCompass,
+    IconPrinter
 } from "@tabler/icons-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,9 +15,11 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { AIAssistantButton } from "@/components/projects/ai-assistant-button";
+import { toast } from "sonner";
+import { createPortal } from "react-dom";
 
 // --- TYPES ---
 export interface Space {
@@ -29,15 +32,16 @@ export interface Space {
     y: number; 
     w: number; 
     h: number; 
-    // 👇 ADD THESE TWO LINES
     rotation?: number; 
     badge?: string;
-    features?: string[]; // Kept for backward compatibility if needed, but 'badge' is the main one now
+    features?: string[];
 }
 
 interface SpacesManagerProps {
     spaces: Space[];
     onChange: (spaces: Space[]) => void;
+    projectId?: string;
+    documents?: any[];
 }
 
 // --- CONSTANTS ---
@@ -64,13 +68,16 @@ const SPACE_FEATURES = [
 const GRID_COLS = 12;
 const GRID_ROWS = 12;
 
-export function SpacesManager({ spaces = [], onChange }: SpacesManagerProps) {
+export function SpacesManager({ spaces = [], onChange, projectId, documents }: SpacesManagerProps) {
     const [view, setView] = useState<"list" | "plan">("plan");
     const [selectedId, setSelectedId] = useState<string | null>(null);
-    const [showGuide, setShowGuide] = useState(true);
     const [isMoving, setIsMoving] = useState(false);
+    const [mounted, setMounted] = useState(false);
 
-    // --- ALGORITHME "TETRIS" ---
+    React.useEffect(() => {
+        setMounted(true);
+    }, []);
+
     const findFreeSpot = (w: number, h: number) => {
         for (let y = 0; y <= GRID_ROWS - h; y++) {
             for (let x = 0; x <= GRID_COLS - w; x++) {
@@ -84,7 +91,6 @@ export function SpacesManager({ spaces = [], onChange }: SpacesManagerProps) {
         return { x: 0, y: 0 };
     };
 
-    // --- ACTIONS ---
     const addSpace = () => {
         const defaultW = 3;
         const defaultH = 2;
@@ -167,10 +173,12 @@ export function SpacesManager({ spaces = [], onChange }: SpacesManagerProps) {
     const totalSurf = spaces.reduce((acc, s) => acc + (Number(s.surface) || 0), 0);
     const totalPax = spaces.reduce((acc, s) => acc + (Number(s.capacity) || 0), 0);
 
-    return (
-        <div className="space-y-6 animate-in fade-in duration-500">
+    const handlePrint = () => {
+        window.print();
+    };
 
-            {/* 1. HEADER */}
+    return (
+        <div className="space-y-6 animate-in fade-in duration-500 relative">
             <div className="flex flex-col gap-4 border-b pb-6">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
@@ -187,6 +195,26 @@ export function SpacesManager({ spaces = [], onChange }: SpacesManagerProps) {
                                 <TabsTrigger value="list" className="h-7 text-xs px-3"><IconList className="w-3.5 h-3.5 mr-1.5" /> Liste</TabsTrigger>
                             </TabsList>
                         </Tabs>
+                        {projectId && documents && (
+                            <AIAssistantButton 
+                                projectId={projectId} 
+                                documents={documents} 
+                                mode="spaces" 
+                                onExtractSpaces={(extractedSpaces: any[]) => {
+                                    const mappedSpaces = extractedSpaces.map((s: any) => ({
+                                        ...s,
+                                        id: crypto.randomUUID(),
+                                        features: s.features || []
+                                    }));
+                                    onChange(mappedSpaces);
+                                    setView("plan");
+                                }} 
+                            />
+                        )}
+                        <Button variant="outline" size="sm" onClick={handlePrint} className="h-9 text-xs gap-1.5 print:hidden">
+                            <IconPrinter className="w-4 h-4" />
+                            Imprimer
+                        </Button>
                         <Button size="sm" onClick={addSpace} className="h-9 text-xs gap-1.5 shadow-sm"><IconPlus className="w-4 h-4" /> Ajouter Zone</Button>
                     </div>
                 </div>
@@ -198,36 +226,17 @@ export function SpacesManager({ spaces = [], onChange }: SpacesManagerProps) {
                 </div>
             </div>
 
-            {/* 2. PLAN VIEW */}
             {view === "plan" && (
                 <div className="relative flex flex-col gap-6">
-
-                    {/* ORIENTATION LABELS */}
-                    <div className="relative w-full aspect-square md:aspect-[16/10] bg-slate-50 dark:bg-slate-900/50 rounded-xl border-2 border-dashed relative overflow-hidden shadow-inner transition-all group">
-
-                        {/* Compass Rose Effect */}
-                        <div className="absolute top-2 left-1/2 -translate-x-1/2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest bg-background/50 px-2 rounded">Nord</div>
-                        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest bg-background/50 px-2 rounded">Sud</div>
-                        <div className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest -rotate-90 bg-background/50 px-2 rounded">Ouest</div>
-                        <div className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest rotate-90 bg-background/50 px-2 rounded">Est</div>
-
-                        {/* GRID CONTAINER */}
-                        <div
-                            className={cn("absolute inset-6 cursor-default transition-all", isMoving && "cursor-crosshair ring-2 ring-primary/20 bg-primary/5 rounded-lg")}
-                            onClick={handleGridClick}
-                        >
-                            {/* Grid Lines */}
+                    <div className="relative w-full aspect-square md:aspect-[16/10] bg-slate-50 dark:bg-slate-900/50 rounded-xl border-2 border-dashed relative overflow-hidden transition-all group">
+                        <div className="absolute top-2 left-1/2 -translate-x-1/2 text-[10px] font-bold text-muted-foreground uppercase bg-background/50 px-2 rounded">Nord</div>
+                        <div className="absolute inset-6" onClick={handleGridClick}>
                             <div className="absolute inset-0 pointer-events-none opacity-[0.08]"
                                 style={{ backgroundImage: `linear-gradient(to right, #000 1px, transparent 1px), linear-gradient(to bottom, #000 1px, transparent 1px)`, backgroundSize: `${100 / GRID_COLS}% ${100 / GRID_ROWS}%` }}>
                             </div>
 
-                            {/* ZONES */}
                             <div className="absolute inset-0 grid gap-1"
-                                style={{
-                                    gridTemplateColumns: `repeat(${GRID_COLS}, 1fr)`,
-                                    gridTemplateRows: `repeat(${GRID_ROWS}, 1fr)`
-                                }}>
-
+                                style={{ gridTemplateColumns: `repeat(${GRID_COLS}, 1fr)`, gridTemplateRows: `repeat(${GRID_ROWS}, 1fr)` }}>
                                 {spaces.map((space) => {
                                     const isSel = selectedId === space.id;
                                     const isErr = isColliding(space);
@@ -236,17 +245,12 @@ export function SpacesManager({ spaces = [], onChange }: SpacesManagerProps) {
                                     return (
                                         <div
                                             key={space.id}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setSelectedId(space.id);
-                                                setIsMoving(false);
-                                            }}
+                                            onClick={(e) => { e.stopPropagation(); setSelectedId(space.id); setIsMoving(false); }}
                                             className={cn(
-                                                "relative rounded-md flex flex-col items-center justify-center p-1 cursor-pointer transition-all duration-200 select-none border shadow-sm group pointer-events-auto hover:z-20",
+                                                "relative rounded-md flex flex-col items-center justify-center p-1 cursor-pointer transition-all border shadow-sm group",
                                                 typeInfo.color,
-                                                isSel ? "ring-2 ring-offset-2 ring-primary z-30 scale-[1.02] shadow-xl" : "opacity-90 hover:opacity-100 hover:scale-[1.01] z-10",
-                                                isErr && "ring-2 ring-red-500 animate-pulse z-40 opacity-100",
-                                                isMoving && isSel && "opacity-50 border-dashed border-2"
+                                                isSel ? "ring-2 ring-offset-2 ring-primary z-30" : "opacity-90 z-10",
+                                                isErr && "ring-2 ring-red-500 animate-pulse"
                                             )}
                                             style={{
                                                 gridColumnStart: (space.x || 0) + 1,
@@ -255,47 +259,21 @@ export function SpacesManager({ spaces = [], onChange }: SpacesManagerProps) {
                                                 gridRowEnd: `span ${space.h || 1}`
                                             }}
                                         >
-                                            {/* Badges for Features (Exits etc) */}
-                                            <div className="absolute -top-1.5 -right-1.5 flex flex-col gap-0.5 z-50">
-                                                {space.features?.map(f => {
-                                                    const feat = SPACE_FEATURES.find(sf => sf.value === f);
-                                                    if (!feat) return null;
-                                                    const Icon = feat.icon;
-                                                    return (
-                                                        <div key={f} className={cn("w-4 h-4 rounded-full flex items-center justify-center shadow-sm border border-white/50 text-[8px]", feat.color)}>
-                                                            <Icon className="w-2.5 h-2.5" />
-                                                        </div>
-                                                    )
-                                                })}
-                                            </div>
-
-                                            {isSel && <IconGripVertical className="absolute top-1 right-1 w-3 h-3 text-white/70" />}
-
-                                            <div className="text-center w-full overflow-hidden text-white drop-shadow-md p-1">
-                                                <span className="font-bold text-[9px] md:text-[10px] leading-tight truncate block">
-                                                    {space.name}
-                                                </span>
-                                                {space.w > 1 && space.h > 1 && (
-                                                    <span className="text-white/80 text-[8px] font-mono mt-0.5 block">
-                                                        {space.surface}m²
-                                                    </span>
-                                                )}
-                                            </div>
+                                            <span className="font-bold text-[9px] text-white truncate">{space.name}</span>
                                         </div>
                                     );
                                 })}
                             </div>
                         </div>
 
-                        {spaces.length === 0 && !showGuide && (
-                            <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground/30 pointer-events-none">
+                        {spaces.length === 0 && (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground/30">
                                 <IconLayoutGrid className="w-16 h-16 mb-3" />
                                 <span className="text-sm font-medium uppercase tracking-widest">Terrain Vide</span>
                             </div>
                         )}
                     </div>
 
-                    {/* 3. EDITOR PANEL */}
                     {selectedSpace ? (
                         <Card className="border-l-4 border-l-primary shadow-lg animate-in slide-in-from-bottom-4 bg-background">
                             <div className="flex justify-between items-center px-4 py-3 bg-muted/30 border-b">
@@ -467,6 +445,176 @@ export function SpacesManager({ spaces = [], onChange }: SpacesManagerProps) {
                         {spaces.length === 0 && <div className="text-center py-12 text-sm text-muted-foreground">Aucune zone définie.</div>}
                     </div>
                 </ScrollArea>
+            )}
+
+            {/* --- NATIVE PRINT CONTAINER --- */}
+            {mounted && createPortal(
+                <div className="print-only-container">
+                    <style dangerouslySetInnerHTML={{__html: `
+                        .print-only-container {
+                            display: none;
+                        }
+                        @media print {
+                            @page { 
+                                size: A4 landscape; 
+                                margin: 0; 
+                            }
+                            body { 
+                                background: white !important; 
+                                margin: 0 !important; 
+                                padding: 0 !important; 
+                                -webkit-print-color-adjust: exact !important; 
+                                print-color-adjust: exact !important; 
+                            }
+                            /* HIDE EVERYTHING IN THE BODY EXCEPT OUR PRINT CONTAINER */
+                            body > *:not(.print-only-container) { 
+                                display: none !important; 
+                            }
+                            .print-only-container {
+                                display: flex !important;
+                                flex-direction: column;
+                                width: 297mm;
+                                height: 210mm;
+                                padding: 10mm;
+                                box-sizing: border-box;
+                                background: white;
+                                overflow: hidden;
+                            }
+                        }
+                    `}} />
+                    
+                    {/* Header */}
+                    <div className="flex justify-between items-center mb-6 border-b-2 border-slate-200 pb-4">
+                        <div className="flex items-center gap-4">
+                            <img src="/logo/logo-black-urba-events.png" alt="URBAEVENTS Logo" className="h-12 object-contain" />
+                            <div>
+                                <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 leading-tight">Plan de Masse</h1>
+                                <p className="text-base text-slate-500 font-medium">Implantation & Aménagement Spatial</p>
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Date d'édition</p>
+                            <p className="text-base font-bold text-slate-800">{new Date().toLocaleDateString('fr-FR')}</p>
+                        </div>
+                    </div>
+
+                    {/* Main Grid + Legend Layout */}
+                    <div className="grid grid-cols-[3.5fr_1fr] print:grid-cols-[5fr_1fr] gap-6 print:gap-4 flex-1 min-h-0">
+                        
+                        {/* The Visual Grid */}
+                        <div className="bg-slate-50 border-2 border-slate-300 rounded-xl relative overflow-hidden p-8 h-full flex flex-col">
+                            {/* Crosshairs in corners (Architectural feel) */}
+                            <div className="absolute top-2 left-2 w-4 h-4 border-t border-l border-slate-400 opacity-50" />
+                            <div className="absolute top-2 right-2 w-4 h-4 border-t border-r border-slate-400 opacity-50" />
+                            <div className="absolute bottom-2 left-2 w-4 h-4 border-b border-l border-slate-400 opacity-50" />
+                            <div className="absolute bottom-2 right-2 w-4 h-4 border-b border-r border-slate-400 opacity-50" />
+
+                            {/* Orientation */}
+                            <div className="absolute top-2 left-1/2 -translate-x-1/2 text-[9px] font-bold text-slate-400 uppercase tracking-widest bg-white px-2 rounded shadow-sm z-10 border border-slate-100">Nord</div>
+                            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 text-[9px] font-bold text-slate-400 uppercase tracking-widest bg-white px-2 rounded shadow-sm z-10 border border-slate-100">Sud</div>
+                            <div className="absolute left-1 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-400 uppercase tracking-widest -rotate-90 bg-white px-2 rounded shadow-sm z-10 border border-slate-100">Ouest</div>
+                            <div className="absolute right-1 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-400 uppercase tracking-widest rotate-90 bg-white px-2 rounded shadow-sm z-10 border border-slate-100">Est</div>
+
+                            <div className="relative flex-1 border-[1.5px] border-slate-800 bg-white mt-4 mx-6 mb-4 shadow-sm">
+                                
+                                {/* Architectural Ruler Top (Letters) */}
+                                <div className="absolute -top-5 left-0 right-0 h-5 flex">
+                                    {Array.from({length: GRID_COLS}).map((_, i) => (
+                                        <div key={i} className="flex-1 flex items-end justify-center pb-0.5 text-[8px] font-mono font-bold text-slate-500 border-l border-slate-200">
+                                            {String.fromCharCode(65 + i)}
+                                        </div>
+                                    ))}
+                                </div>
+                                
+                                {/* Architectural Ruler Left (Numbers) */}
+                                <div className="absolute -left-5 top-0 bottom-0 w-5 flex flex-col">
+                                    {Array.from({length: GRID_ROWS}).map((_, i) => (
+                                        <div key={i} className="flex-1 flex items-center justify-end pr-1.5 text-[8px] font-mono font-bold text-slate-500 border-t border-slate-200">
+                                            {i + 1}
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Grid Lines (Blueprint style) */}
+                                <div className="absolute inset-0 pointer-events-none opacity-[0.15]"
+                                    style={{ backgroundImage: `linear-gradient(to right, #000 1px, transparent 1px), linear-gradient(to bottom, #000 1px, transparent 1px)`, backgroundSize: `${100 / GRID_COLS}% ${100 / GRID_ROWS}%` }}>
+                                </div>
+
+                                {/* Spaces */}
+                                <div className="absolute inset-0 grid gap-0.5"
+                                    style={{ gridTemplateColumns: `repeat(${GRID_COLS}, 1fr)`, gridTemplateRows: `repeat(${GRID_ROWS}, 1fr)` }}>
+                                    {spaces.map((s) => {
+                                        const typeInfo = SPACE_TYPES.find(t => t.value === s.type) || SPACE_TYPES[SPACE_TYPES.length - 1];
+                                        return (
+                                            <div
+                                                key={s.id}
+                                                className={cn("rounded-lg border-2 shadow-sm relative overflow-hidden", typeInfo.color)}
+                                                style={{ gridColumn: `${s.x + 1} / span ${s.w}`, gridRow: `${s.y + 1} / span ${s.h}` }}
+                                            >
+                                                <div className="absolute inset-0 flex flex-col items-center justify-center p-1 text-center text-white">
+                                                    <span className="font-extrabold text-[0.7rem] uppercase tracking-wide drop-shadow-md leading-tight line-clamp-2 px-1">{s.name}</span>
+                                                    {(s.surface || 0) > 0 && (
+                                                        <span className="text-[0.55rem] font-medium bg-black/20 px-1 rounded backdrop-blur-sm mt-0.5">{s.surface}m²</span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Totals & Legend */}
+                        <div className="flex flex-col gap-3 print:gap-1.5 overflow-hidden h-full">
+                            <div className="grid grid-cols-2 gap-2 shrink-0">
+                                <div className="bg-slate-100 print:bg-white p-2 print:p-1 rounded-lg print:rounded-none border border-slate-200 print:border-slate-800 text-center">
+                                    <p className="text-[8px] print:text-[6px] font-bold text-slate-500 print:text-black uppercase tracking-widest">Surface Totale</p>
+                                    <p className="text-base print:text-xs font-extrabold text-slate-800 print:text-black">{totalSurf}<span className="text-[10px] print:text-[8px] font-medium text-slate-500 print:text-black ml-0.5">m²</span></p>
+                                </div>
+                                <div className="bg-slate-100 print:bg-white p-2 print:p-1 rounded-lg print:rounded-none border border-slate-200 print:border-slate-800 text-center">
+                                    <p className="text-[8px] print:text-[6px] font-bold text-slate-500 print:text-black uppercase tracking-widest">Capacité</p>
+                                    <p className="text-base print:text-xs font-extrabold text-slate-800 print:text-black">{totalPax}<span className="text-[10px] print:text-[8px] font-medium text-slate-500 print:text-black ml-0.5">pax</span></p>
+                                </div>
+                            </div>
+
+                            <div className="bg-white border border-slate-200 print:border-slate-800 rounded-lg print:rounded-none shadow-sm flex-1 flex flex-col min-h-0">
+                                <div className="bg-slate-100 print:bg-slate-800 px-3 print:px-2 py-1.5 print:py-1 border-b border-slate-200 print:border-slate-800 shrink-0">
+                                    <h3 className="font-bold text-slate-800 print:text-white uppercase tracking-widest text-[9px] print:text-[7px]">Légende & Détails</h3>
+                                </div>
+                                <div className="divide-y divide-slate-100 overflow-hidden flex-1 flex flex-col">
+                                    {spaces.slice(0, 10).map((s) => {
+                                        const typeInfo = SPACE_TYPES.find(t => t.value === s.type) || SPACE_TYPES[SPACE_TYPES.length - 1];
+                                        return (
+                                            <div key={s.id} className="px-3 py-1.5 flex items-center gap-2">
+                                                <div className={cn("w-3 h-3 rounded-sm border-[1.5px] shrink-0", typeInfo.color)} />
+                                                <div className="flex-1 min-w-0 flex items-center justify-between">
+                                                    <div className="flex-1 min-w-0 pr-1">
+                                                        <p className="font-bold text-slate-900 text-[9px] truncate">{s.name}</p>
+                                                        <p className="text-[7px] font-semibold text-slate-500 uppercase tracking-wider truncate">{s.type}</p>
+                                                    </div>
+                                                    <div className="flex gap-1.5 shrink-0 text-right">
+                                                        {(s.surface || 0) > 0 && <div className="text-[8px] font-medium text-slate-600">{s.surface}m²</div>}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+                                    {spaces.length > 10 && (
+                                        <div className="px-3 py-1.5 text-center text-[8px] text-slate-500 italic bg-slate-50">
+                                            + {spaces.length - 10} autre(s) zone(s)...
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                    
+                    <div className="mt-4 text-center border-t-2 border-slate-100 pt-3 shrink-0">
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Document généré automatiquement par URBAEVENTS Platform</p>
+                    </div>
+                </div>,
+                document.body
             )}
         </div>
     );

@@ -211,17 +211,19 @@ function formatDate(dateString: string | null) {
 
 // 1. Status Badge
 function TaskStatusBadge({ status }: { status: string }) {
-  const config: Record<string, string> = {
-    TODO: "bg-orange-500/15 text-orange-700 dark:text-orange-400 border-orange-200/50 dark:border-orange-900/50",
-    IN_PROGRESS: "bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-200/50 dark:border-blue-900/50",
-    DONE: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-200/50 dark:border-emerald-900/50",
+  const config: Record<string, { color: string, dot: string, label: string }> = {
+    TODO: { color: "bg-orange-500/10 text-orange-600 border-orange-500/20", dot: "bg-orange-500", label: "À faire" },
+    IN_PROGRESS: { color: "bg-blue-500/10 text-blue-600 border-blue-500/20", dot: "bg-blue-500", label: "En cours" },
+    DONE: { color: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20", dot: "bg-emerald-500", label: "Terminé" },
   };
-  const labels: Record<string, string> = { TODO: "À faire", IN_PROGRESS: "En cours", DONE: "Terminé" };
+
+  const style = config[status] || config.TODO;
 
   return (
-    <Badge variant="outline" className={cn("capitalize whitespace-nowrap font-medium", config[status] || config.TODO)}>
-      {labels[status] || status}
-    </Badge>
+    <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1.5 border w-fit", style.color)}>
+      <div className={cn("w-1.5 h-1.5 rounded-full", style.dot)} />
+      {style.label}
+    </span>
   );
 }
 
@@ -229,17 +231,17 @@ function TaskStatusBadge({ status }: { status: string }) {
 function TaskPriorityBadge({ priority }: { priority: string }) {
   const config: Record<string, { color: string, icon: React.ReactNode, label: string }> = {
     HIGH: {
-      color: "bg-red-500/15 text-red-700 dark:text-red-400 border-red-200/50 dark:border-red-900/50",
+      color: "text-red-600 bg-red-500/10 border border-red-500/20 shadow-sm",
       icon: <IconFlag className="h-3 w-3 fill-current" />,
       label: "Haute"
     },
     NORMAL: {
-      color: "bg-blue-500/15 text-blue-700 dark:text-blue-400 border-blue-200/50 dark:border-blue-900/50",
+      color: "text-blue-600 bg-blue-500/10 border border-transparent",
       icon: <IconFlag className="h-3 w-3" />,
       label: "Normale"
     },
     LOW: {
-      color: "bg-slate-500/15 text-slate-700 dark:text-slate-400 border-slate-200/50 dark:border-slate-800/50",
+      color: "text-slate-600 bg-slate-500/10 border border-transparent",
       icon: <IconFlag className="h-3 w-3" />,
       label: "Basse"
     },
@@ -248,7 +250,7 @@ function TaskPriorityBadge({ priority }: { priority: string }) {
   const style = config[priority] || config.NORMAL;
 
   return (
-    <div className={cn("flex items-center gap-1.5 text-[10px] uppercase font-bold px-2 py-0.5 rounded-full border w-fit", style.color)}>
+    <div className={cn("flex items-center gap-1.5 text-[10px] uppercase font-bold px-2.5 py-0.5 rounded-md w-fit", style.color)}>
       {style.icon}
       {style.label}
     </div>
@@ -258,16 +260,16 @@ function TaskPriorityBadge({ priority }: { priority: string }) {
 // 3. Department Badge
 function DepartmentBadge({ department }: { department: Task["department"] }) {
   const deptConfig = {
-    CREATIVE: { label: "Créatif", color: "bg-purple-500/15 text-purple-700 dark:text-purple-400 border-purple-200/50" },
-    TECHNICAL_OFFICE: { label: "Bureau Tech", color: "bg-cyan-500/15 text-cyan-700 dark:text-cyan-400 border-cyan-200/50" },
-    WORKSHOP: { label: "Atelier", color: "bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-200/50" },
-    FIELD: { label: "Terrain", color: "bg-green-500/15 text-green-700 dark:text-green-400 border-green-200/50" },
-    LOGISTICS: { label: "Logistique", color: "bg-slate-500/15 text-slate-700 dark:text-slate-400 border-slate-200/50" },
+    CREATIVE: { label: "Créatif", color: "bg-purple-500/10 text-purple-600 border border-purple-500/20" },
+    TECHNICAL_OFFICE: { label: "Bureau Tech", color: "bg-cyan-500/10 text-cyan-600 border border-cyan-500/20" },
+    WORKSHOP: { label: "Atelier", color: "bg-amber-500/10 text-amber-600 border border-amber-500/20" },
+    FIELD: { label: "Terrain", color: "bg-green-500/10 text-green-600 border border-green-500/20" },
+    LOGISTICS: { label: "Logistique", color: "bg-slate-500/10 text-slate-600 border border-slate-500/20" },
   };
   const config = deptConfig[department] || deptConfig.CREATIVE;
 
   return (
-    <div className={cn("text-[10px] px-2 py-0.5 rounded-full border w-fit font-semibold whitespace-nowrap", config.color)}>
+    <div className={cn("text-[10px] uppercase tracking-widest px-2.5 py-1 rounded-md w-fit font-bold whitespace-nowrap shadow-sm", config.color)}>
       {config.label}
     </div>
   );

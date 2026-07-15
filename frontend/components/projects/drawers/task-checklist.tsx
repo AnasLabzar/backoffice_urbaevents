@@ -19,13 +19,25 @@ import { Separator } from "@/components/ui/separator";
 import { FileUpload } from "@/components/ui/file-upload";
 import { IconChecklist, IconClock, IconLoader, IconCircleCheck, IconUpload, IconUser, IconFileDownload, IconListCheck } from "@tabler/icons-react";
 import { cn } from "@/lib/utils";
-import { GET_TASKS_BY_PROJECT_QUERY, ME_QUERY, PM_UPDATE_TASK_STATUS_MUTATION, TEAM_UPLOAD_TASK_V1_MUTATION, TEAM_UPLOAD_TASK_FINAL_MUTATION, GET_PROJECTS_FEED } from "@/lib/graphql/projects";
+import { GET_TASKS_BY_PROJECT_QUERY, ME_QUERY, PM_UPDATE_TASK_STATUS_MUTATION, PM_UPDATE_TASK_PRIORITY_MUTATION, TEAM_UPLOAD_TASK_V1_MUTATION, TEAM_UPLOAD_TASK_FINAL_MUTATION, GET_PROJECTS_FEED } from "@/lib/graphql/projects";
 
 const TASK_STATUS_BADGE_MAP: { [key: string]: { label: string; className: string; icon: React.ElementType } } = {
     TODO: { label: "À Faire", className: "bg-gray-100 text-gray-800 dark:bg-gray-800/30 dark:text-gray-300", icon: IconClock },
     IN_PROGRESS: { label: "En Cours", className: "bg-blue-100 text-blue-800 dark:bg-blue-800/30 dark:text-blue-300", icon: IconLoader },
     DONE: { label: "Terminé", className: "bg-green-100 text-green-800 dark:bg-green-800/30 dark:text-green-300", icon: IconCircleCheck },
 };
+
+function TaskPriorityBadge({ priority }: { priority: string }) {
+    if (!priority) return null;
+    const priorityMap: any = {
+        LOW: { label: "Basse", color: "bg-slate-100 text-slate-700 dark:bg-slate-800/50 dark:text-slate-300" },
+        NORMAL: { label: "Normale", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300" },
+        MEDIUM: { label: "Moyenne", color: "bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-300" },
+        HIGH: { label: "Haute", color: "bg-red-100 text-red-700 font-bold border-red-200 dark:bg-red-900/50 dark:text-red-300 dark:border-red-800" },
+    };
+    const info = priorityMap[priority] || priorityMap.NORMAL;
+    return <Badge variant="outline" className={cn("text-[10px] h-5 px-1.5", info.color)}>{info.label}</Badge>;
+}
 
 const getFileUrl = (filePath: string) => {
     if (!filePath) return "#";
@@ -71,6 +83,11 @@ export function TaskChecklistPanel({ project }: { project: any }) {
         onCompleted: () => toast.success("Status mis à jour!"),
         onError: (error) => toast.error(`Erreur: ${error.message}`),
         refetchQueries: [{ query: GET_TASKS_BY_PROJECT_QUERY, variables: { projectId: project.id } }, { query: GET_PROJECTS_FEED }],
+    });
+    const [updateTaskPriority, { loading: loadingPriorityUpdate }] = useMutation(PM_UPDATE_TASK_PRIORITY_MUTATION, {
+        onCompleted: () => toast.success("Priorité mise à jour!"),
+        onError: (error) => toast.error(`Erreur: ${error.message}`),
+        refetchQueries: [{ query: GET_TASKS_BY_PROJECT_QUERY, variables: { projectId: project.id } }],
     });
     const [uploadV1, { loading: loadingV1 }] = useMutation(TEAM_UPLOAD_TASK_V1_MUTATION, {
         onCompleted: () => { toast.success("V1 uploadée!"); setFileV1(null); },
@@ -151,6 +168,7 @@ export function TaskChecklistPanel({ project }: { project: any }) {
                                             <div className="flex flex-col items-start text-left gap-1">
                                                 <span className="font-semibold text-sm line-clamp-1">{task.description}</span>
                                                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                    <TaskPriorityBadge priority={task.priority} />
                                                     <div className="flex items-center gap-1">
                                                         <IconUser className="h-3 w-3" />
                                                         <span>{task.assignedTo?.name || 'Non assigné'}</span>
@@ -167,20 +185,41 @@ export function TaskChecklistPanel({ project }: { project: any }) {
                                         {canEdit ? (
                                             /* --- MODE ÉDITION (Assigné) --- */
                                             <div className="flex flex-col gap-5">
-                                                <div className="p-3 bg-muted/30 rounded-md border border-border/50">
-                                                    <Label className="mb-2 block">Changer le statut</Label>
-                                                    <Select
-                                                        value={task.status}
-                                                        onValueChange={(val) => updateTaskStatus({ variables: { taskId: task.id, status: val } })}
-                                                        disabled={loadingTaskUpdate}
-                                                    >
-                                                        <SelectTrigger className="w-full bg-background"><SelectValue /></SelectTrigger>
-                                                        <SelectContent>
-                                                            <SelectItem value="TODO">À Faire</SelectItem>
-                                                            <SelectItem value="IN_PROGRESS">En Cours</SelectItem>
-                                                            <SelectItem value="DONE">Terminé</SelectItem>
-                                                        </SelectContent>
-                                                    </Select>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                    <div className="p-3 bg-muted/30 rounded-md border border-border/50">
+                                                        <Label className="mb-2 block">Changer le statut</Label>
+                                                        <Select
+                                                            value={task.status}
+                                                            onValueChange={(val) => updateTaskStatus({ variables: { taskId: task.id, status: val } })}
+                                                            disabled={loadingTaskUpdate}
+                                                        >
+                                                            <SelectTrigger className="w-full bg-background"><SelectValue /></SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="TODO">À Faire</SelectItem>
+                                                                <SelectItem value="IN_PROGRESS">En Cours</SelectItem>
+                                                                <SelectItem value="DONE">Terminé</SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </div>
+                                                    
+                                                    {userRole === 'PROJECT_MANAGER' || userRole === 'ADMIN' ? (
+                                                        <div className="p-3 bg-muted/30 rounded-md border border-border/50">
+                                                            <Label className="mb-2 block">Changer la priorité</Label>
+                                                            <Select
+                                                                value={task.priority || 'NORMAL'}
+                                                                onValueChange={(val) => updateTaskPriority({ variables: { taskId: task.id, priority: val } })}
+                                                                disabled={loadingPriorityUpdate}
+                                                            >
+                                                                <SelectTrigger className="w-full bg-background"><SelectValue /></SelectTrigger>
+                                                                <SelectContent>
+                                                                    <SelectItem value="LOW">Basse</SelectItem>
+                                                                    <SelectItem value="NORMAL">Normale</SelectItem>
+                                                                    <SelectItem value="MEDIUM">Moyenne</SelectItem>
+                                                                    <SelectItem value="HIGH">Haute</SelectItem>
+                                                                </SelectContent>
+                                                            </Select>
+                                                        </div>
+                                                    ) : null}
                                                 </div>
 
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
